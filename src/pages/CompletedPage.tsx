@@ -7,14 +7,28 @@ import { isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
 type TimeFilter = 'all' | 'today' | 'this_week' | 'this_month';
 
 export const CompletedPage: React.FC = () => {
-  const { completedTasks, searchQuery } = useTaskStore();
+  const { completedTasks, projects, sections, searchQuery } = useTaskStore();
   const [filter, setFilter] = useState<TimeFilter>('all');
 
+  const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+  const sectionMap = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections]);
+
+  const enrichedCompletedTasks = useMemo(() => {
+    return completedTasks.map((t) => ({
+      ...t,
+      project: projectMap.get(t.project_id),
+      section: t.section_id ? sectionMap.get(t.section_id) : undefined,
+    }));
+  }, [completedTasks, projectMap, sectionMap]);
+
   const filtered = useMemo(() => {
-    return completedTasks.filter((task) => {
+    return enrichedCompletedTasks.filter((task) => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        if (!task.content.toLowerCase().includes(q)) return false;
+        const matchesContent = task.content.toLowerCase().includes(q);
+        const matchesProject = (task.project?.name || '').toLowerCase().includes(q);
+        const matchesSection = (task.section?.name || '').toLowerCase().includes(q);
+        if (!matchesContent && !matchesProject && !matchesSection) return false;
       }
 
       if (filter === 'all') return true;
@@ -32,7 +46,7 @@ export const CompletedPage: React.FC = () => {
       }
       return true;
     });
-  }, [completedTasks, filter, searchQuery]);
+  }, [enrichedCompletedTasks, filter, searchQuery]);
 
   return (
     <div className="space-y-5 max-w-5xl">

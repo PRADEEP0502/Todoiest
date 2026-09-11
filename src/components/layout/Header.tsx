@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTaskStore } from '../../store/TaskContext';
 import { formatRelativeTime } from '../../utils/dateUtils';
-import { Search, RefreshCw, Plus, Check } from 'lucide-react';
+import { Search, RefreshCw, Plus } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const {
@@ -20,14 +20,14 @@ export const Header: React.FC = () => {
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-30">
-      {/* Search Input */}
+      {/* Global Search Input */}
       <div className="relative flex-1 max-w-md">
         <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search tasks..."
+          placeholder="Search tasks, projects and sections..."
           className="w-full pl-9 pr-4 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
         />
       </div>
@@ -68,8 +68,8 @@ export const Header: React.FC = () => {
         <button
           onClick={() => syncNow()}
           disabled={isSyncing}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-sm disabled:opacity-50"
-          title="Synchronize tasks with Todoist"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-2xs disabled:opacity-50"
+          title="Synchronize projects, sections, and tasks with Todoist"
         >
           <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isSyncing ? 'animate-spin text-blue-600' : ''}`} />
           <span className="hidden sm:inline">

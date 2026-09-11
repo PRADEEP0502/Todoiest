@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Settings,
   CheckSquare2,
+  Folder,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -17,6 +18,8 @@ export const Sidebar: React.FC = () => {
     setCurrentTab,
     metrics,
     projects,
+    tasks,
+    selectedProjectId,
     setSelectedProjectId,
     isDemoMode,
     toggleDemoMode,
@@ -54,7 +57,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-60 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 select-none">
+    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 select-none">
       {/* Product Branding */}
       <div className="h-16 px-5 flex items-center gap-3 border-b border-slate-100">
         <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-blue-500/20 shrink-0">
@@ -71,43 +74,99 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Navigation Menu */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = currentTab === item.id;
-          return (
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        {/* Main Tabs */}
+        <div className="space-y-1">
+          {navItems.map((item) => {
+            const isActive = currentTab === item.id && selectedProjectId === null;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setSelectedProjectId(null);
+                  setCurrentTab(item.id);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  isActive
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className={isActive ? 'text-blue-600' : 'text-slate-400'}>
+                    {item.icon}
+                  </span>
+                  <span>{item.label}</span>
+                </div>
+
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span
+                    className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${
+                      isActive
+                        ? 'bg-blue-200/60 text-blue-800'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Dynamic Todoist Projects in Sidebar */}
+        <div className="space-y-1 pt-2 border-t border-slate-100">
+          <div className="px-3 flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Todoist Projects
+            </span>
             <button
-              key={item.id}
               onClick={() => {
                 setSelectedProjectId(null);
-                setCurrentTab(item.id);
+                setCurrentTab('projects');
               }}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                isActive
-                  ? 'bg-blue-50 text-blue-700 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-              }`}
+              className="text-[10px] text-blue-600 hover:underline font-semibold"
             >
-              <div className="flex items-center gap-2.5">
-                <span className={isActive ? 'text-blue-600' : 'text-slate-400'}>
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-              </div>
+              All
+            </button>
+          </div>
 
-              {item.badge !== undefined && item.badge > 0 && (
-                <span
-                  className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${
-                    isActive
-                      ? 'bg-blue-200/60 text-blue-800'
-                      : 'bg-slate-100 text-slate-600'
+          <div className="space-y-0.5">
+            {projects.map((project) => {
+              const isSelected = currentTab === 'projects' && selectedProjectId === project.id;
+              const projectTaskCount = tasks.filter(
+                (t) => !t.is_completed && t.project_id === project.id
+              ).length;
+
+              return (
+                <button
+                  key={project.id}
+                  onClick={() => {
+                    setSelectedProjectId(project.id);
+                    setCurrentTab('projects');
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-all ${
+                    isSelected
+                      ? 'bg-blue-50 text-blue-700 font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                   }`}
                 >
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
+                    <span className="truncate text-left">{project.name}</span>
+                  </div>
+
+                  {projectTaskCount > 0 && (
+                    <span className="text-[10px] font-mono text-slate-400 pl-1">
+                      {projectTaskCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Bottom Area: Settings & Mode */}

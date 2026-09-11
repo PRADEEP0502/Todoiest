@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTaskStore } from '../store/TaskContext';
 import { testTodoistConnection } from '../services/todoist';
 import { formatRelativeTime } from '../utils/dateUtils';
-import { Settings, Key, CheckCircle2, AlertCircle, RefreshCw, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Settings, Key, CheckCircle2, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
   const {

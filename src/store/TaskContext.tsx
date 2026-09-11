@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type {
   TodoistTask,
   TodoistProject,
+  TodoistSection,
   CreateTaskPayload,
   UpdateTaskPayload,
 } from '../types/todoist';
@@ -13,6 +14,7 @@ import type {
 } from '../types/dashboard';
 import {
   DEMO_PROJECTS,
+  DEMO_SECTIONS,
   getInitialDemoTasks,
   getInitialDemoCompletedTasks,
   fetchFullTodoistSync,
@@ -47,6 +49,7 @@ interface TaskContextType {
   tasks: TodoistTask[];
   completedTasks: TodoistTask[];
   projects: TodoistProject[];
+  sections: TodoistSection[];
   enrichedTasks: EnrichedTask[];
   metrics: DashboardMetrics;
 
@@ -57,9 +60,15 @@ interface TaskContextType {
   closeTaskDetail: () => void;
   
   isCreateModalOpen: boolean;
-  createModalDefaults: { projectId?: string; dueDate?: string; priority?: 1 | 2 | 3 | 4 };
-  openCreateModal: (defaults?: { projectId?: string; dueDate?: string; priority?: 1 | 2 | 3 | 4 }) => void;
+  createModalDefaults: { projectId?: string; sectionId?: string; dueDate?: string; priority?: 1 | 2 | 3 | 4 };
+  openCreateModal: (defaults?: { projectId?: string; sectionId?: string; dueDate?: string; priority?: 1 | 2 | 3 | 4 }) => void;
   closeCreateModal: () => void;
+
+  // Collapse state for projects & sections
+  collapsedSections: Record<string, boolean>;
+  toggleSectionCollapse: (sectionId: string) => void;
+  collapsedProjects: Record<string, boolean>;
+  toggleProjectCollapse: (projectId: string) => void;
 
   // Sync & Connection
   syncState: SyncState;
@@ -86,8 +95,9 @@ const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_TOKEN_KEY = 'taskflow_todoist_token';
 const LOCAL_STORAGE_DEMO_KEY = 'taskflow_is_demo_mode';
-const LOCAL_STORAGE_DEMO_TASKS_KEY = 'taskflow_demo_tasks_v3';
-const LOCAL_STORAGE_DEMO_COMPLETED_KEY = 'taskflow_demo_completed_v3';
+const LOCAL_STORAGE_DEMO_TASKS_KEY = 'taskflow_demo_tasks_v4';
+const LOCAL_STORAGE_DEMO_COMPLETED_KEY = 'taskflow_demo_completed_v4';
+const LOCAL_STORAGE_DEMO_SECTIONS_KEY = 'taskflow_demo_sections_v4';
 
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
@@ -98,9 +108,13 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [createModalDefaults, setCreateModalDefaults] = useState<{
     projectId?: string;
+    sectionId?: string;
     dueDate?: string;
     priority?: 1 | 2 | 3 | 4;
   }>({});
+
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
 
   const [apiToken, setApiTokenState] = useState<string>(() => {
     return localStorage.getItem(LOCAL_STORAGE_TOKEN_KEY) || import.meta.env.VITE_TODOIST_API_TOKEN || '';
@@ -143,6 +157,19 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return isDemoMode ? DEMO_PROJECTS : [];
   });
 
+  const [sections, setSections] = useState<TodoistSection[]>(() => {
+    if (isDemoMode) {
+      const saved = localStorage.getItem(LOCAL_STORAGE_DEMO_SECTIONS_KEY);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {}
+      }
+      return DEMO_SECTIONS;
+    }
+    return [];
+  });
+
   const [syncState, setSyncState] = useState<SyncState>({
     status: 'idle',
     lastSynced: new Date(),
@@ -162,11 +189,26 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const toggleSectionCollapse = useCallback((sectionId: string) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [sectionId]: !prev[sectionId],
+    }));
+  }, []);
+
+  const toggleProjectCollapse = useCallback((projectId: string) => {
+    setCollapsedProjects((prev) => ({
+      ...prev,
+      [projectId]: !prev[projectId],
+    }));
+  }, []);
+
   useEffect(() => {
     if (isDemoMode) {
       localStorage.setItem(LOCAL_STORAGE_DEMO_TASKS_KEY, JSON.stringify(tasks));
+      localStorage.setItem(LOCAL_STORAGE_DEMO_SECTIONS_KEY, JSON.stringify(sections));
     }
-  }, [tasks, isDemoMode]);
+  }, [tasks, sections, isDemoMode]);
 
   useEffect(() => {
     if (isDemoMode) {
@@ -185,8 +227,8 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       addToast({
         type: 'success',
-        title: 'Synced successfully',
-        message: 'Demo workspace data refreshed.',
+        title: 'Synced successfully ✓',
+        message: 'Demo projects, sections, and tasks refreshed.',
       });
       return;
     }
@@ -209,14 +251,15 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await fetchFullTodoistSync(apiToken);
       setTasks(result.tasks);
       setProjects(result.projects);
+      setSections(result.sections);
       setSyncState({
         status: 'success',
         lastSynced: result.timestamp,
       });
       addToast({
         type: 'success',
-        title: 'Synced successfully',
-        message: `Fetched ${result.tasks.length} tasks from Todoist.`,
+        title: 'Synced successfully ✓',
+        message: `Synced ${result.projects.length} projects, ${result.sections.length} sections, and ${result.tasks.length} tasks from Todoist.`,
       });
     } catch (error: any) {
       const errorMsg = error.message || 'Failed to sync with Todoist';
@@ -236,10 +279,11 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (isDemoMode) {
       if (projects.length === 0) setProjects(DEMO_PROJECTS);
+      if (sections.length === 0) setSections(DEMO_SECTIONS);
     } else if (apiToken) {
       syncNow();
     }
-  }, [isDemoMode, apiToken, syncNow, projects.length]);
+  }, [isDemoMode, apiToken, syncNow, projects.length, sections.length]);
 
   const setApiToken = useCallback((token: string) => {
     setApiTokenState(token);
@@ -253,12 +297,13 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(LOCAL_STORAGE_DEMO_KEY, String(enable));
       if (enable) {
         setProjects(DEMO_PROJECTS);
+        setSections(DEMO_SECTIONS);
         setTasks(getInitialDemoTasks());
         setCompletedTasks(getInitialDemoCompletedTasks());
         addToast({
           type: 'info',
           title: 'Switched to Demo Mode',
-          message: 'Loaded sample tasks for presentation.',
+          message: 'Loaded Todoist hierarchy demo dataset.',
         });
       } else {
         if (apiToken) {
@@ -266,6 +311,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setTasks([]);
           setProjects([]);
+          setSections([]);
           addToast({
             type: 'info',
             title: 'Live Todoist Mode',
@@ -283,6 +329,12 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return map;
   }, [projects]);
 
+  const sectionMap = useMemo(() => {
+    const map = new Map<string, TodoistSection>();
+    sections.forEach((s) => map.set(s.id, s));
+    return map;
+  }, [sections]);
+
   const enrichedTasks: EnrichedTask[] = useMemo(() => {
     return tasks.map((task) => {
       const isOverdue = isTaskOverdue(task.due?.date);
@@ -293,13 +345,14 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return {
         ...task,
         project: projectMap.get(task.project_id),
+        section: task.section_id ? sectionMap.get(task.section_id) : undefined,
         isOverdue,
         isToday,
         daysOverdue,
         priorityLabel: priorityMeta.displayLabel,
       };
     });
-  }, [tasks, projectMap]);
+  }, [tasks, projectMap, sectionMap]);
 
   const selectedTask = useMemo(() => {
     if (!selectedTaskId) return null;
@@ -310,11 +363,12 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return {
         ...completed,
         project: projectMap.get(completed.project_id),
+        section: completed.section_id ? sectionMap.get(completed.section_id) : undefined,
         priorityLabel: getPriorityMeta(completed.priority).displayLabel,
       };
     }
     return null;
-  }, [selectedTaskId, enrichedTasks, completedTasks, projectMap]);
+  }, [selectedTaskId, enrichedTasks, completedTasks, projectMap, sectionMap]);
 
   const metrics: DashboardMetrics = useMemo(() => {
     const activeTasks = tasks.filter((t) => !t.is_completed);
@@ -339,7 +393,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const openCreateModal = useCallback(
-    (defaults?: { projectId?: string; dueDate?: string; priority?: 1 | 2 | 3 | 4 }) => {
+    (defaults?: { projectId?: string; sectionId?: string; dueDate?: string; priority?: 1 | 2 | 3 | 4 }) => {
       setCreateModalDefaults(defaults || {});
       setIsCreateModalOpen(true);
     },
@@ -356,7 +410,8 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (isDemoMode) {
         const newTask: TodoistTask = {
           id: `task_demo_${Date.now()}`,
-          project_id: payload.project_id || projects[0]?.id || 'proj_work',
+          project_id: payload.project_id || projects[0]?.id || 'proj_projects_target',
+          section_id: payload.section_id || null,
           content: payload.content,
           description: payload.description || '',
           is_completed: false,
@@ -371,6 +426,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             : null,
           created_at: new Date().toISOString(),
+          comment_count: 0,
         };
 
         setTasks((prev) => [newTask, ...prev]);
@@ -415,6 +471,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 description: payload.description ?? t.description,
                 priority: payload.priority ?? t.priority,
                 project_id: payload.project_id ?? t.project_id,
+                section_id: payload.section_id !== undefined ? payload.section_id : t.section_id,
                 due: payload.due_date
                   ? {
                       date: payload.due_date,
@@ -579,6 +636,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     tasks,
     completedTasks,
     projects,
+    sections,
     enrichedTasks,
     metrics,
     selectedTaskId,
@@ -589,6 +647,10 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     createModalDefaults,
     openCreateModal,
     closeCreateModal,
+    collapsedSections,
+    toggleSectionCollapse,
+    collapsedProjects,
+    toggleProjectCollapse,
     syncState,
     isDemoMode,
     apiToken,

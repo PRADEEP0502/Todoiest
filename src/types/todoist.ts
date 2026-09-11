@@ -12,6 +12,7 @@ export interface TodoistTask {
   id: string;
   project_id: string;
   section_id?: string | null;
+  parent_id?: string | null;
   content: string;
   description: string;
   is_completed: boolean;
@@ -42,6 +43,13 @@ export interface TodoistProject {
   view_style?: 'list' | 'board';
 }
 
+export interface TodoistSection {
+  id: string;
+  project_id: string;
+  order: number;
+  name: string;
+}
+
 export interface TodoistLabel {
   id: string;
   name: string;
@@ -54,7 +62,8 @@ export interface CreateTaskPayload {
   content: string;
   description?: string;
   project_id?: string;
-  section_id?: string;
+  section_id?: string | null;
+  parent_id?: string | null;
   labels?: string[];
   priority?: 1 | 2 | 3 | 4;
   due_string?: string;
@@ -67,6 +76,7 @@ export interface UpdateTaskPayload {
   content?: string;
   description?: string;
   project_id?: string;
+  section_id?: string | null;
   labels?: string[];
   priority?: 1 | 2 | 3 | 4;
   due_string?: string;

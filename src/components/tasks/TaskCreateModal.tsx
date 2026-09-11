@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTaskStore } from '../../store/TaskContext';
 import { getISOFormattedDate } from '../../utils/dateUtils';
-import { X, Plus, Calendar, Flag, Folder } from 'lucide-react';
+import { X, Plus, Calendar, Flag, Folder, Layers } from 'lucide-react';
 import type { TaskPriorityLevel } from '../../types/dashboard';
 
 export const TaskCreateModal: React.FC = () => {
@@ -10,25 +10,41 @@ export const TaskCreateModal: React.FC = () => {
     closeCreateModal,
     createModalDefaults,
     projects,
+    sections,
     handleCreateTask,
   } = useTaskStore();
 
   const [title, setTitle] = useState('');
   const [projectId, setProjectId] = useState('');
+  const [sectionId, setSectionId] = useState('');
   const [priority, setPriority] = useState<TaskPriorityLevel>(1);
   const [dueDate, setDueDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Available sections for the currently selected project
+  const projectSections = sections.filter((s) => s.project_id === projectId);
+
   useEffect(() => {
     if (isCreateModalOpen) {
       setTitle('');
       setError(null);
-      setProjectId(createModalDefaults.projectId || projects[0]?.id || '');
+      const initialProjId = createModalDefaults.projectId || projects[0]?.id || '';
+      setProjectId(initialProjId);
+      setSectionId(createModalDefaults.sectionId || '');
       setPriority(createModalDefaults.priority || 1);
       setDueDate(createModalDefaults.dueDate || getISOFormattedDate(0));
     }
   }, [isCreateModalOpen, createModalDefaults, projects]);
+
+  // When project changes, update section if previous section belongs to another project
+  const handleProjectChange = (newProjId: string) => {
+    setProjectId(newProjId);
+    const validSection = sections.find((s) => s.project_id === newProjId && s.id === sectionId);
+    if (!validSection) {
+      setSectionId('');
+    }
+  };
 
   if (!isCreateModalOpen) return null;
 
@@ -45,6 +61,7 @@ export const TaskCreateModal: React.FC = () => {
     const success = await handleCreateTask({
       content: title.trim(),
       project_id: projectId || undefined,
+      section_id: sectionId || undefined,
       priority,
       due_date: dueDate || undefined,
     });
@@ -100,7 +117,7 @@ export const TaskCreateModal: React.FC = () => {
             />
           </div>
 
-          {/* Project & Priority */}
+          {/* Project & Section Row */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
@@ -108,7 +125,7 @@ export const TaskCreateModal: React.FC = () => {
               </label>
               <select
                 value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
+                onChange={(e) => handleProjectChange(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
               >
                 {projects.map((p) => (
@@ -119,6 +136,27 @@ export const TaskCreateModal: React.FC = () => {
               </select>
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5 text-slate-400" /> Section / Heading
+              </label>
+              <select
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
+              >
+                <option value="">(No Section / General)</option>
+                {projectSections.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Priority & Due Date Row */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
                 <Flag className="w-3.5 h-3.5 text-slate-400" /> Priority
@@ -134,19 +172,18 @@ export const TaskCreateModal: React.FC = () => {
                 <option value={1}>P4 · Normal (Slate)</option>
               </select>
             </div>
-          </div>
 
-          {/* Due Date */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" /> Due Date
-            </label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
-            />
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" /> Due Date
+              </label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-blue-500 bg-white"
+              />
+            </div>
           </div>
 
           {/* Actions */}

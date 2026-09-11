@@ -1,4 +1,4 @@
-import type { TodoistTask, TodoistProject } from './todoist';
+import type { TodoistTask, TodoistProject, TodoistSection } from './todoist';
 
 export type NavigationTab =
   | 'dashboard'
@@ -25,6 +25,7 @@ export interface SyncState {
 
 export interface EnrichedTask extends TodoistTask {
   project?: TodoistProject;
+  section?: TodoistSection;
   isOverdue?: boolean;
   isToday?: boolean;
   daysOverdue?: number;

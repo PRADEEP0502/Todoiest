@@ -2,7 +2,7 @@ import React from 'react';
 import { useTaskStore } from '../store/TaskContext';
 import { TaskItemRow } from '../components/tasks/TaskItemRow';
 import { isTaskToday, isTaskTomorrow, parseTaskDueDate } from '../utils/dateUtils';
-import { format, isThisWeek, isFuture } from 'date-fns';
+import { isThisWeek } from 'date-fns';
 import { Clock, Plus, CheckCircle2 } from 'lucide-react';
 import type { EnrichedTask } from '../types/dashboard';
 
@@ -15,7 +15,8 @@ export const UpcomingPage: React.FC = () => {
       const q = searchQuery.toLowerCase();
       return (
         t.content.toLowerCase().includes(q) ||
-        (t.project?.name || '').toLowerCase().includes(q)
+        (t.project?.name || '').toLowerCase().includes(q) ||
+        (t.section?.name || '').toLowerCase().includes(q)
       );
     }
     return true;
