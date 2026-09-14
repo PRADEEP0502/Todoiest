@@ -1,98 +1,50 @@
-import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
-export interface ModalProps {
-  isOpen: boolean;
+interface ModalProps {
+  title: ReactNode;
   onClose: () => void;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
-  className?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+  width?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({
-  isOpen,
-  onClose,
-  title,
-  description,
-  children,
-  footer,
-  maxWidth = 'lg',
-  className = '',
-}) => {
+export function Modal({ title, onClose, children, footer, width = 'max-w-lg' }: ModalProps) {
+  const panel = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
+    const previous = document.activeElement as HTMLElement | null;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
     };
-
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
-
+    document.addEventListener('keydown', onKey);
+    const first = panel.current?.querySelector<HTMLElement>('[data-autofocus]') ?? panel.current;
+    first?.focus();
     return () => {
-      document.body.style.overflow = '';
-      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', onKey);
+      previous?.focus?.();
     };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
-  const maxWidthClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
-  };
+  }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/25 sm:items-start sm:p-6 sm:pt-[10vh]" onMouseDown={onClose}>
       <div
-        className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-
-      {/* Modal Dialog */}
-      <div
-        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-slate-900 border border-slate-800 rounded-xl shadow-2xl shadow-black/60 overflow-hidden transform transition-all z-10 my-8 ${className}`}
+        ref={panel}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
+        onMouseDown={(e) => e.stopPropagation()}
+        className={`flex max-h-[92vh] w-full ${width} flex-col rounded-t-xl bg-surface shadow-pop outline-none sm:rounded-xl`}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-slate-800/80">
-          <div>
-            {title && (
-              <h2 className="text-base font-semibold text-slate-100 tracking-tight">{title}</h2>
-            )}
-            {description && (
-              <p className="text-xs text-slate-400 mt-1">{description}</p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 p-1.5 rounded-lg transition-colors ml-4 shrink-0"
-            aria-label="Close modal"
-          >
-            <X className="w-4 h-4" />
+        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+          <div className="min-w-0 text-[13px] text-ink-2">{title}</div>
+          <button type="button" className="icon-btn -mr-2" onClick={onClose} aria-label="Close">
+            <X size={16} />
           </button>
         </div>
-
-        {/* Content */}
-        <div className="p-5">{children}</div>
-
-        {/* Footer */}
-        {footer && (
-          <div className="flex items-center justify-end gap-3 px-5 py-3.5 bg-slate-950/40 border-t border-slate-800/80">
-            {footer}
-          </div>
-        )}
+        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3">{footer}</div>}
       </div>
     </div>
   );
-};
+}

@@ -1,108 +1,108 @@
-export const TODOIST_BASE_URL = 'https://api.todoist.com/rest/v2';
+import type { Paginated } from '../../types/todoist';
+
+export const TODOIST_API_BASE = 'https://api.todoist.com/api/v1';
+
+/** Page size for list endpoints (the API maximum is 200). */
+const PAGE_LIMIT = 200;
+/** Safety stop so a misbehaving cursor can never loop forever. */
+const MAX_PAGES = 50;
 
 export class TodoistApiError extends Error {
-  public statusCode?: number;
-  public details?: any;
+  readonly status: number;
 
-  constructor(message: string, statusCode?: number, details?: any) {
+  constructor(message: string, status: number) {
     super(message);
     this.name = 'TodoistApiError';
-    this.statusCode = statusCode;
-    this.details = details;
+    this.status = status;
   }
 }
 
-export interface RequestOptions extends RequestInit {
-  token?: string;
-  params?: Record<string, string | number | boolean | undefined>;
+type Query = Record<string, string | number | undefined | null>;
+
+interface RequestOptions {
+  method?: 'GET' | 'POST' | 'DELETE';
+  query?: Query;
+  body?: unknown;
+  signal?: AbortSignal;
 }
 
-export async function todoistFetch<T>(
-  endpoint: string,
-  options: RequestOptions = {}
-): Promise<T> {
-  const { token, params, headers, ...customConfig } = options;
+function describeStatus(status: number): string {
+  switch (status) {
+    case 400:
+      return 'Todoist rejected the request (400).';
+    case 401:
+      return 'Todoist token is invalid or expired. Update it in Settings.';
+    case 403:
+      return 'You do not have access to this Todoist resource.';
+    case 404:
+      return 'Not found in Todoist. It may have been deleted — sync to refresh.';
+    case 429:
+      return 'Todoist rate limit reached. Wait a minute and sync again.';
+    default:
+      return status >= 500 ? 'Todoist is having trouble right now. Try again shortly.' : `Todoist request failed (${status}).`;
+  }
+}
 
-  // Retrieve token from options, env variable, or localStorage
-  const activeToken =
-    token ||
-    (typeof window !== 'undefined' ? localStorage.getItem('todoist_api_token') : null) ||
-    import.meta.env.VITE_TODOIST_API_TOKEN;
+/** A thin, token-bound HTTP client for the Todoist API v1. */
+export class TodoistClient {
+  private readonly token: string;
 
-  if (!activeToken) {
-    throw new TodoistApiError('Todoist API token is not configured.', 401);
+  constructor(token: string) {
+    this.token = token.trim();
   }
 
-  let url = endpoint.startsWith('http') ? endpoint : `${TODOIST_BASE_URL}${endpoint}`;
-
-  if (params) {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        searchParams.append(key, String(value));
-      }
-    });
-    const queryString = searchParams.toString();
-    if (queryString) {
-      url += (url.includes('?') ? '&' : '?') + queryString;
+  async request<T>(path: string, { method = 'GET', query, body, signal }: RequestOptions = {}): Promise<T> {
+    const url = new URL(TODOIST_API_BASE + path);
+    for (const [key, value] of Object.entries(query ?? {})) {
+      if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
     }
-  }
 
-  const defaultHeaders: Record<string, string> = {
-    'Authorization': `Bearer ${activeToken.trim()}`,
-    'Content-Type': 'application/json',
-  };
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-  try {
-    const response = await fetch(url, {
-      ...customConfig,
-      headers: {
-        ...defaultHeaders,
-        ...headers,
-      },
-    });
-
-    // 204 No Content (e.g. Delete, Close)
-    if (response.status === 204) {
-      return {} as T;
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      throw new TodoistApiError('Could not reach Todoist. Check your internet connection.', 0);
     }
 
     if (!response.ok) {
-      let errorData;
+      let detail = '';
       try {
-        errorData = await response.json();
+        const data = await response.json();
+        detail = typeof data?.error === 'string' ? data.error : '';
       } catch {
-        errorData = await response.text();
+        // Non-JSON error body; fall back to the status description.
       }
-
-      let errorMessage = `Todoist API Error (${response.status}): ${response.statusText}`;
-      if (response.status === 401) {
-        errorMessage = 'Invalid or expired Todoist API token. Please verify your token in Settings.';
-      } else if (response.status === 403) {
-        errorMessage = 'Access forbidden. You do not have permission for this resource.';
-      } else if (response.status === 404) {
-        errorMessage = 'Requested Todoist task or resource was not found.';
-      } else if (response.status === 429) {
-        errorMessage = 'Todoist API rate limit exceeded. Please wait a moment before trying again.';
-      } else if (typeof errorData === 'string' && errorData) {
-        errorMessage = errorData;
-      } else if (errorData && errorData.error) {
-        errorMessage = errorData.error;
-      }
-
-      throw new TodoistApiError(errorMessage, response.status, errorData);
+      const message = describeStatus(response.status);
+      throw new TodoistApiError(detail && response.status === 400 ? `${message} ${detail}` : message, response.status);
     }
 
-    return (await response.json()) as T;
-  } catch (error: any) {
-    if (error instanceof TodoistApiError) {
-      throw error;
+    if (response.status === 204) return undefined as T;
+    const text = await response.text();
+    return (text ? JSON.parse(text) : undefined) as T;
+  }
+
+  /** Follows `next_cursor` until every page of a `{ results, next_cursor }` list is loaded. */
+  async listAll<T>(path: string, query: Query = {}, signal?: AbortSignal): Promise<T[]> {
+    const all: T[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const data: Paginated<T> = await this.request<Paginated<T>>(path, {
+        query: { ...query, limit: PAGE_LIMIT, cursor },
+        signal,
+      });
+      all.push(...data.results);
+      cursor = data.next_cursor;
+      if (!cursor) break;
     }
-    // Network or offline error
-    throw new TodoistApiError(
-      error.message || 'Network error: Unable to connect to Todoist API.',
-      0,
-      error
-    );
+    return all;
   }
 }

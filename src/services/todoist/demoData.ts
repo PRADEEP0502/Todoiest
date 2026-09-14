@@ -1,384 +1,393 @@
-import type { TodoistProject, TodoistSection, TodoistTask } from '../../types/todoist';
-import { getISOFormattedDate } from '../../utils/dateUtils';
+import type {
+  ApiPriority,
+  TodoistCollaborator,
+  TodoistProject,
+  TodoistSection,
+  TodoistTask,
+  WorkspaceSnapshot,
+} from '../../types/todoist';
+import { completedWindowStart } from './dataSource';
 
-export const DEMO_PROJECTS: TodoistProject[] = [
-  {
-    id: 'proj_projects_target',
-    name: 'PROJECTS 🎯🎯',
-    color: 'blue',
-    order: 1,
-    is_favorite: true,
-  },
-  {
-    id: 'proj_manpower',
-    name: 'MANPOWER 🎯',
-    color: 'orange',
-    order: 2,
-    is_favorite: true,
-  },
-  {
-    id: 'proj_rv',
-    name: 'RV',
-    color: 'green',
-    order: 3,
-    is_favorite: false,
-  },
-  {
-    id: 'proj_md_pradeep',
-    name: 'MD & PRADEEP',
-    color: 'charcoal',
-    order: 4,
-    is_favorite: true,
-  },
-  {
-    id: 'proj_personal',
-    name: 'Personal & Operations',
-    color: 'violet',
-    order: 5,
-    is_favorite: false,
-  },
-];
+// Sample workspace for presentations. Shaped exactly like Todoist API v1 data so it flows
+// through the same code paths as live data. Section names repeat across projects on purpose.
 
-export const DEMO_SECTIONS: TodoistSection[] = [
-  // Sections inside PROJECTS 🎯🎯
-  {
-    id: 'sec_onboard',
-    project_id: 'proj_projects_target',
-    name: 'ON BOARD PROCESS',
-    order: 1,
-  },
-  {
-    id: 'sec_website',
-    project_id: 'proj_projects_target',
-    name: 'WEBSITE',
-    order: 2,
-  },
-  {
-    id: 'sec_tech_infra',
-    project_id: 'proj_projects_target',
-    name: 'TECH INFRASTRUCTURE',
-    order: 3,
-  },
-
-  // Sections inside MANPOWER 🎯
-  {
-    id: 'sec_mp_sourcing',
-    project_id: 'proj_manpower',
-    name: 'SOURCING & RECRUITMENT',
-    order: 1,
-  },
-  {
-    id: 'sec_mp_interviews',
-    project_id: 'proj_manpower',
-    name: 'INTERVIEWS & SELECTION',
-    order: 2,
-  },
-
-  // Sections inside MD & PRADEEP
-  {
-    id: 'sec_md_agenda',
-    project_id: 'proj_md_pradeep',
-    name: 'EXECUTIVE AGENDA',
-    order: 1,
-  },
-  {
-    id: 'sec_md_initiatives',
-    project_id: 'proj_md_pradeep',
-    name: 'STRATEGIC INITIATIVES',
-    order: 2,
-  },
-  {
-    id: 'sec_md_approvals',
-    project_id: 'proj_md_pradeep',
-    name: 'PENDING APPROVALS',
-    order: 3,
-  },
-
-  // Sections inside RV
-  {
-    id: 'sec_rv_general',
-    project_id: 'proj_rv',
-    name: 'GENERAL REVIEW',
-    order: 1,
-  },
-];
-
-export function getInitialDemoTasks(): TodoistTask[] {
-  const today = getISOFormattedDate(0);
-  const tomorrow = getISOFormattedDate(1);
-  const friday = getISOFormattedDate(2);
-  const nextWeek = getISOFormattedDate(5);
-  const overdue1 = getISOFormattedDate(-1);
-  const overdue2 = getISOFormattedDate(-2);
-  const overdue3 = getISOFormattedDate(-4);
-
-  return [
-    // --- ON BOARD PROCESS (inside PROJECTS 🎯🎯) ---
-    {
-      id: 'task_demo_101',
-      project_id: 'proj_projects_target',
-      section_id: 'sec_onboard',
-      content: 'Develop LMS-style Onboarding System',
-      description: 'Design onboarding milestone pathways for new joinees.',
-      is_completed: false,
-      priority: 4, // P1
-      order: 1,
-      due: { date: today, string: 'Today 10:00 AM' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
-      labels: ['System'],
-      comment_count: 3,
-    },
-    {
-      id: 'task_demo_102',
-      project_id: 'proj_projects_target',
-      section_id: 'sec_onboard',
-      content: 'Review digital induction checklist and employee handbook',
-      description: 'Ensure compliance with revised HR policy guidelines.',
-      is_completed: false,
-      priority: 3, // P2
-      order: 2,
-      due: { date: today, string: 'Today 2:30 PM' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
-      labels: [],
-      comment_count: 1,
-    },
-    {
-      id: 'task_demo_103',
-      project_id: 'proj_projects_target',
-      section_id: 'sec_onboard',
-      content: 'Automate welcome email sequences & IT asset provisioning',
-      description: 'Integrate Google Workspace and Slack auto-provisioning.',
-      is_completed: false,
-      priority: 2, // P3
-      order: 3,
-      due: { date: tomorrow, string: 'Tomorrow' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
-      labels: [],
-    },
-
-    // --- WEBSITE (inside PROJECTS 🎯🎯) ---
-    {
-      id: 'task_demo_104',
-      project_id: 'proj_projects_target',
-      section_id: 'sec_website',
-      content: 'Finalize corporate website redesign wireframes',
-      description: 'Approve typography, hero section copy, and MD message.',
-      is_completed: false,
-      priority: 4, // P1
-      order: 4,
-      due: { date: today, string: 'Today 4:00 PM' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
-      labels: ['Design'],
-      comment_count: 5,
-    },
-    {
-      id: 'task_demo_105',
-      project_id: 'proj_projects_target',
-      section_id: 'sec_website',
-      content: 'SEO optimization & mobile responsiveness audit',
-      description: 'Lighthouse score targeting 95+ performance rating.',
-      is_completed: false,
-      priority: 2, // P3
-      order: 5,
-      due: { date: friday, string: 'Friday' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
-      labels: [],
-    },
-
-    // --- TECH INFRASTRUCTURE (inside PROJECTS 🎯🎯) ---
-    {
-      id: 'task_demo_106',
-      project_id: 'proj_projects_target',
-      section_id: 'sec_tech_infra',
-      content: 'Deploy multi-region cloud backup architecture',
-      description: 'Ensure automated daily snapshots with 15-minute RPO.',
-      is_completed: false,
-      priority: 3, // P2
-      order: 6,
-      due: { date: nextWeek, string: 'Next Week' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
-      labels: [],
-    },
-
-    // --- SOURCING & RECRUITMENT (inside MANPOWER 🎯) ---
-    {
-      id: 'task_demo_201',
-      project_id: 'proj_manpower',
-      section_id: 'sec_mp_sourcing',
-      content: 'Manpower requirements sources & consultant vendor review',
-      description: 'Finalize contracts with top 3 executive search agencies.',
-      is_completed: false,
-      priority: 4, // P1
-      order: 7,
-      due: { date: today, string: 'Today 11:30 AM' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
-      labels: ['Urgent'],
-      comment_count: 2,
-    },
-    {
-      id: 'task_demo_202',
-      project_id: 'proj_manpower',
-      section_id: 'sec_mp_sourcing',
-      content: 'Publish job description for Senior Operations Manager',
-      description: 'Highlight warehouse automation and vendor management background.',
-      is_completed: false,
-      priority: 2, // P3
-      order: 8,
-      due: { date: tomorrow, string: 'Tomorrow' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
-      labels: [],
-    },
-
-    // --- INTERVIEWS & SELECTION (inside MANPOWER 🎯) ---
-    {
-      id: 'task_demo_203',
-      project_id: 'proj_manpower',
-      section_id: 'sec_mp_interviews',
-      content: 'Interview shortlisted VP of Engineering candidates',
-      description: 'Technical evaluation and leadership culture alignment.',
-      is_completed: false,
-      priority: 4, // P1
-      order: 9,
-      due: { date: today, string: 'Today 5:00 PM' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
-      labels: ['Interview'],
-      comment_count: 4,
-    },
-
-    // --- EXECUTIVE AGENDA (inside MD & PRADEEP) ---
-    {
-      id: 'task_demo_301',
-      project_id: 'proj_md_pradeep',
-      section_id: 'sec_md_agenda',
-      content: 'Prepare Weekly Review Presentation for MD Sir',
-      description: 'Consolidate project progress, blocker items, and resource allocation.',
-      is_completed: false,
-      priority: 4, // P1
-      order: 10,
-      due: { date: today, string: 'Today 9:30 AM' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
-      labels: ['Review'],
-      comment_count: 6,
-    },
-    {
-      id: 'task_demo_302',
-      project_id: 'proj_md_pradeep',
-      section_id: 'sec_md_initiatives',
-      content: 'Formulate Q4 Growth Strategy & Budget Plan',
-      description: 'Align business expansion metrics with operational team.',
-      is_completed: false,
-      priority: 3, // P2
-      order: 11,
-      due: { date: friday, string: 'Friday' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
-      labels: [],
-    },
-    {
-      id: 'task_demo_303',
-      project_id: 'proj_md_pradeep',
-      section_id: 'sec_md_approvals',
-      content: 'Sign off on new vendor billing terms & SLA',
-      description: 'Requires MD authorization on non-standard payment schedule.',
-      is_completed: false,
-      priority: 3, // P2
-      order: 12,
-      due: { date: overdue1, string: 'Yesterday' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
-      labels: ['Urgent'],
-      comment_count: 2,
-    },
-
-    // --- RV PROJECT ---
-    {
-      id: 'task_demo_401',
-      project_id: 'proj_rv',
-      section_id: 'sec_rv_general',
-      content: 'Review fleet maintenance log & insurance renewals',
-      description: 'Check vehicle inspection certificates across branches.',
-      is_completed: false,
-      priority: 3, // P2
-      order: 13,
-      due: { date: overdue2, string: '2 days ago' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 7).toISOString(),
-      labels: [],
-    },
-    {
-      id: 'task_demo_402',
-      project_id: 'proj_rv',
-      section_id: 'sec_rv_general',
-      content: 'Audit monthly fuel expense reconciliation',
-      description: 'Reconcile corporate card charges with GPS mileage.',
-      is_completed: false,
-      priority: 2, // P3
-      order: 14,
-      due: { date: overdue3, string: '4 days ago' },
-      created_at: new Date(Date.now() - 3600000 * 24 * 9).toISOString(),
-      labels: [],
-    },
-  ];
+interface TaskSpec {
+  content: string;
+  /** Days from today; omit for no due date. */
+  due?: number;
+  time?: string;
+  p?: 1 | 2 | 3 | 4; // UI priority (P1 = most urgent)
+  labels?: string[];
+  notes?: number;
+  who?: string;
+  description?: string;
+  sub?: TaskSpec[];
 }
 
-export function getInitialDemoCompletedTasks(): TodoistTask[] {
-  const today = getISOFormattedDate(0);
-  const yesterday = getISOFormattedDate(-1);
-  const day2 = getISOFormattedDate(-2);
+interface SectionSpec {
+  name: string;
+  tasks: TaskSpec[];
+}
 
-  return [
-    {
-      id: 'task_comp_1',
-      project_id: 'proj_projects_target',
-      section_id: 'sec_onboard',
-      content: 'Publish internal knowledge base & wiki guide',
-      description: 'Setup Notion / internal portal with standard SOPs.',
-      is_completed: true,
-      priority: 3,
-      order: 101,
-      due: { date: today },
-      created_at: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
-      completed_at: `${today}T11:20:00Z`,
-      labels: [],
-    },
-    {
-      id: 'task_comp_2',
-      project_id: 'proj_md_pradeep',
-      section_id: 'sec_md_approvals',
-      content: 'Approve ISO 27001 Security Audit scope & milestone plan',
-      description: 'Signed off with external auditing firm.',
-      is_completed: true,
-      priority: 4,
-      order: 102,
-      due: { date: today },
-      created_at: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
-      completed_at: `${today}T14:45:00Z`,
-      labels: [],
-    },
-    {
-      id: 'task_comp_3',
-      project_id: 'proj_manpower',
-      section_id: 'sec_mp_interviews',
-      content: 'Extend offer letter to Lead Software Architect',
-      description: 'Candidate accepted offer. Starting date confirmed.',
-      is_completed: true,
-      priority: 4,
-      order: 103,
-      due: { date: yesterday },
-      created_at: new Date(Date.now() - 3600000 * 24 * 8).toISOString(),
-      completed_at: `${yesterday}T16:00:00Z`,
-      labels: [],
-    },
-    {
-      id: 'task_comp_4',
-      project_id: 'proj_rv',
-      section_id: 'sec_rv_general',
-      content: 'Finalize quarterly equipment maintenance contract',
-      description: 'Signed with authorized service partner.',
-      is_completed: true,
-      priority: 3,
-      order: 104,
-      due: { date: day2 },
-      created_at: new Date(Date.now() - 3600000 * 24 * 10).toISOString(),
-      completed_at: `${day2}T10:30:00Z`,
-      labels: [],
-    },
-  ];
+interface ProjectSpec {
+  id: string;
+  name: string;
+  color: string;
+  workspace?: string;
+  parent?: string;
+  inbox?: boolean;
+  shared?: boolean;
+  /** Tasks that sit directly in the project, outside any section. */
+  tasks?: TaskSpec[];
+  sections?: SectionSpec[];
+  /** Completed tasks: [content, section index or -1, days ago]. */
+  done?: [string, number, number][];
+}
+
+const PEOPLE: TodoistCollaborator[] = [
+  { id: 'u-pradeep', name: 'Pradeep', email: 'pradeep@example.com' },
+  { id: 'u-md', name: 'MD', email: 'md@example.com' },
+  { id: 'u-kavya', name: 'Kavya S', email: 'kavya@example.com' },
+  { id: 'u-arun', name: 'Arun M', email: 'arun@example.com' },
+];
+
+const PROJECTS: ProjectSpec[] = [
+  {
+    id: 'p-inbox',
+    name: 'Inbox',
+    color: 'grey',
+    inbox: true,
+    tasks: [
+      { content: 'Call CA regarding GST filing', due: 0, p: 2, labels: ['call'] },
+      { content: 'Share board meeting slides with directors', due: 2 },
+      { content: 'Book travel for Chennai site visit', due: 5, p: 3 },
+    ],
+    done: [['Renew office internet plan', -1, 1]],
+  },
+  {
+    id: 'p-rv',
+    name: 'RV',
+    color: 'blue',
+    workspace: 'ws-jpm',
+    shared: true,
+    sections: [
+      {
+        name: 'Site Visits',
+        tasks: [
+          { content: 'Inspect RV plant safety compliance', due: 0, time: '10:30', p: 1, labels: ['urgent'], notes: 2, who: 'u-arun' },
+          { content: 'Prepare checklist for Coimbatore unit visit', due: 1, p: 2, who: 'u-arun' },
+          { content: 'Review last quarter visit reports', due: 6 },
+        ],
+      },
+      {
+        name: 'Client Follow-ups',
+        tasks: [
+          { content: 'Send revised quotation to Sri Lakshmi Traders', due: -2, p: 1, notes: 4, who: 'u-pradeep' },
+          { content: 'Follow up on pending PO from Apex Motors', due: 0, p: 2, labels: ['call'] },
+          { content: 'Schedule review call with dealer network', due: 3, p: 3 },
+        ],
+      },
+      {
+        name: 'Documentation',
+        tasks: [
+          { content: 'Update RV product catalogue', due: 9, p: 4 },
+          { content: 'Archive signed contracts in shared drive' },
+        ],
+      },
+    ],
+    done: [
+      ['Collect feedback from Madurai dealer', 1, 0],
+      ['Finalise RV service agreement', 2, 3],
+      ['Site visit — Hosur warehouse', 0, 12],
+    ],
+  },
+  {
+    id: 'p-manpower',
+    name: 'MANPOWER 🎯',
+    color: 'orange',
+    workspace: 'ws-jpm',
+    shared: true,
+    sections: [
+      {
+        name: 'Hiring Pipeline',
+        tasks: [
+          { content: 'Manpower requirements sources', due: 1, p: 1, notes: 3, who: 'u-kavya' },
+          { content: 'Shortlist candidates for Plant Supervisor', due: 0, p: 2, labels: ['review'], who: 'u-kavya' },
+          { content: 'Approve job description for Sales Executive', due: -1, p: 2, who: 'u-md' },
+          { content: 'Coordinate with placement agencies', due: 4 },
+        ],
+      },
+      {
+        name: 'Training',
+        tasks: [
+          { content: 'Plan safety training for new joinees', due: 7, p: 3 },
+          { content: 'Collect trainer feedback forms', due: 2 },
+        ],
+      },
+      {
+        name: 'Follow-ups',
+        tasks: [
+          { content: 'Check offer acceptance status', due: 1, labels: ['waiting'] },
+          { content: 'Remind HR about attendance policy draft', due: 11 },
+        ],
+      },
+    ],
+    done: [
+      ['Interview panel for Accounts Assistant', 0, 0],
+      ['Publish openings on job portals', 0, 4],
+      ['Induction for 6 new operators', 1, 9],
+    ],
+  },
+  {
+    id: 'p-projects',
+    name: 'PROJECTS 🎯🎯',
+    color: 'violet',
+    workspace: 'ws-jpm',
+    shared: true,
+    sections: [
+      {
+        name: 'ON BOARD PROCESS',
+        tasks: [
+          {
+            content: 'Develop LMS-style Onboarding System',
+            due: 1,
+            p: 1,
+            notes: 5,
+            who: 'u-pradeep',
+            description: 'Self-paced modules, quizzes and completion tracking for every new employee.',
+            sub: [
+              { content: 'Define module list with HR', due: 0, p: 2 },
+              { content: 'Record welcome video from MD', due: 3 },
+              { content: 'Choose LMS platform', due: 2, p: 2, labels: ['review'] },
+            ],
+          },
+          { content: 'Create employee handbook v2', due: 5, p: 2, who: 'u-kavya' },
+          { content: 'Set up day-one IT access checklist', due: 0, p: 3 },
+          { content: 'Buddy programme guidelines', due: 8 },
+          { content: 'Onboarding feedback survey', due: 14, p: 4 },
+        ],
+      },
+      {
+        name: 'WEBSITE',
+        tasks: [
+          { content: 'Finalise homepage copy', due: -3, p: 1, labels: ['urgent'], notes: 1, who: 'u-pradeep' },
+          { content: 'Approve new product photography', due: 2, p: 2, who: 'u-md' },
+          { content: 'Add careers page with open roles', due: 6, p: 3 },
+          { content: 'Set up contact form email routing', due: 10 },
+        ],
+      },
+      {
+        name: 'MANPOWER',
+        tasks: [
+          { content: 'Estimate project staffing for Q4', due: 4, p: 2 },
+          { content: 'Identify contract engineers for ERP rollout', due: 12 },
+        ],
+      },
+      {
+        name: 'ERP Rollout',
+        tasks: [],
+      },
+    ],
+    done: [
+      ['Kick-off meeting for onboarding system', 0, 1],
+      ['Domain renewal', 1, 2],
+      ['Wireframes signed off', 1, 6],
+      ['Vendor demo — ERP option A', 3, 15],
+    ],
+  },
+  {
+    id: 'p-finance',
+    name: 'Finance & Accounts',
+    color: 'green',
+    workspace: 'ws-jpm',
+    sections: [
+      {
+        name: 'Monthly Close',
+        tasks: [
+          { content: 'Review cash flow statement', due: 0, p: 1, labels: ['finance'] },
+          { content: 'Reconcile vendor ledgers', due: 3, p: 3, labels: ['finance'] },
+        ],
+      },
+      { name: 'Audits', tasks: [{ content: 'Share documents with internal auditor', due: 13, p: 2 }] },
+    ],
+    done: [['Approve September salaries', 0, 0]],
+  },
+  {
+    id: 'p-vendor',
+    name: 'Vendor Payments',
+    color: 'green',
+    workspace: 'ws-jpm',
+    parent: 'p-finance',
+    tasks: [
+      { content: 'Clear pending invoices above ₹5L', due: -1, p: 1, notes: 2 },
+      { content: 'Negotiate 60-day credit with steel supplier', due: 8, p: 3 },
+    ],
+  },
+  {
+    id: 'p-guide',
+    name: 'Todoist Team Guide',
+    color: 'charcoal',
+    sections: [
+      {
+        name: 'Getting Started',
+        tasks: [
+          { content: 'Invite team members to the workspace' },
+          { content: 'Create a project for each department' },
+        ],
+      },
+      { name: 'Tips', tasks: [{ content: 'Use sections to group related tasks' }] },
+    ],
+  },
+  {
+    id: 'p-md',
+    name: 'MD & PRADEEP',
+    color: 'red',
+    shared: true,
+    sections: [
+      {
+        name: 'Weekly Review',
+        tasks: [
+          { content: 'Prepare weekly status summary', due: 0, time: '17:00', p: 1, who: 'u-pradeep', notes: 1 },
+          { content: 'Review pending approvals list', due: 0, p: 2, who: 'u-md' },
+        ],
+      },
+      {
+        name: 'Decisions Pending',
+        tasks: [
+          { content: 'Decide on second shift for RV plant', due: 2, p: 1, notes: 6, who: 'u-md' },
+          { content: 'Approve marketing budget for Q4', due: 4, p: 2, labels: ['finance'], who: 'u-md' },
+          { content: 'New office lease — go / no-go', due: 16 },
+        ],
+      },
+      {
+        name: 'Follow-ups',
+        tasks: [
+          { content: 'Bank loan renewal paperwork', due: -4, p: 2, labels: ['waiting'] },
+          { content: 'Check status of insurance claim', due: 5 },
+        ],
+      },
+    ],
+    done: [
+      ['Weekly status summary', 0, 7],
+      ['Quarterly board pack', 1, 5],
+      ['Approve travel policy update', 1, 18],
+    ],
+  },
+];
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+function localDate(base: Date, offsetDays: number): string {
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + offsetDays);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+const toApiPriority = (p: 1 | 2 | 3 | 4 = 4) => (5 - p) as ApiPriority;
+
+export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
+  const projects: TodoistProject[] = [];
+  const sections: TodoistSection[] = [];
+  const tasks: TodoistTask[] = [];
+  const completed: TodoistTask[] = [];
+  let taskSeq = 0;
+  const windowStart = completedWindowStart(now);
+
+  const makeTask = (
+    spec: TaskSpec,
+    projectId: string,
+    sectionId: string | null,
+    parentId: string | null,
+    order: number,
+  ): void => {
+    const id = `demo-task-${++taskSeq}`;
+    tasks.push({
+      id,
+      project_id: projectId,
+      section_id: sectionId,
+      parent_id: parentId,
+      content: spec.content,
+      description: spec.description ?? '',
+      priority: toApiPriority(spec.p),
+      due:
+        spec.due === undefined
+          ? null
+          : {
+              date: localDate(now, spec.due) + (spec.time ? `T${spec.time}:00` : ''),
+              string: spec.time ? `at ${spec.time}` : '',
+              is_recurring: false,
+              lang: 'en',
+            },
+      labels: spec.labels ?? [],
+      responsible_uid: spec.who ?? null,
+      note_count: spec.notes ?? 0,
+      child_order: order,
+      checked: false,
+      added_at: now.toISOString(),
+      completed_at: null,
+    });
+    spec.sub?.forEach((child, i) => makeTask(child, projectId, sectionId, id, i + 1));
+  };
+
+  PROJECTS.forEach((spec, pIndex) => {
+    projects.push({
+      id: spec.id,
+      name: spec.name,
+      color: spec.color,
+      parent_id: spec.parent ?? null,
+      child_order: pIndex + 1,
+      is_shared: spec.shared ?? false,
+      inbox_project: spec.inbox ?? false,
+      workspace_id: spec.workspace ?? null,
+    });
+
+    spec.tasks?.forEach((t, i) => makeTask(t, spec.id, null, null, i + 1));
+
+    const sectionIds: string[] = [];
+    spec.sections?.forEach((section, sIndex) => {
+      const id = `${spec.id}-s${sIndex + 1}`;
+      sectionIds.push(id);
+      sections.push({ id, project_id: spec.id, name: section.name, section_order: sIndex + 1 });
+      section.tasks.forEach((t, i) => makeTask(t, spec.id, id, null, i + 1));
+    });
+
+    spec.done?.forEach(([content, sectionIndex, daysAgo], i) => {
+      const minutesEarlier = 20 + ((pIndex * 5 + i) * 37) % 240;
+      const at = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000 - minutesEarlier * 60 * 1000);
+      if (at < windowStart) return;
+      completed.push({
+        id: `demo-done-${spec.id}-${i}`,
+        project_id: spec.id,
+        section_id: sectionIndex >= 0 ? (sectionIds[sectionIndex] ?? null) : null,
+        parent_id: null,
+        content,
+        description: '',
+        priority: 1,
+        due: null,
+        labels: [],
+        responsible_uid: null,
+        note_count: 0,
+        child_order: i + 1,
+        checked: true,
+        added_at: null,
+        completed_at: at.toISOString(),
+      });
+    });
+  });
+
+  return {
+    user: { id: 'u-pradeep', email: 'pradeep@example.com', full_name: 'Pradeep', inbox_project_id: 'p-inbox' },
+    workspaces: [{ id: 'ws-jpm', name: 'JPM' }],
+    projects,
+    sections,
+    tasks,
+    completed,
+    labels: ['urgent', 'call', 'review', 'waiting', 'finance'].map((name, i) => ({
+      id: `demo-label-${i}`,
+      name,
+      color: 'grey',
+      order: i,
+    })),
+    collaborators: Object.fromEntries(PEOPLE.map((p) => [p.id, p])),
+    syncedAt: now.toISOString(),
+  };
 }

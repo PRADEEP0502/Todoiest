@@ -1,93 +1,133 @@
-// Todoist REST API v2 entity types
+// Entity shapes returned by the Todoist API v1 (https://developer.todoist.com/api/v1/).
+// Only the fields the dashboard uses are typed; the API returns more.
+
+/** Todoist API priority: 4 = P1 (urgent) … 1 = P4 (normal). */
+export type ApiPriority = 1 | 2 | 3 | 4;
 
 export interface TodoistDue {
-  date: string; // YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS
+  /** `YYYY-MM-DD`, or `YYYY-MM-DDTHH:MM:SS[Z]` when the task has a time. */
+  date: string;
   string?: string;
+  lang?: string;
   is_recurring?: boolean;
-  datetime?: string;
-  timezone?: string;
+  timezone?: string | null;
 }
 
-export interface TodoistTask {
+export interface TodoistUser {
   id: string;
-  project_id: string;
-  section_id?: string | null;
-  parent_id?: string | null;
-  content: string;
-  description: string;
-  is_completed: boolean;
-  labels: string[];
-  order: number;
-  priority: 1 | 2 | 3 | 4; // 1: Natural (P4), 2: High (P3), 3: Very High (P2), 4: Urgent (P1)
-  due?: TodoistDue | null;
-  url?: string;
-  comment_count?: number;
-  created_at: string;
-  creator_id?: string;
-  assignee_id?: string | null;
-  completed_at?: string | null;
+  email: string;
+  full_name: string;
+  inbox_project_id?: string | null;
+  avatar_medium?: string | null;
+}
+
+export interface TodoistWorkspace {
+  id: string;
+  name: string;
 }
 
 export interface TodoistProject {
   id: string;
   name: string;
-  color?: string;
-  parent_id?: string | null;
-  order: number;
-  comment_count?: number;
-  is_shared?: boolean;
+  color: string;
+  parent_id: string | null;
+  child_order: number;
+  is_archived?: boolean;
+  is_deleted?: boolean;
   is_favorite?: boolean;
-  is_inbox_project?: boolean;
-  is_team_inbox?: boolean;
-  url?: string;
-  view_style?: 'list' | 'board';
+  is_shared?: boolean;
+  inbox_project?: boolean;
+  view_style?: string;
+  /** Present only on projects that belong to a team workspace. */
+  workspace_id?: string | null;
+  folder_id?: string | null;
 }
 
 export interface TodoistSection {
   id: string;
   project_id: string;
-  order: number;
   name: string;
+  section_order: number;
+  is_archived?: boolean;
+  is_deleted?: boolean;
+}
+
+export interface TodoistTask {
+  id: string;
+  project_id: string;
+  section_id: string | null;
+  parent_id: string | null;
+  content: string;
+  description: string;
+  priority: ApiPriority;
+  due: TodoistDue | null;
+  labels: string[];
+  responsible_uid: string | null;
+  note_count: number;
+  child_order: number;
+  checked: boolean;
+  is_deleted?: boolean;
+  added_at: string | null;
+  completed_at: string | null;
 }
 
 export interface TodoistLabel {
   id: string;
   name: string;
-  color?: string;
-  order?: number;
-  is_favorite?: boolean;
+  color: string;
+  order: number | null;
 }
 
-export interface CreateTaskPayload {
+export interface TodoistCollaborator {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface Paginated<T> {
+  results: T[];
+  next_cursor: string | null;
+}
+
+export interface CreateTaskInput {
   content: string;
   description?: string;
   project_id?: string;
   section_id?: string | null;
   parent_id?: string | null;
-  labels?: string[];
-  priority?: 1 | 2 | 3 | 4;
-  due_string?: string;
+  priority?: ApiPriority;
+  /** `YYYY-MM-DD` */
   due_date?: string;
-  due_datetime?: string;
-  assignee_id?: string;
+  labels?: string[];
 }
 
-export interface UpdateTaskPayload {
+export interface UpdateTaskInput {
   content?: string;
   description?: string;
-  project_id?: string;
-  section_id?: string | null;
-  labels?: string[];
-  priority?: 1 | 2 | 3 | 4;
-  due_string?: string;
+  priority?: ApiPriority;
+  /** `YYYY-MM-DD`. Use `due_string: "no date"` to clear. */
   due_date?: string;
-  due_datetime?: string;
-  assignee_id?: string;
+  due_string?: string;
+  labels?: string[];
 }
 
-export interface TodoistUser {
-  id: string;
-  name: string;
-  email: string;
-  avatar_url?: string;
+export interface MoveTaskInput {
+  project_id?: string;
+  section_id?: string;
+  parent_id?: string;
+}
+
+/** Everything the dashboard renders, fetched in one sync. */
+export interface WorkspaceSnapshot {
+  user: TodoistUser;
+  workspaces: TodoistWorkspace[];
+  projects: TodoistProject[];
+  sections: TodoistSection[];
+  tasks: TodoistTask[];
+  /** Tasks completed since the start of the current month (or week, if earlier). */
+  completed: TodoistTask[];
+  labels: TodoistLabel[];
+  /** Keyed by user id, merged across shared projects. */
+  collaborators: Record<string, TodoistCollaborator>;
+  syncedAt: string;
 }

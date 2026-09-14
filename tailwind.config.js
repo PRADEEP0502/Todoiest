@@ -1,31 +1,32 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  darkMode: 'class',
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#f0f7ff',
-          100: '#e0effe',
-          200: '#bae0fd',
-          300: '#7cc5fb',
-          400: '#36a5f7',
-          500: '#0c87eb',
-          600: '#026bc9',
-          700: '#0355a2',
-          800: '#074884',
-          900: '#0c3d6e',
-          950: '#082749',
-        },
+        canvas: '#f7f6f3',
+        surface: '#ffffff',
+        sidebar: '#f1f0ec',
+        hover: '#ecebe6',
+        line: '#e6e4de',
+        'line-strong': '#d3d0c8',
+        ink: { DEFAULT: '#1d1c1a', 2: '#57534e', 3: '#8b867e' },
+        accent: { DEFAULT: '#1f6f5c', hover: '#185b4b', soft: '#e6f0ec' },
+        danger: { DEFAULT: '#b42318', soft: '#fdecea' },
+        p1: '#d0342c',
+        p2: '#c26a00',
+        p3: '#2f6bd8',
       },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+      },
+      fontSize: {
+        '2xs': ['11px', '16px'],
+      },
+      boxShadow: {
+        pop: '0 12px 32px -8px rgba(29, 28, 26, 0.18), 0 2px 6px rgba(29, 28, 26, 0.06)',
       },
     },
   },
   plugins: [],
-}
+};

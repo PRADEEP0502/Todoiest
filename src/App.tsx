@@ -1,71 +1,71 @@
-import React from 'react';
-import { TaskProvider, useTaskStore } from './store/TaskContext';
+import { useEffect, useRef } from 'react';
+import { Toasts } from './components/common/Toasts';
+import { MobileNav, TopBar } from './components/layout/TopBar';
 import { Sidebar } from './components/layout/Sidebar';
-import { Header } from './components/layout/Header';
-import { TaskDetailDrawer } from './components/tasks/TaskDetailDrawer';
-import { TaskCreateModal } from './components/tasks/TaskCreateModal';
-import { ToastContainer } from './components/common/Toast';
-
-// Pages
+import { TaskDialog } from './components/tasks/TaskDialog';
+import { useRoute, type Route } from './hooks/useRoute';
+import { CompletedPage } from './pages/CompletedPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { ProjectDetailPage } from './pages/ProjectDetailPage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { TodayPage } from './pages/TodayPage';
 import { UpcomingPage } from './pages/UpcomingPage';
-import { ProjectsPage } from './pages/ProjectsPage';
-import { CompletedPage } from './pages/CompletedPage';
-import { SettingsPage } from './pages/SettingsPage';
+import { UiProvider } from './store/ui';
+import { WorkspaceProvider } from './store/workspace';
 
-const MainLayout: React.FC = () => {
-  const { currentTab } = useTaskStore();
+function Page({ route }: { route: Route }) {
+  switch (route.name) {
+    case 'today':
+      return <TodayPage />;
+    case 'upcoming':
+      return <UpcomingPage />;
+    case 'projects':
+      return <ProjectsPage />;
+    case 'project':
+      return <ProjectDetailPage projectId={route.projectId} sectionId={route.sectionId} />;
+    case 'completed':
+      return <CompletedPage />;
+    case 'settings':
+      return <SettingsPage />;
+    default:
+      return <DashboardPage />;
+  }
+}
 
-  const renderTab = () => {
-    switch (currentTab) {
-      case 'dashboard':
-        return <DashboardPage />;
-      case 'today':
-        return <TodayPage />;
-      case 'upcoming':
-        return <UpcomingPage />;
-      case 'projects':
-        return <ProjectsPage />;
-      case 'completed':
-        return <CompletedPage />;
-      case 'settings':
-        return <SettingsPage />;
-      default:
-        return <DashboardPage />;
-    }
-  };
+function Shell() {
+  const route = useRoute();
+  const main = useRef<HTMLElement>(null);
+  const routeKey = route.name === 'project' ? `project:${route.projectId}` : route.name;
+
+  useEffect(() => {
+    main.current?.scrollTo({ top: 0 });
+  }, [routeKey]);
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
-      {/* Left Sidebar */}
-      <Sidebar />
-
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        {/* Top Header */}
-        <Header />
-
-        {/* Scrollable Content View */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {renderTab()}
+    <div className="flex h-full overflow-hidden">
+      <Sidebar route={route} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar route={route} />
+        <main ref={main} className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[920px] px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
+            <Page route={route} />
+          </div>
         </main>
+        <MobileNav route={route} />
       </div>
-
-      {/* Overlays */}
-      <TaskDetailDrawer />
-      <TaskCreateModal />
-      <ToastContainer />
+      <TaskDialog />
+      <Toasts />
     </div>
-  );
-};
-
-export function App() {
-  return (
-    <TaskProvider>
-      <MainLayout />
-    </TaskProvider>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <UiProvider>
+      <WorkspaceProvider>
+        <Shell />
+      </WorkspaceProvider>
+    </UiProvider>
+  );
+}

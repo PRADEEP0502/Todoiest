@@ -1,7 +1,5 @@
-export * from './client';
-export * from './tasks';
-export * from './projects';
-export * from './sections';
-export * from './labels';
-export * from './sync';
-export * from './demoData';
+export { TodoistApiError, TodoistClient, TODOIST_API_BASE } from './client';
+export { SYNC_STEP_LABEL, completedWindowStart, type DataMode, type DataSource, type SyncStep } from './dataSource';
+export { createLiveSource, verifyToken } from './liveSource';
+export { createDemoSource } from './demoSource';
+export { createDemoSnapshot } from './demoData';

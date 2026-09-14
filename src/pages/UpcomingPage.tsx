@@ -1,108 +1,54 @@
-import React from 'react';
-import { useTaskStore } from '../store/TaskContext';
-import { TaskItemRow } from '../components/tasks/TaskItemRow';
-import { isTaskToday, isTaskTomorrow, parseTaskDueDate } from '../utils/dateUtils';
-import { isThisWeek } from 'date-fns';
-import { Clock, Plus, CheckCircle2 } from 'lucide-react';
-import type { EnrichedTask } from '../types/dashboard';
+import { CalendarDays } from 'lucide-react';
+import { Gate } from '../components/common/Gate';
+import { Count, EmptyState, PageHeader } from '../components/common/ui';
+import { GroupedTasks } from '../components/tasks/GroupedTasks';
+import { useNow } from '../hooks/useNow';
+import { daysBetween, dueDateKey, toDateKey, upcomingBucket, type DateBucket } from '../lib/dates';
+import { byPriorityThenTime } from '../lib/stats';
+import type { TodoistTask } from '../types/todoist';
 
-export const UpcomingPage: React.FC = () => {
-  const { enrichedTasks, openCreateModal, searchQuery } = useTaskStore();
-
-  const activeTasks = enrichedTasks.filter((t) => {
-    if (t.is_completed) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        t.content.toLowerCase().includes(q) ||
-        (t.project?.name || '').toLowerCase().includes(q) ||
-        (t.section?.name || '').toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
-
-  // Group tasks
-  const tomorrowTasks: EnrichedTask[] = [];
-  const thisWeekTasks: EnrichedTask[] = [];
-  const laterTasks: EnrichedTask[] = [];
-
-  activeTasks.forEach((t) => {
-    if (!t.due?.date) {
-      laterTasks.push(t);
-      return;
-    }
-    if (isTaskToday(t.due.date)) {
-      // today tasks can be checked in today view
-      return;
-    }
-    if (isTaskTomorrow(t.due.date)) {
-      tomorrowTasks.push(t);
-      return;
-    }
-    const d = parseTaskDueDate(t.due.date);
-    if (d && isThisWeek(d)) {
-      thisWeekTasks.push(t);
-    } else {
-      laterTasks.push(t);
-    }
-  });
-
-  const sections = [
-    { title: 'Tomorrow', tasks: tomorrowTasks },
-    { title: 'This Week', tasks: thisWeekTasks },
-    { title: 'Later & Future', tasks: laterTasks },
-  ].filter((s) => s.tasks.length > 0);
+export function UpcomingPage() {
+  const now = useNow(60_000);
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-blue-600" />
-            <span>Upcoming</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Tasks scheduled for upcoming days.
-          </p>
-        </div>
+    <Gate>
+      {({ snapshot }) => {
+        const todayKey = toDateKey(now);
+        const buckets = new Map<string, { bucket: DateBucket; tasks: TodoistTask[]; singleDay: boolean }>();
+        const dated = snapshot.tasks
+          .map((task) => ({ task, key: dueDateKey(task.due) }))
+          .filter((x): x is { task: TodoistTask; key: string } => x.key !== null && daysBetween(todayKey, x.key) >= 0)
+          .sort((a, b) => a.key.localeCompare(b.key));
 
-        <button
-          onClick={() => openCreateModal()}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Task</span>
-        </button>
-      </div>
+        for (const { task, key } of dated) {
+          const bucket = upcomingBucket(key, now);
+          let entry = buckets.get(bucket.id);
+          if (!entry) buckets.set(bucket.id, (entry = { bucket, tasks: [], singleDay: daysBetween(todayKey, key) < 7 }));
+          entry.tasks.push(task);
+        }
 
-      {sections.length === 0 ? (
-        <div className="p-10 text-center bg-white border border-slate-200 rounded-xl text-slate-500">
-          <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-800">No upcoming tasks</p>
-          <p className="text-xs text-slate-500 mt-0.5">Plan ahead by adding upcoming deliverables.</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {sections.map((sec) => (
-            <div key={sec.title} className="space-y-2.5">
-              <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
-                <h2 className="text-sm font-bold text-slate-800">{sec.title}</h2>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
-                  {sec.tasks.length}
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {sec.tasks.map((task) => (
-                  <TaskItemRow key={task.id} task={task} />
+        return (
+          <>
+            <PageHeader title="Upcoming" subtitle={`${dated.length} scheduled task${dated.length === 1 ? '' : 's'}`} />
+            {buckets.size === 0 ? (
+              <EmptyState icon={<CalendarDays size={26} />} title="Nothing scheduled">Tasks with due dates will appear here, grouped by day.</EmptyState>
+            ) : (
+              <div className="space-y-5">
+                {[...buckets.values()].map(({ bucket, tasks, singleDay }) => (
+                  <section key={bucket.id}>
+                    <div className="mb-2 flex items-baseline gap-2 border-b border-line pb-1.5">
+                      <h2 className={`text-[15px] font-semibold ${bucket.id === 'today' ? 'text-accent' : 'text-ink'}`}>{bucket.label}</h2>
+                      {bucket.sublabel && <span className="text-[12px] text-ink-3">{bucket.sublabel}</span>}
+                      <Count className="ml-auto">{tasks.length}</Count>
+                    </div>
+                    <GroupedTasks tasks={tasks} viewKey={`upcoming:${bucket.id}`} compare={byPriorityThenTime} hideDue={singleDay} />
+                  </section>
                 ))}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            )}
+          </>
+        );
+      }}
+    </Gate>
   );
-};
+}

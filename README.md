@@ -1,126 +1,69 @@
-# TaskFlow — Enterprise Productivity Dashboard for Todoist
+# Workspace — Todoist Dashboard
 
-**TaskFlow** is an executive-grade, production-quality productivity dashboard engineered on top of the **Todoist REST API v2**. Designed specifically for executive briefings and high-level decision makers, TaskFlow transforms granular task tracking into operational velocity metrics, strategic workload analysis, and priority timelines.
+A clean dashboard that shows an entire Todoist workspace — **Projects → Sections → Tasks → Subtasks** — and lets you complete, edit, add and delete tasks. Todoist is the only source of truth: nothing is hardcoded and there is no separate task database.
 
----
+## Run it
 
-## 🏛 Architecture
-
-```
-Todoist (Cloud)
-      ▲
-      │ (REST API v2: Tasks, Projects, Labels)
-      ▼
-TaskFlow Service Layer (src/services/todoist)
-      ▲
-      │ (Reactive State & Optimistic Mutations)
-      ▼
-TaskFlow Central Store (src/store/TaskContext)
-      ▲
-      │ (Typed Hooks & Filter State)
-      ▼
-Executive UI (Overview, Today, Projects, Analytics, Settings)
-```
-
-- **Single Source of Truth**: Todoist remains the authoritative system of record. Every creation, update, priority adjustment, or completion is synced directly with Todoist endpoints.
-- **Service Layer Isolation**: All HTTP operations, authentication token parsing, rate-limit recovery, and payload schemas are strictly isolated within `src/services/todoist/`.
-- **Zero Hardcoding**: Tokens are configured securely via browser LocalStorage or environment variables (`VITE_TODOIST_API_TOKEN`).
-- **Interactive Presentation Mode**: High-fidelity Demo Mode with persistent local state allows flawless demonstrations without requiring live credentials.
-
----
-
-## 🚀 Key Features & Workspaces
-
-1. **Executive Overview Dashboard**
-   - **5 Top KPIs**: Total Tasks, Due Today, Overdue, Completed, Completion Rate.
-   - **Weekly Productivity Trend**: Delivery velocity chart across Monday through Sunday.
-   - **Task Distribution**: Proportional donut breakdown across status categories.
-   - **Priority 1 Urgent Focus**: Dedicated executive action queue for mission-critical objectives.
-   - **Today's Execution Agenda**: Real-time snapshot of deliverables due today.
-
-2. **Today Workspace**
-   - **Important (P1)**: High-impact priority 1 tasks highlighted with clear badges.
-   - **Tasks**: Standard operational assignments scheduled for today.
-   - **Completed Today**: Live audit of tasks delivered today.
-
-3. **My Tasks**
-   - Comprehensive active task repository with dynamic search, multi-priority filtering, project dropdowns, and column sorting.
-   - Quick-add bar for zero-friction task capture.
-
-4. **Upcoming Timeline**
-   - Chronological horizons grouped by *Today*, *Tomorrow*, *This Week*, *Later/Future*, and *No Due Date*.
-
-5. **Overdue Control Center**
-   - Immediate escalation view showing original target dates, elapsed overdue days, priorities, and assigned projects.
-
-6. **Completed Archive**
-   - Historical audit log with time filters (*Today*, *This Week*, *This Month*, *All Time*).
-
-7. **Projects Portfolio**
-   - Project cards showing live workload distribution, active vs completed counts, and percentage progress bars.
-   - Full project drill-down view with segregated active deliverables and completed archives.
-
-8. **Productivity & Velocity Analytics**
-   - 6 quantitative metrics including average daily completion velocity.
-   - Recharts-powered business visualizations:
-     * Weekly Completed vs Pending
-     * Monthly Output Velocity
-     * Project Task Allocation
-     * Priority Distribution (P1 Urgent to P4 Normal)
-
-9. **Integration & System Settings**
-   - Todoist API Token configuration with hide/show toggle.
-   - Connection testing & live sync status relative timers.
-   - One-click toggle between **Demo Mode** and **Live Todoist Mode**.
-   - User preferences (Default view, date format, auto-sync cadence).
-
-10. **Interactive Task Management**
-    - Quick priority switcher (P1 Urgent, P2 High, P3 Medium, P4 Normal).
-    - Slide-over Task Detail Drawer with editable properties, creation timestamps, completion timestamps, and copyable task IDs.
-    - Modal task creation with quick date presets (*Today*, *Tomorrow*, *+1 Wk*), priority buttons, and label tagging.
-
----
-
-## 🎯 Demo Presentation Flow (For MD Briefing)
-
-1. **Open Overview**: Highlight top KPI cards (Total Tasks, Due Today, Overdue, Completed, Completion Rate) and Weekly Productivity trends.
-2. **Open Today**: Show prioritized split between Priority 1 Urgent tasks and standard items.
-3. **Create a Task**: Click `Add Task`, select Priority 1, assign project and due date. Show it appearing instantly in the dashboard.
-4. **Complete a Task**: Click the checkbox on any task; observe the task smoothly transition to Completed, and notice the Completion Rate and Analytics update in real time.
-5. **Open Projects**: Demonstrate project-level delivery percentages and drill into a specific project.
-6. **Open Analytics**: Review velocity trajectories, monthly output, and priority distribution.
-7. **Open Settings**: Show the mode switcher (Demo Mode vs Live Todoist) and Todoist API connection interface.
-
----
-
-## 🛠 Tech Stack
-
-- **React 18** + **TypeScript**
-- **Vite**
-- **Tailwind CSS**
-- **Lucide React** (Consistent enterprise icon set)
-- **Recharts** (Clean business-grade charts)
-- **date-fns** (Strict date math & relative formatting)
-
----
-
-## 📦 Getting Started
-
-### 1. Install Dependencies
 ```bash
 npm install
+npm run dev        # http://localhost:5173
+npm test           # unit + API-contract tests
+npm run build      # production build in dist/
 ```
 
-### 2. Run Development Server
-```bash
-npm run dev
+Opens in **Demo Mode** with sample data. To use the real account, go to **Settings**, paste a Todoist API token (Todoist → Settings → Integrations → Developer) and click **Connect Todoist**. The badge switches to **LIVE TODOIST**. You can also set `VITE_TODOIST_API_TOKEN` in `.env.local`.
+
+> The token is kept in this browser's localStorage and requests go straight from the browser to Todoist (Todoist allows CORS). Only deploy this where the people who can open it are allowed to see the workspace.
+
+## Pages
+
+| Page | What it shows |
+| --- | --- |
+| Dashboard | Greeting, Total / Today / Overdue / Completed counts, Today's Work, project list with progress |
+| Today | Tasks due today grouped Project → Section; overdue tasks in a separate block (collapsed by default) |
+| Upcoming | Tasks by date (Today, Tomorrow, weekdays, Next week, months), each grouped Project → Section |
+| Projects | Every project, grouped by team workspace and Personal, with sub-projects |
+| Project | All sections in Todoist order, task counts, tasks and nested subtasks, collapse/expand per section |
+| Completed | Completed tasks with project, section and time; Today / This Week / This Month; reopen |
+| Settings | Connect/disconnect Todoist, switch to Demo Mode, greeting name |
+
+Global search (`Ctrl K` or `/`) finds projects, sections and tasks and shows where each one lives, e.g. `PROJECTS 🎯🎯 → ON BOARD PROCESS → Develop LMS-style Onboarding System`.
+
+Collapsed projects, sections and subtasks are remembered per device, keyed by Todoist ID.
+
+## How data flows
+
+```
+Todoist API v1  ──►  src/services/todoist/  ──►  src/store/workspace.tsx  ──►  src/lib/hierarchy.ts  ──►  pages
+                     (only place with HTTP)       (sync + task actions)        (ID-based tree)
 ```
 
-### 3. Build for Production
-```bash
-npm run build
+- **API:** [Todoist API v1](https://developer.todoist.com/api/v1/) (`https://api.todoist.com/api/v1`). The older REST v2 API has been replaced by v1.
+- **Sync** loads everything fresh: `/user`, `/workspaces`, `/projects`, `/sections`, `/tasks`, `/tasks/completed/by_completion_date`, `/labels`, and `/projects/{id}/collaborators` for assignee names. Every list follows `next_cursor` until all pages are loaded. New, renamed, moved and deleted items show up on the next sync with no code changes.
+- **When it syncs:** on open, every 5 minutes while the tab is visible, when you come back to the tab, and when you press **Sync**. The button shows each step (Fetching projects… → Fetching sections… → Fetching tasks… → ✓ Sync complete).
+- **Task actions:** `POST /tasks` (add), `POST /tasks/{id}` (edit), `POST /tasks/{id}/move` (change project or section), `POST /tasks/{id}/close` (complete, with Undo → `/reopen`), `DELETE /tasks/{id}`. Completing a task updates the screen immediately and re-syncs if Todoist returns an error. A sync that overlaps a task change is retried so the change isn't overwritten.
+- **Relationships use IDs only** (`project_id`, `section_id`, `parent_id`). Section names can repeat across projects. A task whose section or parent task no longer exists is shown under "No section" or as a top-level task, so it never disappears.
+- **Priorities:** Todoist's API stores P1 as `4`. The dashboard converts in one place (`src/lib/priority.ts`).
+- **Demo vs live:** each is a separate `DataSource`. Switching mode throws away the previous data, so demo and live data never mix. Demo changes last until the page reloads.
+
+## Project layout
+
+```
+src/
+  services/todoist/   client (auth, errors, pagination), endpoints, live + demo data sources
+  lib/                hierarchy index, dates, search, stats, priority — pure and unit-tested
+  store/              workspace state (sync, task actions), UI state (dialog, toasts), settings
+  components/         layout (sidebar, top bar, sync status), tasks (row, tree, grouped list, dialog), search
+  pages/              Dashboard, Today, Upcoming, Projects, ProjectDetail, Completed, Settings
 ```
 
----
+## Tests
 
-*TaskFlow — Enterprise Productivity Intelligence.*
+`npm test` covers:
+
+- Building the hierarchy: workspace grouping, sub-projects, section order, duplicate section names, subtasks, missing sections/parents, project cycles
+- Dynamic changes: new project → section → task appears; renames, moves and deletions are reflected
+- A large workspace (80 projects, 640 sections, 9,600 tasks) built quickly and counted correctly
+- Date grouping, Completed ranges, and search paths
+- The live source against a mocked Todoist API: exact v1 endpoints, request bodies, cursor pagination, sync step order, error messages
+- Demo source: completing a parent also completes its subtasks; demo sessions are isolated
