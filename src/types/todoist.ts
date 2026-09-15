@@ -147,6 +147,21 @@ export interface UpdateTaskInput {
   labels?: string[];
 }
 
+export interface CreateProjectInput {
+  name: string;
+  /** Creates a sub-project. */
+  parent_id?: string;
+  /** Todoist color name, e.g. "blue". */
+  color?: string;
+  /** Creates the project in this team workspace instead of the personal space. */
+  workspace_id?: string;
+}
+
+export interface CreateSectionInput {
+  name: string;
+  project_id: string;
+}
+
 export interface MoveTaskInput {
   project_id?: string;
   section_id?: string;

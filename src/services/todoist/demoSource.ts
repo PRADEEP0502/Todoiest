@@ -180,5 +180,37 @@ export function createDemoSource(): DataSource {
       });
       return structuredClone(comment);
     },
+
+    async getTask(id) {
+      await wait(80);
+      return structuredClone(find(id));
+    },
+
+    async createProject(input) {
+      await wait(120);
+      const project = {
+        id: `demo-project-${++seq}`,
+        name: input.name,
+        color: input.color ?? 'charcoal',
+        parent_id: input.parent_id ?? null,
+        child_order: state.projects.length + 1,
+        workspace_id: input.workspace_id ?? null,
+        created_at: new Date().toISOString(),
+      };
+      state.projects.push(project);
+      return structuredClone(project);
+    },
+
+    async createSection(input) {
+      await wait(120);
+      const section = {
+        id: `demo-section-${++seq}`,
+        project_id: input.project_id,
+        name: input.name,
+        section_order: state.sections.filter((x) => x.project_id === input.project_id).length + 1,
+      };
+      state.sections.push(section);
+      return structuredClone(section);
+    },
   };
 }

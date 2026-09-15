@@ -14,7 +14,7 @@ export const PRIORITY_STYLE: Record<UiPriority, { label: string; text: string; r
 };
 
 /** Todoist's named project colors. */
-const PROJECT_COLORS: Record<string, string> = {
+export const PROJECT_COLORS: Record<string, string> = {
   berry_red: '#b8255f',
   red: '#dc4c3e',
   orange: '#c77100',

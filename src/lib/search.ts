@@ -1,5 +1,6 @@
 import type { Person, TodoistProject, TodoistSection, TodoistTask } from '../types/todoist';
 import { type WorkspaceIndex, taskPath } from './hierarchy';
+import { plainText } from './text';
 
 /** `path` always ends with the matched item's own name, e.g. Project → Section → Parent → Task. */
 export type SearchResult =
@@ -9,13 +10,8 @@ export type SearchResult =
   | { kind: 'label'; id: string; name: string; count: number; path: string[] }
   | { kind: 'person'; id: string; person: Person; count: number; path: string[] };
 
-/** Todoist task names may contain Markdown links and emphasis; show them as plain text. */
-export function plainText(text: string): string {
-  return text
-    .replace(/\[([^\]]+)\]\((?:[^)]+)\)/g, '$1')
-    .replace(/(\*\*|__)(.+?)\1/g, '$2')
-    .replace(/(^|[^*])\*([^*]+)\*/g, '$1$2');
-}
+// Kept here for existing imports; lives in ./text so the hierarchy module can use it too.
+export { plainText } from './text';
 
 const normalize = (s: string) => plainText(s).toLocaleLowerCase().normalize('NFKD');
 

@@ -8,7 +8,7 @@ export function Toasts() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-lg bg-ink px-4 py-2.5 text-[13px] text-white shadow-pop"
+          className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-[13px] text-white shadow-pop"
         >
           {toast.tone === 'error' ? (
             <AlertCircle size={16} className="shrink-0 text-red-300" />

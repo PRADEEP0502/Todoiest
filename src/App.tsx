@@ -84,17 +84,20 @@ function Shell() {
   }, [key]);
 
   return (
-    <div className="flex h-full overflow-hidden">
-      <Sidebar route={route} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar route={route} />
-        <main ref={main} className="flex-1 overflow-y-auto">
-          {/* One width for every page, so headings never jump sideways between views. */}
-          <div className="mx-auto w-full max-w-[1080px] px-4 pb-16 pt-6 sm:px-8 sm:pt-7">
-            <Page route={route} visit={visit} />
-          </div>
-        </main>
-        <MobileNav route={route} />
+    <div className="h-full bg-page md:p-3 lg:p-4">
+      {/* The app sits on the grey page as one large rounded sheet (desktop). */}
+      <div className="flex h-full overflow-hidden bg-canvas md:rounded-shell md:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.03)]">
+        <Sidebar route={route} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar route={route} />
+          <main ref={main} className="flex-1 overflow-y-auto">
+            {/* One width for every page, so headings never jump sideways between views. */}
+            <div className="mx-auto w-full max-w-[1120px] px-4 pb-16 pt-5 sm:px-8 md:pl-4 md:pr-8 lg:pr-10">
+              <Page route={route} visit={visit} />
+            </div>
+          </main>
+          <MobileNav route={route} />
+        </div>
       </div>
       <TaskDialog />
       <Toasts />

@@ -5,6 +5,11 @@ const MAX_COMPLETED_PAGES = 20;
 
 const taskPath = (id: string) => `/tasks/${encodeURIComponent(id)}`;
 
+/** One active task (GET /tasks/{id}) — used to pick up a recurring task's next date after completing it. */
+export function getTask(client: TodoistClient, id: string): Promise<TodoistTask> {
+  return client.request<TodoistTask>(taskPath(id));
+}
+
 export function createTask(client: TodoistClient, input: CreateTaskInput): Promise<TodoistTask> {
   return client.request<TodoistTask>('/tasks', { method: 'POST', body: input });
 }

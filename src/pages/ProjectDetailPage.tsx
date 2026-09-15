@@ -1,9 +1,10 @@
-import { ChevronsDownUp, ChevronsUpDown, FolderX, Plus } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { ChevronsDownUp, ChevronsUpDown, FolderX, ListPlus, Plus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Gate } from '../components/common/Gate';
 import { Count, EmptyState, ProjectDot } from '../components/common/ui';
+import { NewSectionDialog } from '../components/projects/CreateDialogs';
 import { ProjectSections, projectBlockKeys } from '../components/projects/ProjectSections';
-import { isOpen, setOpen, useDisclosureState } from '../hooks/useDisclosure';
+import { disclosureKey, isOpen, setOpen, useDisclosureState } from '../hooks/useDisclosure';
 import { href } from '../hooks/useRoute';
 import { PERSONAL_GROUP_ID, type WorkspaceIndex } from '../lib/hierarchy';
 import { revealKeys } from '../lib/projects';
@@ -25,6 +26,7 @@ export function ProjectDetailPage(props: Props) {
 function ProjectDetail({ index, workspaces, projectId, sectionId, taskId, visit }: Props & { index: WorkspaceIndex; workspaces: TodoistWorkspace[] }) {
   const { openNewTask } = useUi();
   const openState = useDisclosureState();
+  const [addingSection, setAddingSection] = useState(false);
   const project = index.projectById.get(projectId);
   useReveal(index, projectId, sectionId, taskId, visit);
 
@@ -83,11 +85,26 @@ function ProjectDetail({ index, workspaces, projectId, sectionId, taskId, visit 
               {allOpen ? 'Collapse all' : 'Expand all'}
             </button>
           )}
+          <button type="button" className="btn-secondary" onClick={() => setAddingSection(true)}>
+            <ListPlus size={15} /> <span className="hidden sm:inline">Add section</span>
+            <span className="sm:hidden">Section</span>
+          </button>
           <button type="button" className="btn-secondary" onClick={() => openNewTask({ projectId: project.id })}>
             <Plus size={15} /> Add task
           </button>
         </div>
       </div>
+      {addingSection && (
+        <NewSectionDialog
+          projectId={project.id}
+          onClose={() => setAddingSection(false)}
+          onCreated={(section) => {
+            setAddingSection(false);
+            // Open the new section so it is ready for its first task.
+            setOpen([disclosureKey.section(section.id)], true);
+          }}
+        />
+      )}
 
       {childProjects.length > 0 && (
         <div className="mb-5 flex flex-wrap gap-2">

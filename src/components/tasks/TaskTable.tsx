@@ -49,7 +49,7 @@ export function TaskTable({ tasks, listKey, extra }: TaskTableProps) {
           const priority = toUiPriority(task.priority);
           const holder = task.responsible_uid ? snapshot.people[task.responsible_uid]?.name : undefined;
           return (
-            <li key={task.id} className={`grid gap-x-3 gap-y-0.5 px-4 py-2.5 hover:bg-canvas/60 ${cols}`}>
+            <li key={task.id} className={`grid items-start gap-x-3 gap-y-0.5 px-4 py-3 hover:bg-black/[0.02] ${cols}`}>
               <button type="button" onClick={() => openTask(task.id)} className="min-w-0 text-left">
                 <span className="block break-words text-[13.5px] text-ink hover:underline">{plainText(task.content)}</span>
                 {parent && <span className="block truncate text-[12px] text-ink-3">↳ {plainText(parent.content)}</span>}

@@ -56,7 +56,13 @@ export function SettingsPage() {
                     autoComplete="off"
                     spellCheck={false}
                     className="field pr-10 font-mono text-[13px]"
-                    placeholder={settings.token ? '•••••••• saved on this device — paste to replace' : 'Paste your personal API token'}
+                    placeholder={
+                      settings.tokenSource === 'saved'
+                        ? '•••••••• saved in this browser — paste to replace'
+                        : settings.tokenSource === 'env'
+                          ? '•••••••• from .env.local — paste to use a different one'
+                          : 'Paste your personal API token'
+                    }
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                   />
@@ -86,7 +92,10 @@ export function SettingsPage() {
             ) : (
               <span className="text-[13px] text-ink-2">You’re viewing sample data. Connect a token to see the live Todoist workspace.</span>
             )}
-            {settings.token && (
+            {settings.tokenSource === 'env' && (
+              <span className="ml-auto text-[12px] text-ink-3">Token is set in <code className="rounded bg-canvas px-1">.env.local</code> — remove it there to disconnect.</span>
+            )}
+            {settings.tokenSource === 'saved' && (
               <button type="button" className="btn-ghost ml-auto text-danger hover:text-danger" onClick={forgetToken}>Remove token</button>
             )}
           </div>

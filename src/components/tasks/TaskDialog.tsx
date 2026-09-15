@@ -4,6 +4,7 @@ import { addDays, dueDateKey, dueTime, formatShortDate, formatTime, startOfWeek,
 import { plainText } from '../../lib/search';
 import { descendantsOf, PERSONAL_GROUP_ID, taskPath } from '../../lib/hierarchy';
 import { PRIORITY_STYLE, toUiPriority, type UiPriority } from '../../lib/priority';
+import { isUncompletable } from '../../lib/text';
 import { useUi, type NewTaskDefaults } from '../../store/ui';
 import { useWorkspace, type TaskForm } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
@@ -102,13 +103,14 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
       </span>
       <button className="btn-secondary" onClick={() => setConfirmDelete(false)} disabled={busy}>Keep</button>
       <button className="btn-danger" onClick={remove} disabled={busy}>
-        <Trash2 size={14} /> Delete
+        <Trash2 size={14} /> {busy ? 'Deleting…' : 'Delete'}
       </button>
     </>
   ) : (
     <>
       {task && (
         <>
+          {!isUncompletable(task.content) && (
           <button
             className="btn-secondary"
             onClick={() => {
@@ -119,6 +121,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
           >
             <Check size={14} className="text-accent" /> Complete
           </button>
+          )}
           <button className="btn-ghost text-danger hover:text-danger" onClick={() => setConfirmDelete(true)} disabled={busy} aria-label="Delete task">
             <Trash2 size={14} /> <span className="hidden sm:inline">Delete</span>
           </button>
@@ -127,7 +130,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
       <span className="flex-1" />
       <button className="btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
       <button className="btn-primary" onClick={() => submit()} disabled={!valid || busy || (!!task && !dirty)}>
-        {busy ? 'Saving…' : task ? 'Save' : 'Add task'}
+        {busy ? (task ? 'Updating…' : 'Saving…') : task ? 'Save' : 'Add task'}
       </button>
     </>
   );

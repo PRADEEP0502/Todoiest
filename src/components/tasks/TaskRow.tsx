@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { useNow } from '../../hooks/useNow';
 import { describeDue, dueTime } from '../../lib/dates';
 import { PRIORITY_STYLE, toUiPriority } from '../../lib/priority';
-import { plainText } from '../../lib/search';
+import { isUncompletable, plainText } from '../../lib/text';
 import { useUi } from '../../store/ui';
 import { useWorkspace } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
@@ -29,6 +29,7 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
   const now = useNow();
   const [checking, setChecking] = useState(false);
 
+  const heading = isUncompletable(task.content);
   const priority = toUiPriority(task.priority);
   const style = PRIORITY_STYLE[priority];
   const due = hideDue ? null : describeDue(task.due, now);
@@ -94,19 +95,26 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
         )}
       </span>
 
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={checking}
-        aria-label={`Complete ${task.content}`}
-        onClick={complete}
-        className={`mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors ${style.ring} ${checking ? 'bg-accent !border-accent' : `${style.fill} hover:bg-accent-soft`}`}
-      >
-        <Check size={11} strokeWidth={3} className={checking ? 'text-white' : 'text-ink-3 opacity-0 group-hover:opacity-60'} />
-      </button>
+      {heading ? (
+        // Todoist heading-style task ("* " prefix): it can't be completed, so there's no checkbox.
+        <span className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center" aria-hidden>
+          <span className="h-1.5 w-1.5 rounded-full bg-ink-3" />
+        </span>
+      ) : (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={checking}
+          aria-label={`Complete ${plainText(task.content)}`}
+          onClick={complete}
+          className={`mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors ${style.ring} ${checking ? 'bg-accent !border-accent' : `${style.fill} hover:bg-accent-soft`}`}
+        >
+          <Check size={11} strokeWidth={3} className={checking ? 'text-white' : 'text-ink-3 opacity-0 group-hover:opacity-60'} />
+        </button>
+      )}
 
       <button type="button" onClick={() => openTask(task.id)} className="min-w-0 flex-1 text-left">
-        <span className={`block break-words text-[14px] leading-5 ${checking ? 'text-ink-3 line-through' : 'text-ink'}`}>
+        <span className={`block break-words text-[14px] leading-5 ${checking ? 'text-ink-3 line-through' : heading ? 'font-semibold text-ink' : 'text-ink'}`}>
           {plainText(task.content)}
         </span>
         {(meta.length > 0 || path) && (

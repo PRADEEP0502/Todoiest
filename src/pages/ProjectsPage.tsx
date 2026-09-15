@@ -1,11 +1,12 @@
-import { ArrowRight, ChevronsDownUp, ChevronsUpDown, FolderKanban, Inbox, Search, X } from 'lucide-react';
+import { ArrowRight, ChevronsDownUp, ChevronsUpDown, FolderKanban, FolderPlus, Inbox, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Gate } from '../components/common/Gate';
 import { Chevron, Count, EmptyState, PageHeader, ProjectDot } from '../components/common/ui';
+import { NewProjectDialog } from '../components/projects/CreateDialogs';
 import { ProjectSections } from '../components/projects/ProjectSections';
 import { disclosureKey, isOpen, setOpen, useDisclosure, useDisclosureState } from '../hooks/useDisclosure';
 import { useNow } from '../hooks/useNow';
-import { href } from '../hooks/useRoute';
+import { href, navigate } from '../hooks/useRoute';
 import { formatDaysAgo } from '../lib/dates';
 import { PERSONAL_GROUP_ID, type ProjectNode, type WorkspaceIndex } from '../lib/hierarchy';
 import { filterProjects, projectActivity, RECENT_DAYS, type ProjectFilter } from '../lib/projects';
@@ -25,6 +26,7 @@ function ProjectsList({ index, snapshot }: { index: WorkspaceIndex; snapshot: Wo
   const now = useNow(60_000);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ProjectFilter>('all');
+  const [creating, setCreating] = useState(false);
   const openState = useDisclosureState();
 
   const activity = useMemo(() => projectActivity(snapshot), [snapshot]);
@@ -39,7 +41,21 @@ function ProjectsList({ index, snapshot }: { index: WorkspaceIndex; snapshot: Wo
       <PageHeader
         title="Projects"
         subtitle={`${counts.all} project${counts.all === 1 ? '' : 's'} · ${snapshot.tasks.length} open tasks`}
+        actions={
+          <button type="button" className="btn-secondary" onClick={() => setCreating(true)}>
+            <FolderPlus size={15} /> New project
+          </button>
+        }
       />
+      {creating && (
+        <NewProjectDialog
+          onClose={() => setCreating(false)}
+          onCreated={(project) => {
+            setCreating(false);
+            navigate(href.project(project.id));
+          }}
+        />
+      )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 basis-60">

@@ -1,7 +1,11 @@
 import type {
+  CreateProjectInput,
+  CreateSectionInput,
   CreateTaskInput,
   MoveTaskInput,
   TodoistComment,
+  TodoistProject,
+  TodoistSection,
   TodoistTask,
   UpdateTaskInput,
   WorkspaceSnapshot,
@@ -33,6 +37,10 @@ export interface DataSource {
   reopenTask(id: string): Promise<void>;
   deleteTask(id: string): Promise<void>;
   addComment(taskId: string, content: string): Promise<TodoistComment>;
+  /** Re-reads one task, e.g. a recurring task after completion moved it to its next date. */
+  getTask(id: string): Promise<TodoistTask>;
+  createProject(input: CreateProjectInput): Promise<TodoistProject>;
+  createSection(input: CreateSectionInput): Promise<TodoistSection>;
 }
 
 export const ACTIVITY_WINDOW_DAYS = 7;

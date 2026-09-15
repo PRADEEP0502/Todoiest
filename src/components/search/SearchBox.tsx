@@ -75,13 +75,13 @@ export function SearchBox({ autoFocus, onDone, inline }: SearchBoxProps) {
   return (
     <div ref={root} className="relative w-full">
       <div className="relative">
-        <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+        <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-3" />
         <input
           ref={input}
           autoFocus={autoFocus}
           type="search"
           value={query}
-          placeholder="Search projects, sections, tasks, labels, people…"
+          placeholder="Search tasks, projects, people…"
           onChange={(e) => {
             setQuery(e.target.value);
             setActive(0);
@@ -104,7 +104,7 @@ export function SearchBox({ autoFocus, onDone, inline }: SearchBoxProps) {
               onDone?.();
             }
           }}
-          className="field h-9 bg-canvas pl-9 pr-14 [&::-webkit-search-cancel-button]:hidden"
+          className="field h-11 rounded-full border-black/[0.05] pl-10 pr-16 shadow-pill [&::-webkit-search-cancel-button]:hidden"
           aria-label="Search"
           aria-expanded={!!showResults}
           role="combobox"
@@ -116,7 +116,7 @@ export function SearchBox({ autoFocus, onDone, inline }: SearchBoxProps) {
           </button>
         ) : (
           !inline && (
-            <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line bg-surface px-1.5 text-2xs text-ink-3 lg:block">
+            <kbd className="pointer-events-none absolute right-3.5 top-1/2 hidden -translate-y-1/2 rounded-md border border-black/[0.06] bg-canvas px-1.5 text-2xs text-ink-3 lg:block">
               Ctrl K
             </kbd>
           )
@@ -130,7 +130,7 @@ export function SearchBox({ autoFocus, onDone, inline }: SearchBoxProps) {
           className={
             inline
               ? 'mt-3'
-              : 'absolute left-0 right-0 top-full z-40 mt-1.5 max-h-[70vh] overflow-y-auto rounded-lg border border-line bg-surface p-1.5 shadow-pop lg:min-w-[34rem]'
+              : 'absolute left-0 right-0 top-full z-40 mt-2 max-h-[70vh] overflow-y-auto rounded-3xl border border-black/[0.05] bg-surface p-2 shadow-pop lg:min-w-[34rem]'
           }
         >
           {flat.length === 0 ? (

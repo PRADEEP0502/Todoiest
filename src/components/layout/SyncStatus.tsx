@@ -51,7 +51,7 @@ export function StatusPill() {
     <a
       href={href.settings()}
       title={`${c.title} · ${c.detail}`}
-      className={`inline-flex h-8 max-w-[18rem] items-center gap-2 rounded-full border px-3 text-[12px] transition-colors ${mode === 'demo' ? 'border-amber-200 bg-amber-50/70 hover:bg-amber-50' : 'border-line bg-surface hover:bg-hover'}`}
+      className={`inline-flex h-9 max-w-[18rem] items-center gap-2 rounded-full border px-3.5 text-[12px] shadow-pill transition-colors ${mode === 'demo' ? 'border-amber-200 bg-amber-50 hover:bg-amber-100/60' : 'border-black/[0.05] bg-surface hover:bg-[#fafafa]'}`}
     >
       <span className={`h-2 w-2 shrink-0 rounded-full ${c.dot}`} aria-hidden />
       <span className={`shrink-0 font-semibold ${mode === 'demo' ? 'tracking-[0.04em] text-amber-900' : 'text-ink'}`}>{mode === 'demo' ? 'DEMO MODE' : 'LIVE TODOIST'}</span>
@@ -93,5 +93,43 @@ export function SyncButton({ compact = false }: { compact?: boolean }) {
       {icon}
       {compact ? <span className="sr-only">{label}</span> : <span className="truncate">{label}</span>}
     </button>
+  );
+}
+
+/** Saving… → Saved ✓ (or Not saved) for changes being sent to Todoist. Hidden when idle. */
+export function WriteStatus({ compact = false }: { compact?: boolean }) {
+  const { writeState } = useWorkspace();
+  if (writeState.phase === 'idle') return <span aria-live="polite" className="sr-only" />;
+  const tone = writeState.phase === 'error' ? 'text-danger' : writeState.phase === 'done' ? 'text-accent' : 'text-ink-2';
+  const icon =
+    writeState.phase === 'working' ? (
+      <Loader2 size={14} className="animate-spin" />
+    ) : writeState.phase === 'done' ? (
+      <Check size={14} strokeWidth={2.5} />
+    ) : (
+      <AlertCircle size={14} />
+    );
+  return (
+    <span role="status" aria-live="polite" className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium ${tone}`} title={writeState.label}>
+      {icon}
+      {compact ? <span className="sr-only">{writeState.label}</span> : writeState.label.replace(' ✓', '')}
+    </span>
+  );
+}
+
+/** Sidebar footer card: connection state and last sync, opens Settings. */
+export function StatusCard() {
+  const c = useConnection();
+  return (
+    <a href={href.settings()} className="mb-2 flex items-center gap-3 rounded-2xl border border-black/[0.04] bg-surface px-3.5 py-3 shadow-card transition-shadow hover:shadow-pill" title={c.detail}>
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className={`absolute inset-0 rounded-full opacity-30 ${c.dot} ${c.dot === 'bg-emerald-500' ? 'animate-ping [animation-duration:2.5s]' : ''}`} />
+        <span className={`relative h-2.5 w-2.5 rounded-full ${c.dot}`} />
+      </span>
+      <span className="min-w-0 leading-tight">
+        <span className="block truncate text-[13px] font-semibold text-ink">{c.title}</span>
+        <span className="block truncate text-[11.5px] text-ink-3">{c.synced ? `Synced ${c.synced.toLowerCase()}` : 'Not synced yet'}</span>
+      </span>
+    </a>
   );
 }

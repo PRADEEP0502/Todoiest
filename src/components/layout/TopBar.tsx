@@ -7,7 +7,7 @@ import { useWorkspace } from '../../store/workspace';
 import { SearchBox } from '../search/SearchBox';
 import { NavItem, useNavLinks } from './Sidebar';
 import { Brand } from './Sidebar';
-import { ModeBadge, StatusPill, SyncButton } from './SyncStatus';
+import { ModeBadge, StatusPill, SyncButton, WriteStatus } from './SyncStatus';
 
 function useNewTaskDefaults(route: Route) {
   const { index } = useWorkspace();
@@ -36,11 +36,12 @@ export function TopBar({ route }: { route: Route }) {
   return (
     <>
       {/* Desktop */}
-      <header className="hidden h-14 shrink-0 items-center gap-4 border-b border-line bg-surface px-5 md:flex">
+      <header className="hidden h-[76px] shrink-0 items-center gap-4 pl-4 pr-8 pt-3 md:flex lg:pr-10">
         <div className="max-w-md flex-1">
           <SearchBox />
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <WriteStatus />
           <StatusPill />
           <SyncButton />
           <BellLink className="mx-0.5" />
@@ -51,10 +52,11 @@ export function TopBar({ route }: { route: Route }) {
       </header>
 
       {/* Mobile */}
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 md:hidden">
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-black/[0.04] bg-canvas px-3 md:hidden">
         <Brand compact />
         <ModeBadge />
         <div className="ml-auto flex items-center gap-1">
+          <WriteStatus compact />
           <button type="button" className="icon-btn h-8 w-8" onClick={() => setSearching(true)} aria-label="Search">
             <Search size={17} />
           </button>
@@ -103,7 +105,7 @@ export function MobileNav({ route }: { route: Route }) {
     <>
       {moreOpen && (
         <div className="fixed inset-0 z-40 bg-ink/25 md:hidden" onClick={() => setMoreOpen(false)}>
-          <div className="absolute inset-x-0 bottom-0 rounded-t-xl bg-surface px-3 pb-20 pt-3 shadow-pop" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-canvas px-3 pb-20 pt-4 shadow-pop" onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 flex items-center justify-between px-2">
               <span className="text-[14px] font-semibold text-ink">All views</span>
               <button type="button" className="icon-btn" onClick={() => setMoreOpen(false)} aria-label="Close">
@@ -119,9 +121,9 @@ export function MobileNav({ route }: { route: Route }) {
           </div>
         </div>
       )}
-      <nav className="relative z-50 grid shrink-0 grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Main">
+      <nav className="relative z-50 grid shrink-0 grid-cols-5 border-t border-black/[0.05] bg-surface pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Main">
         {items.map(({ to, active, icon, label }) => (
-          <a key={label} href={to} aria-current={active ? 'page' : undefined} className={`flex flex-col items-center gap-0.5 py-2 text-2xs ${active ? 'font-semibold text-accent' : 'text-ink-3'}`}>
+          <a key={label} href={to} aria-current={active ? 'page' : undefined} className={`flex flex-col items-center gap-0.5 py-2 text-2xs ${active ? 'font-semibold text-ink' : 'text-ink-3'}`}>
             {icon}
             {label}
           </a>
@@ -130,7 +132,7 @@ export function MobileNav({ route }: { route: Route }) {
           type="button"
           onClick={() => setMoreOpen((o) => !o)}
           aria-expanded={moreOpen}
-          className={`flex flex-col items-center gap-0.5 py-2 text-2xs ${moreOpen || inMore ? 'font-semibold text-accent' : 'text-ink-3'}`}
+          className={`flex flex-col items-center gap-0.5 py-2 text-2xs ${moreOpen || inMore ? 'font-semibold text-ink' : 'text-ink-3'}`}
         >
           <Menu size={19} />
           More

@@ -200,6 +200,36 @@ describe('live Todoist source (API v1)', () => {
     expect(comment).toMatchObject({ id: 'c9', task_id: 't1', content: 'Done by Friday' });
   });
 
+  it('creates projects and sections, and re-reads a task, with the documented requests', async () => {
+    const calls = mockTodoist({
+      'POST /api/v1/projects': ({ body }) => ({ id: 'p9', child_order: 1, parent_id: null, color: 'grey', ...(body as object) }),
+      'POST /api/v1/sections': ({ body }) => ({ id: 's9', section_order: 1, ...(body as object) }),
+      'GET /api/v1/tasks/t1': () => apiTask('t1', { due: { date: '2026-09-16', is_recurring: true } }),
+    });
+    const source = createLiveSource('tok');
+
+    await source.createProject({ name: 'Plant Expansion', color: 'blue' });
+    await source.createProject({ name: 'Team plan', workspace_id: '240513' });
+    await source.createProject({ name: 'Sub', parent_id: 'p1' });
+    const section = await source.createSection({ name: 'WEBSITE', project_id: 'p9' });
+    const task = await source.getTask('t1');
+
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      'POST /api/v1/projects',
+      'POST /api/v1/projects',
+      'POST /api/v1/projects',
+      'POST /api/v1/sections',
+      'GET /api/v1/tasks/t1',
+    ]);
+    expect(calls[0].body).toEqual({ name: 'Plant Expansion', color: 'blue' });
+    // Documented as an integer, so numeric workspace ids are sent as numbers.
+    expect(calls[1].body).toEqual({ name: 'Team plan', workspace_id: 240513 });
+    expect(calls[2].body).toEqual({ name: 'Sub', parent_id: 'p1' });
+    expect(calls[3].body).toEqual({ name: 'WEBSITE', project_id: 'p9' });
+    expect(section.id).toBe('s9');
+    expect(task.due?.is_recurring).toBe(true);
+  });
+
   it('turns HTTP failures into readable errors', async () => {
     mockTodoist({ 'POST /api/v1/sync': () => new Response('{}', { status: 401 }) });
     const error = await createLiveSource('bad').sync(() => {}).catch((e) => e);

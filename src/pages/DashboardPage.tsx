@@ -1,8 +1,8 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, ListChecks } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
-import { Avatar, Count, EmptyState, MetricStrip, Panel, ProjectDot, type Metric } from '../components/common/ui';
+import { Avatar, Chip, Count, EmptyState, Headline, MetricStrip, Panel, ProjectDot, type Metric } from '../components/common/ui';
 import { TaskRow } from '../components/tasks/TaskRow';
 import { useNow } from '../hooks/useNow';
 import { href } from '../hooks/useRoute';
@@ -59,27 +59,47 @@ export function DashboardPage() {
           .sort((a, b) => Number(isOverdue(b, todayKey)) - Number(isOverdue(a, todayKey)) || byPriorityThenTime(a, b));
 
         const recent = snapshot.activity.filter((e) => now.getTime() - Date.parse(e.event_date) <= DAY);
+        const addedThisWeek = snapshot.tasks.filter((t) => t.added_at && now.getTime() - Date.parse(t.added_at) <= 7 * DAY).length;
 
         return (
           <div className="space-y-5">
             <div>
-              <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.01em] text-ink">
-                {greeting(now)}, {name} 👋
-              </h1>
-              <p className="mt-0.5 text-[13px] text-ink-2">{formatLongDate(now)}</p>
+              <Headline fade={name}>{`${greeting(now)},`}</Headline>
+              <p className="mt-1 text-[14px] text-ink-2">{formatLongDate(now)}</p>
             </div>
 
-            <MetricStrip
-              label="Workspace totals"
-              columns="grid-cols-2 sm:grid-cols-5"
-              items={[
-                { label: 'Total Active Tasks', value: snapshot.tasks.length, href: href.metric('active'), note: `in ${index.orderedProjects.length} projects`, wideOnMobile: true },
-                { label: 'Due Today', value: dueToday, href: href.today() },
-                { label: 'Overdue', value: overdue, href: href.overdue(), tone: 'danger' },
-                { label: 'No Due Date', value: count('no-due'), href: href.metric('no-due') },
-                { label: 'Completed', value: snapshot.completedStatus.ok ? completedToday(snapshot, now) : null, href: href.completed(), note: 'today' },
-              ]}
-            />
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+              {/* Hero card: one big figure with its context, in the style of the reference design. */}
+              <a href={href.metric('active')} className="panel group relative flex flex-col px-6 pb-6 pt-5 transition-shadow hover:shadow-pill sm:px-7">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[#3a3a3a]">Overview</h2>
+                  <ArrowUpRight size={16} className="text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+                </div>
+                <span className="mt-5 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-black/[0.045] text-ink-2">
+                  <ListChecks size={24} strokeWidth={1.75} />
+                </span>
+                <span className="mt-6 text-[15px] font-medium text-ink-2">Total active tasks</span>
+                <span className="mt-1 flex items-start gap-2">
+                  <span className="num-fade text-[76px] font-semibold leading-[80px] tracking-[-0.055em] sm:text-[88px] sm:leading-[92px]">{snapshot.tasks.length}</span>
+                </span>
+                <span className="mt-4 flex flex-wrap items-center gap-2">
+                  {overdue > 0 ? <Chip tone="bad">{overdue} overdue</Chip> : <Chip tone="good">Nothing overdue</Chip>}
+                  {addedThisWeek > 0 && <Chip tone="good">↑ {addedThisWeek} added this week</Chip>}
+                  <span className="text-[13px] text-ink-3">in {index.orderedProjects.length} projects</span>
+                </span>
+              </a>
+
+              <MetricStrip
+                label="Workspace totals"
+                columns="grid-cols-2"
+                items={[
+                  { label: 'Due Today', value: dueToday, href: href.today(), note: 'tasks due today' },
+                  { label: 'Overdue', value: overdue, href: href.overdue(), tone: 'danger', note: 'past due date' },
+                  { label: 'No Due Date', value: count('no-due'), href: href.metric('no-due'), note: 'active tasks without a date' },
+                  { label: 'Completed', value: snapshot.completedStatus.ok ? completedToday(snapshot, now) : null, href: href.completed(), note: 'completed today' },
+                ]}
+              />
+            </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               <div>

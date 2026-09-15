@@ -4,7 +4,8 @@ import { cacheGet, cacheSet, tokenFingerprint } from './cache';
 import { TodoistApiError, TodoistClient } from './client';
 import { ACTIVITY_WINDOW_DAYS, completedWindowStart, toMoveInput, withCommentCounts, type DataSource } from './dataSource';
 import { applySync, readSync, type SyncState } from './syncApi';
-import { closeTask, createTask, deleteTask, getCompletedTasks, moveTask, reopenTask, updateTask } from './tasks';
+import { createProject, createSection } from './projects';
+import { closeTask, createTask, deleteTask, getCompletedTasks, getTask, moveTask, reopenTask, updateTask } from './tasks';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -139,6 +140,9 @@ export function createLiveSource(token: string): DataSource {
     reopenTask: (id) => reopenTask(client, id),
     deleteTask: (id) => deleteTask(client, id),
     addComment: (taskId, content) => createComment(client, taskId, content),
+    getTask: (id) => getTask(client, id),
+    createProject: (input) => createProject(client, input),
+    createSection: (input) => createSection(client, input),
   };
 }
 
