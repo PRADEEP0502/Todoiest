@@ -2,7 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { dueDateKey } from '../lib/dates';
 import { buildIndex, descendantsOf, type WorkspaceIndex } from '../lib/hierarchy';
 import { toApiPriority, type UiPriority } from '../lib/priority';
+import type { MetricRules } from '../lib/metrics';
 import {
+  cacheClear,
   createDemoSource,
   createLiveSource,
   verifyToken,
@@ -10,7 +12,7 @@ import {
   type DataSource,
   type SyncStep,
 } from '../services/todoist';
-import type { TodoistTask, UpdateTaskInput, WorkspaceSnapshot } from '../types/todoist';
+import type { TodoistComment, TodoistTask, UpdateTaskInput, WorkspaceSnapshot } from '../types/todoist';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import { useUi } from './ui';
 
@@ -19,6 +21,8 @@ export interface SyncState {
   step: SyncStep | null;
   error: string | null;
   lastSyncedAt: string | null;
+  /** True while the screen shows data saved on this device and a fresh sync is running. */
+  fromCache: boolean;
 }
 
 export interface TaskForm {
@@ -43,6 +47,9 @@ interface WorkspaceContextValue {
   completeTask: (taskId: string) => void;
   reopenTask: (task: TodoistTask) => void;
   deleteTask: (taskId: string) => Promise<boolean>;
+  addComment: (taskId: string, content: string) => Promise<TodoistComment | null>;
+  setRules: (rules: MetricRules) => void;
+  setNotifyOwnActions: (value: boolean) => void;
   connectLive: (token: string) => Promise<{ name: string }>;
   switchToDemo: () => void;
   forgetToken: () => void;
@@ -53,6 +60,8 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 const AUTO_SYNC_MS = 5 * 60 * 1000;
 const FOCUS_SYNC_AFTER_MS = 60 * 1000;
+/** After a change, sync shortly so activity, counts and notifications catch up. */
+const AFTER_WRITE_SYNC_MS = 2500;
 
 const errorMessage = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong.');
 const isAbort = (err: unknown) => err instanceof DOMException && err.name === 'AbortError';
@@ -61,7 +70,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { notify } = useUi();
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
-  const [sync, setSync] = useState<SyncState>({ status: 'idle', step: null, error: null, lastSyncedAt: null });
+  const [sync, setSync] = useState<SyncState>({ status: 'idle', step: null, error: null, lastSyncedAt: null, fromCache: false });
 
   // A new source (and a clean slate) whenever the mode or token changes: demo and live data never mix.
   const source = useMemo<DataSource>(
@@ -98,7 +107,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
           setSnapshot(next);
           lastSyncedAt.current = Date.now();
-          setSync({ status: 'done', step: null, error: null, lastSyncedAt: next.syncedAt });
+          setSync({ status: 'done', step: null, error: null, lastSyncedAt: next.syncedAt, fromCache: false });
           doneTimer.current = setTimeout(() => setSync((s) => (s.status === 'done' ? { ...s, status: 'idle' } : s)), 2500);
           return;
         }
@@ -117,17 +126,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return job;
   }, [source]);
 
-  // Initial load for each source, with a clean slate.
+  // Initial load for each source, with a clean slate: saved data first (if any), then a sync.
   useEffect(() => {
+    let cancelled = false;
     setSnapshot(null);
-    setSync({ status: 'idle', step: null, error: null, lastSyncedAt: null });
-    void syncNow();
+    setSync({ status: 'idle', step: null, error: null, lastSyncedAt: null, fromCache: false });
+    void source.loadCached().then((cached) => {
+      if (cancelled) return;
+      if (cached) {
+        setSnapshot((current) => current ?? cached);
+        setSync((s) => (s.lastSyncedAt ? s : { ...s, lastSyncedAt: cached.syncedAt, fromCache: true }));
+      }
+      void syncNow();
+    });
     return () => {
+      cancelled = true;
       abortRef.current?.abort();
       abortRef.current = null;
       inFlight.current = null;
     };
-  }, [syncNow]);
+  }, [source, syncNow]);
 
   // Keep the dashboard in step with changes made in Todoist itself.
   useEffect(() => {
@@ -153,15 +171,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     indexRef.current = index;
   }, [index]);
 
-  /** Runs a write against the source, flagging it so overlapping syncs refetch. */
-  const write = useCallback(async <T,>(run: () => Promise<T>): Promise<T> => {
-    writeVersion.current++;
-    try {
-      return await run();
-    } finally {
+  const followUpTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(followUpTimer.current), []);
+
+  /** Runs a write against the source, flagging it so overlapping syncs refetch, then syncs shortly after. */
+  const write = useCallback(
+    async <T,>(run: () => Promise<T>): Promise<T> => {
       writeVersion.current++;
-    }
-  }, []);
+      try {
+        return await run();
+      } finally {
+        writeVersion.current++;
+        clearTimeout(followUpTimer.current);
+        followUpTimer.current = setTimeout(() => void syncNow(), AFTER_WRITE_SYNC_MS);
+      }
+    },
+    [syncNow],
+  );
 
   const createTask = useCallback(
     async (form: TaskForm) => {
@@ -245,10 +271,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       );
       write(() => source.reopenTask(task.id))
         .then(() => notify({ tone: 'info', message: 'Task reopened' }))
-        .catch((err) => notify({ tone: 'error', message: `Could not reopen task. ${errorMessage(err)}` }))
-        .finally(() => void syncNow());
+        .catch((err) => notify({ tone: 'error', message: `Could not reopen task. ${errorMessage(err)}` }));
     },
-    [source, write, notify, syncNow],
+    [source, write, notify],
   );
 
   const completeTask = useCallback(
@@ -303,6 +328,29 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [source, write, notify],
   );
 
+  const addComment = useCallback(
+    async (taskId: string, content: string) => {
+      try {
+        const comment = await write(() => source.addComment(taskId, content.trim()));
+        setSnapshot((s) =>
+          s
+            ? {
+                ...s,
+                comments: [...s.comments, comment],
+                tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, note_count: t.note_count + 1 } : t)),
+              }
+            : s,
+        );
+        notify({ tone: 'success', message: 'Comment added' });
+        return comment;
+      } catch (err) {
+        notify({ tone: 'error', message: `Could not add comment. ${errorMessage(err)}` });
+        return null;
+      }
+    },
+    [source, write, notify],
+  );
+
   const connectLive = useCallback(
     async (token: string) => {
       const account = await verifyToken(token);
@@ -325,10 +373,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     completeTask,
     reopenTask,
     deleteTask,
+    addComment,
     connectLive,
     switchToDemo: () => setSettings((s) => ({ ...s, mode: 'demo' })),
-    forgetToken: () => setSettings((s) => ({ ...s, token: '', mode: 'demo' })),
+    forgetToken: () => {
+      void cacheClear();
+      setSettings((s) => ({ ...s, token: '', mode: 'demo' }));
+    },
     setDisplayName: (displayName) => setSettings((s) => ({ ...s, displayName })),
+    setRules: (rules) => setSettings((s) => ({ ...s, rules })),
+    setNotifyOwnActions: (notifyOwnActions) => setSettings((s) => ({ ...s, notifyOwnActions })),
   };
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

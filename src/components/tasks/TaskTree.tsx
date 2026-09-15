@@ -1,4 +1,4 @@
-import { useCollapse } from '../../hooks/useCollapse';
+import { disclosureKey, useDisclosure } from '../../hooks/useDisclosure';
 import type { TodoistTask } from '../../types/todoist';
 import { TaskRow } from './TaskRow';
 
@@ -8,22 +8,24 @@ interface TaskTreeProps {
   pathOf?: (task: TodoistTask) => string[] | undefined;
   hideDue?: boolean;
   depth?: number;
+  /** Subtasks start collapsed in the project hierarchy; filtered lists open them. */
+  subtasksOpen?: boolean;
 }
 
 /** Tasks with their subtasks nested underneath; each parent can be collapsed. */
-export function TaskTree({ tasks, childrenOf, pathOf, hideDue, depth = 0 }: TaskTreeProps) {
+export function TaskTree({ tasks, childrenOf, pathOf, hideDue, depth = 0, subtasksOpen = false }: TaskTreeProps) {
   return (
     <div role="list">
       {tasks.map((task) => (
-        <TaskNode key={task.id} task={task} childrenOf={childrenOf} pathOf={pathOf} hideDue={hideDue} depth={depth} />
+        <TaskNode key={task.id} task={task} childrenOf={childrenOf} pathOf={pathOf} hideDue={hideDue} depth={depth} subtasksOpen={subtasksOpen} />
       ))}
     </div>
   );
 }
 
-function TaskNode({ task, childrenOf, pathOf, hideDue, depth }: Omit<TaskTreeProps, 'tasks'> & { task: TodoistTask; depth: number }) {
+function TaskNode({ task, childrenOf, pathOf, hideDue, depth, subtasksOpen }: Omit<TaskTreeProps, 'tasks'> & { task: TodoistTask; depth: number }) {
   const children = childrenOf(task.id);
-  const [collapsed, toggle] = useCollapse(`task:${task.id}`);
+  const [open, toggle] = useDisclosure(disclosureKey.subtasks(task.id), subtasksOpen ?? false);
   return (
     <div role="listitem">
       <TaskRow
@@ -32,11 +34,11 @@ function TaskNode({ task, childrenOf, pathOf, hideDue, depth }: Omit<TaskTreePro
         path={pathOf?.(task)}
         hideDue={hideDue}
         subtaskCount={children.length}
-        collapsed={collapsed}
+        collapsed={!open}
         onToggle={toggle}
       />
-      {children.length > 0 && !collapsed && (
-        <TaskTree tasks={children} childrenOf={childrenOf} pathOf={pathOf} hideDue={hideDue} depth={depth + 1} />
+      {children.length > 0 && open && (
+        <TaskTree tasks={children} childrenOf={childrenOf} pathOf={pathOf} hideDue={hideDue} depth={depth + 1} subtasksOpen={subtasksOpen} />
       )}
     </div>
   );

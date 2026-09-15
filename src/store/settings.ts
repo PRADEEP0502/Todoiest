@@ -1,3 +1,4 @@
+import { DEFAULT_RULES, type MetricRules } from '../lib/metrics';
 import type { DataMode } from '../services/todoist';
 
 export interface Settings {
@@ -5,6 +6,10 @@ export interface Settings {
   token: string;
   /** Overrides the Todoist account name in the greeting. */
   displayName: string;
+  /** How A-5/A-10/A-30/A30+ and No CD/No IDD are worked out from Todoist data. */
+  rules: MetricRules;
+  /** Show notifications for changes made by the connected account itself. */
+  notifyOwnActions: boolean;
 }
 
 const KEY = 'md-dashboard.settings.v1';
@@ -22,6 +27,12 @@ export function loadSettings(): Settings {
     token,
     displayName: stored.displayName ?? '',
     mode: stored.mode === 'live' && token ? 'live' : stored.mode === 'demo' || !token ? 'demo' : 'live',
+    rules: {
+      ...DEFAULT_RULES,
+      ...stored.rules,
+      categoryNames: { ...DEFAULT_RULES.categoryNames, ...stored.rules?.categoryNames },
+    },
+    notifyOwnActions: stored.notifyOwnActions ?? false,
   };
 }
 

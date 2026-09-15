@@ -13,6 +13,8 @@ export default {
         ink: { DEFAULT: '#1d1c1a', 2: '#57534e', 3: '#8b867e' },
         accent: { DEFAULT: '#1f6f5c', hover: '#185b4b', soft: '#e6f0ec' },
         danger: { DEFAULT: '#b42318', soft: '#fdecea' },
+        /** Bar fill for charts — validated for chroma and contrast on white. */
+        chart: '#15876a',
         p1: '#d0342c',
         p2: '#c26a00',
         p3: '#2f6bd8',

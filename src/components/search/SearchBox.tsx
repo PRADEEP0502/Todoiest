@@ -1,10 +1,9 @@
-import { FolderKanban, Hash, Search, SquareCheck, X } from 'lucide-react';
+import { FolderKanban, Hash, Search, SquareCheck, Tag, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { href, navigate } from '../../hooks/useRoute';
 import { searchWorkspace, plainText, type SearchResult } from '../../lib/search';
-import { useUi } from '../../store/ui';
 import { useWorkspace } from '../../store/workspace';
-import { ProjectDot } from '../common/ui';
+import { Avatar, ProjectDot } from '../common/ui';
 
 interface SearchBoxProps {
   autoFocus?: boolean;
@@ -14,16 +13,27 @@ interface SearchBoxProps {
 }
 
 export function SearchBox({ autoFocus, onDone, inline }: SearchBoxProps) {
-  const { index } = useWorkspace();
-  const { openTask } = useUi();
+  const { index, snapshot } = useWorkspace();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
 
-  const results = useMemo(() => (index ? searchWorkspace(index, query) : null), [index, query]);
-  const flat: SearchResult[] = results ? [...results.projects, ...results.sections, ...results.tasks] : [];
+  // Labels and people are searchable too; counts are active tasks.
+  const extras = useMemo(() => {
+    const labels = new Map<string, number>();
+    const holders = new Map<string, number>();
+    for (const l of snapshot?.labels ?? []) labels.set(l.name, 0);
+    for (const t of snapshot?.tasks ?? []) {
+      for (const l of t.labels) labels.set(l, (labels.get(l) ?? 0) + 1);
+      if (t.responsible_uid) holders.set(t.responsible_uid, (holders.get(t.responsible_uid) ?? 0) + 1);
+    }
+    const people = Object.values(snapshot?.people ?? {}).map((person) => ({ person, count: holders.get(person.id) ?? 0 }));
+    return { labels, people };
+  }, [snapshot]);
+  const results = useMemo(() => (index ? searchWorkspace(index, query, extras) : null), [index, query, extras]);
+  const flat: SearchResult[] = results ? [...results.projects, ...results.sections, ...results.tasks, ...results.labels, ...results.people] : [];
 
   // "/" or Ctrl/⌘+K focuses search from anywhere.
   useEffect(() => {
@@ -48,9 +58,12 @@ export function SearchBox({ autoFocus, onDone, inline }: SearchBoxProps) {
   }, [inline]);
 
   const choose = (result: SearchResult) => {
+    // Sections and tasks open inside their project; the project page expands just the path to them.
     if (result.kind === 'project') navigate(href.project(result.id));
-    else if (result.kind === 'section') navigate(href.project(result.section.project_id, result.id));
-    else openTask(result.id);
+    else if (result.kind === 'section') navigate(href.project(result.section.project_id, { sectionId: result.id }));
+    else if (result.kind === 'task') navigate(href.project(result.task.project_id, { taskId: result.id }));
+    else if (result.kind === 'label') navigate(href.label(result.name));
+    else navigate(href.holder(result.id));
     setQuery('');
     setOpen(false);
     input.current?.blur();
@@ -68,7 +81,7 @@ export function SearchBox({ autoFocus, onDone, inline }: SearchBoxProps) {
           autoFocus={autoFocus}
           type="search"
           value={query}
-          placeholder="Search tasks, projects and sections…"
+          placeholder="Search projects, sections, tasks, labels, people…"
           onChange={(e) => {
             setQuery(e.target.value);
             setActive(0);
@@ -121,7 +134,7 @@ export function SearchBox({ autoFocus, onDone, inline }: SearchBoxProps) {
           }
         >
           {flat.length === 0 ? (
-            <p className="px-3 py-6 text-center text-[13px] text-ink-2">No projects, sections or tasks match “{query.trim()}”.</p>
+            <p className="px-3 py-6 text-center text-[13px] text-ink-2">Nothing matches “{query.trim()}”.</p>
           ) : (
             <>
               <ResultGroup title="Projects" results={results.projects} offset={0} active={active} onChoose={choose} onHover={setActive} />
@@ -130,6 +143,15 @@ export function SearchBox({ autoFocus, onDone, inline }: SearchBoxProps) {
                 title={results.total - results.projects.length - results.sections.length > results.tasks.length ? `Tasks (top ${results.tasks.length})` : 'Tasks'}
                 results={results.tasks}
                 offset={results.projects.length + results.sections.length}
+                active={active}
+                onChoose={choose}
+                onHover={setActive}
+              />
+              <ResultGroup title="Labels" results={results.labels} offset={results.projects.length + results.sections.length + results.tasks.length} active={active} onChoose={choose} onHover={setActive} />
+              <ResultGroup
+                title="People"
+                results={results.people}
+                offset={results.projects.length + results.sections.length + results.tasks.length + results.labels.length}
                 active={active}
                 onChoose={choose}
                 onHover={setActive}
@@ -171,9 +193,15 @@ function ResultGroup({
         } else if (result.kind === 'section') {
           icon = <Hash size={13} className="text-ink-3" />;
           name = result.section.name;
-        } else {
+        } else if (result.kind === 'task') {
           icon = <SquareCheck size={13} className="text-ink-3" />;
           name = plainText(result.task.content);
+        } else if (result.kind === 'label') {
+          icon = <Tag size={13} className="text-ink-3" />;
+          name = `${result.name} · ${result.count} active`;
+        } else {
+          icon = <Avatar id={result.id} name={result.person.name} size={16} />;
+          name = `${result.person.name} · ${result.count} active`;
         }
         const trail = result.path.slice(0, -1);
         const projectColor =

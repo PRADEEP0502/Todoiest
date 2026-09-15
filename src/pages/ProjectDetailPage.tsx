@@ -1,34 +1,32 @@
 import { ChevronsDownUp, ChevronsUpDown, FolderX, Plus } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Gate } from '../components/common/Gate';
-import { Chevron, Count, EmptyState, ProjectDot } from '../components/common/ui';
-import { TaskTree } from '../components/tasks/TaskTree';
-import { setCollapsed, useCollapse, useCollapsedSet } from '../hooks/useCollapse';
+import { Count, EmptyState, ProjectDot } from '../components/common/ui';
+import { ProjectSections, projectBlockKeys } from '../components/projects/ProjectSections';
+import { isOpen, setOpen, useDisclosureState } from '../hooks/useDisclosure';
 import { href } from '../hooks/useRoute';
-import { containerKey, countContainer, PERSONAL_GROUP_ID, type WorkspaceIndex } from '../lib/hierarchy';
+import { PERSONAL_GROUP_ID, type WorkspaceIndex } from '../lib/hierarchy';
+import { revealKeys } from '../lib/projects';
 import { useUi } from '../store/ui';
-import type { TodoistProject, TodoistSection } from '../types/todoist';
+import type { TodoistProject, TodoistWorkspace } from '../types/todoist';
 
-const sectionKey = (id: string) => `section:${id}`;
-
-export function ProjectDetailPage({ projectId, sectionId }: { projectId: string; sectionId: string | null }) {
-  return <Gate>{({ index, snapshot }) => <ProjectDetail index={index} projectId={projectId} focusSectionId={sectionId} workspaceNames={snapshot.workspaces} />}</Gate>;
+interface Props {
+  projectId: string;
+  sectionId: string | null;
+  taskId: string | null;
+  /** Changes on every navigation, so picking the same search result again re-reveals it. */
+  visit: number;
 }
 
-function ProjectDetail({
-  index,
-  projectId,
-  focusSectionId,
-  workspaceNames,
-}: {
-  index: WorkspaceIndex;
-  projectId: string;
-  focusSectionId: string | null;
-  workspaceNames: { id: string; name: string }[];
-}) {
+export function ProjectDetailPage(props: Props) {
+  return <Gate>{({ index, snapshot }) => <ProjectDetail {...props} index={index} workspaces={snapshot.workspaces} />}</Gate>;
+}
+
+function ProjectDetail({ index, workspaces, projectId, sectionId, taskId, visit }: Props & { index: WorkspaceIndex; workspaces: TodoistWorkspace[] }) {
   const { openNewTask } = useUi();
-  const collapsedSet = useCollapsedSet();
+  const openState = useDisclosureState();
   const project = index.projectById.get(projectId);
+  useReveal(index, projectId, sectionId, taskId, visit);
 
   if (!project) {
     return (
@@ -40,16 +38,15 @@ function ProjectDetail({
   }
 
   const sections = index.sectionsByProject.get(project.id) ?? [];
-  const unsectioned = index.rootTasks.get(containerKey(project.id, null)) ?? [];
   const openCount = index.openByProject.get(project.id) ?? 0;
   const childProjects = index.orderedProjects.filter((n) => n.project.parent_id === project.id).map((n) => n.project);
-  const keys = sections.map((s) => sectionKey(s.id));
-  const allCollapsed = keys.length > 0 && keys.every((k) => collapsedSet.has(k));
+  const blockKeys = projectBlockKeys(index, project.id);
+  const allOpen = blockKeys.length > 0 && blockKeys.every((k) => isOpen(openState, k, false));
 
   // Breadcrumb: workspace › parent projects.
-  const crumbs: { label: string; to?: string }[] = [];
-  const workspaceName = project.workspace_id ? workspaceNames.find((w) => String(w.id) === String(project.workspace_id))?.name : undefined;
+  const crumbs: { label: string; to: string }[] = [];
   const groupId = project.workspace_id ? String(project.workspace_id) : PERSONAL_GROUP_ID;
+  const workspaceName = workspaces.find((w) => String(w.id) === groupId)?.name;
   crumbs.push({ label: workspaceName ?? index.groups.find((g) => g.id === groupId)?.name ?? 'Projects', to: href.projects() });
   const ancestors: TodoistProject[] = [];
   for (let p = project.parent_id ? index.projectById.get(project.parent_id) : undefined; p && ancestors.length < 10; p = p.parent_id ? index.projectById.get(p.parent_id) : undefined) {
@@ -60,10 +57,11 @@ function ProjectDetail({
   return (
     <div>
       <nav className="mb-2 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-3" aria-label="Breadcrumb">
+        <a href={href.projects()} className="hover:text-ink hover:underline">Projects</a>
         {crumbs.map((c, i) => (
           <span key={i} className="flex items-center gap-1.5">
-            {i > 0 && <span>›</span>}
-            {c.to ? <a href={c.to} className="hover:text-ink hover:underline">{c.label}</a> : c.label}
+            <span>›</span>
+            <a href={c.to} className="hover:text-ink hover:underline">{c.label}</a>
           </span>
         ))}
       </nav>
@@ -79,10 +77,10 @@ function ProjectDetail({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {keys.length > 1 && (
-            <button type="button" className="btn-ghost" onClick={() => setCollapsed(keys, !allCollapsed)}>
-              {allCollapsed ? <ChevronsUpDown size={15} /> : <ChevronsDownUp size={15} />}
-              {allCollapsed ? 'Expand all' : 'Collapse all'}
+          {blockKeys.length > 0 && (
+            <button type="button" className="btn-ghost" onClick={() => setOpen(blockKeys, !allOpen)}>
+              {allOpen ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
+              {allOpen ? 'Collapse all' : 'Expand all'}
             </button>
           )}
           <button type="button" className="btn-secondary" onClick={() => openNewTask({ projectId: project.id })}>
@@ -104,76 +102,35 @@ function ProjectDetail({
       )}
 
       <div className="panel overflow-hidden">
-        {unsectioned.length > 0 && (
-          <div className="px-3 py-2 sm:px-4">
-            {sections.length > 0 && <div className="eyebrow px-1 pb-1 pt-1.5">No section</div>}
-            <TaskTree tasks={unsectioned} childrenOf={(id) => index.subtasks.get(id) ?? []} />
-          </div>
-        )}
-
-        {sections.map((section) => (
-          <SectionBlock key={section.id} section={section} index={index} focused={focusSectionId === section.id} />
-        ))}
-
-        {sections.length === 0 && unsectioned.length === 0 && (
-          <EmptyState title="No open tasks in this project">
-            <button type="button" className="text-accent hover:underline" onClick={() => openNewTask({ projectId: project.id })}>Add a task</button>
-          </EmptyState>
-        )}
+        <ProjectSections index={index} projectId={project.id} />
       </div>
     </div>
   );
 }
 
-function SectionBlock({ section, index, focused }: { section: TodoistSection; index: WorkspaceIndex; focused: boolean }) {
-  const { openNewTask } = useUi();
-  const [collapsed, toggle] = useCollapse(sectionKey(section.id));
-  const ref = useRef<HTMLElement>(null);
-  const [highlight, setHighlight] = useState(false);
-  const roots = index.rootTasks.get(containerKey(section.project_id, section.id)) ?? [];
-  const count = countContainer(index, section.project_id, section.id);
-
-  // Arriving from search: open this section and bring it into view.
+/**
+ * When the URL points at a section or task (e.g. from search), open only the blocks needed
+ * to show it, scroll it into view and flash it briefly. Runs once per navigation.
+ */
+function useReveal(index: WorkspaceIndex, projectId: string, sectionId: string | null, taskId: string | null, visit: number) {
+  const done = useRef<string | null>(null);
   useEffect(() => {
-    if (!focused) return;
-    setCollapsed([sectionKey(section.id)], false);
-    ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    setHighlight(true);
-    const t = setTimeout(() => setHighlight(false), 1600);
-    return () => clearTimeout(t);
-  }, [focused, section.id]);
+    if (!sectionId && !taskId) return;
+    const signature = `${visit}:${projectId}:${sectionId}:${taskId}`;
+    if (done.current === signature) return;
+    done.current = signature;
 
-  return (
-    <section ref={ref} className={`scroll-mt-4 border-t border-line first:border-t-0 transition-colors ${highlight ? 'bg-accent-soft/60' : ''}`}>
-      <div className="group flex items-center gap-2 px-3 py-2.5 sm:px-4">
-        <button type="button" onClick={toggle} aria-expanded={!collapsed} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <Chevron collapsed={collapsed} />
-          <span className="min-w-0">
-            <span className="block break-words text-[14.5px] font-semibold text-ink">{section.name}</span>
-            <span className="block text-[12px] text-ink-3">
-              {count} task{count === 1 ? '' : 's'}
-            </span>
-          </span>
-        </button>
-        <button
-          type="button"
-          className="icon-btn opacity-60 group-hover:opacity-100"
-          onClick={() => openNewTask({ projectId: section.project_id, sectionId: section.id })}
-          aria-label={`Add task to ${section.name}`}
-          title="Add task to this section"
-        >
-          <Plus size={15} />
-        </button>
-      </div>
-      {!collapsed && (
-        <div className="px-3 pb-2 sm:px-4">
-          {roots.length > 0 ? (
-            <TaskTree tasks={roots} childrenOf={(id) => index.subtasks.get(id) ?? []} />
-          ) : (
-            <p className="pb-2 pl-7 text-[13px] text-ink-3">No open tasks</p>
-          )}
-        </div>
-      )}
-    </section>
-  );
+    setOpen(revealKeys(index, { sectionId, taskId }), true);
+    // Not cleared on cleanup: the signature guard means this runs once per visit, and a re-render
+    // (a sync landing, StrictMode's double effect) must not cancel the scroll.
+    setTimeout(() => {
+      const selector = taskId ? `[data-task-id="${CSS.escape(taskId)}"]` : `[data-section-id="${CSS.escape(sectionId!)}"]`;
+      const el = document.querySelector<HTMLElement>(selector);
+      if (!el) return;
+      el.scrollIntoView({ block: taskId ? 'center' : 'start', behavior: 'smooth' });
+      el.classList.remove('reveal-flash');
+      void el.offsetWidth; // restart the animation
+      el.classList.add('reveal-flash');
+    }, 60);
+  },[index, projectId, sectionId, taskId, visit]);
 }

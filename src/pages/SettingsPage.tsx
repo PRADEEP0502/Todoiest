@@ -2,6 +2,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { PageHeader } from '../components/common/ui';
 import { ConnectionBadge, ModeBadge, SyncButton } from '../components/layout/SyncStatus';
+import { MetricRulesCard } from '../components/settings/MetricRulesCard';
 import { useWorkspace } from '../store/workspace';
 
 export function SettingsPage() {
@@ -91,6 +92,8 @@ export function SettingsPage() {
           </div>
         </Card>
 
+        <MetricRulesCard />
+
         <Card title="Greeting">
           <label className="label" htmlFor="display-name">Name shown on the dashboard</label>
           <input
@@ -106,8 +109,10 @@ export function SettingsPage() {
         <Card title="How syncing works">
           <ul className="list-disc space-y-1 pl-5 text-[13px] text-ink-2">
             <li>Todoist is the only source of truth — nothing is stored in a separate database.</li>
-            <li>Projects, sections and tasks are loaded fresh on every sync, so new, renamed, moved or deleted items appear automatically.</li>
-            <li>The dashboard syncs on open, every 5 minutes, and when you return to the tab. Use Sync any time.</li>
+            <li>Every sync asks Todoist what changed, so new, renamed, moved, completed or deleted projects, sections, tasks and labels appear automatically.</li>
+            <li>The dashboard syncs on open, every 5 minutes, when you return to the tab, and shortly after each change. Use Sync any time.</li>
+            <li>The last synced data is kept in this browser so the dashboard opens instantly; later syncs only download what changed.</li>
+            <li>Activity Logs, Comments and Notifications use Todoist’s activity log and comments. What is available depends on the Todoist plan — nothing is invented when it is not.</li>
             <li>Completing, editing, adding and deleting tasks is sent to Todoist immediately.</li>
           </ul>
         </Card>

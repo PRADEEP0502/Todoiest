@@ -1,11 +1,13 @@
-import type { TodoistProject, TodoistSection, TodoistTask } from '../types/todoist';
+import type { Person, TodoistProject, TodoistSection, TodoistTask } from '../types/todoist';
 import { type WorkspaceIndex, taskPath } from './hierarchy';
 
-/** `path` always ends with the matched item's own name, e.g. Project → Section → Task. */
+/** `path` always ends with the matched item's own name, e.g. Project → Section → Parent → Task. */
 export type SearchResult =
   | { kind: 'project'; id: string; project: TodoistProject; path: string[] }
   | { kind: 'section'; id: string; section: TodoistSection; path: string[] }
-  | { kind: 'task'; id: string; task: TodoistTask; path: string[] };
+  | { kind: 'task'; id: string; task: TodoistTask; path: string[] }
+  | { kind: 'label'; id: string; name: string; count: number; path: string[] }
+  | { kind: 'person'; id: string; person: Person; count: number; path: string[] };
 
 /** Todoist task names may contain Markdown links and emphasis; show them as plain text. */
 export function plainText(text: string): string {
@@ -26,10 +28,19 @@ function score(name: string, words: string[], full: string): number {
   return 1;
 }
 
-export function searchWorkspace(index: WorkspaceIndex, query: string, limit = { projects: 6, sections: 8, tasks: 25 }) {
+interface SearchExtras {
+  /** Label name → active task count. */
+  labels?: Map<string, number>;
+  /** People with their active task counts. */
+  people?: { person: Person; count: number }[];
+}
+
+const LIMITS = { projects: 6, sections: 8, tasks: 25, labels: 5, people: 5 };
+
+export function searchWorkspace(index: WorkspaceIndex, query: string, extras: SearchExtras = {}) {
   const full = normalize(query.trim());
   const words = full.split(/\s+/).filter(Boolean);
-  if (!words.length) return { projects: [], sections: [], tasks: [], total: 0 };
+  if (!words.length) return { projects: [], sections: [], tasks: [], labels: [], people: [], total: 0 };
 
   const rank = <T extends SearchResult>(items: { item: T; s: number }[], max: number) =>
     items
@@ -46,29 +57,41 @@ export function searchWorkspace(index: WorkspaceIndex, query: string, limit = { 
         s: score(project.name, words, full),
       };
     }),
-    limit.projects,
+    LIMITS.projects,
   );
 
   const sections = rank(
     [...index.sectionById.values()].map((section) => ({
-      item: {
-        kind: 'section' as const,
-        id: section.id,
-        section,
-        path: [index.projectById.get(section.project_id)?.name ?? '', section.name],
-      },
+      item: { kind: 'section' as const, id: section.id, section, path: [index.projectById.get(section.project_id)?.name ?? '', section.name] },
       s: score(section.name, words, full),
     })),
-    limit.sections,
+    LIMITS.sections,
   );
 
   const taskMatches = [...index.taskById.values()]
-    .map((task) => ({
-      item: { kind: 'task' as const, id: task.id, task, path: [...taskPath(index, task), plainText(task.content)] },
-      s: score(task.content, words, full),
-    }))
+    .map((task) => ({ task, s: score(task.content, words, full) }))
     .filter((x) => x.s > 0);
-  const tasks = rank(taskMatches, limit.tasks);
+  // Paths are only built for the tasks that are actually shown.
+  const tasks = taskMatches
+    .sort((a, b) => b.s - a.s)
+    .slice(0, LIMITS.tasks)
+    .map(({ task }) => ({ kind: 'task' as const, id: task.id, task, path: [...taskPath(index, task), plainText(task.content)] }));
 
-  return { projects, sections, tasks, total: projects.length + sections.length + taskMatches.length };
+  const labels = rank(
+    [...(extras.labels ?? new Map<string, number>())].map(([name, count]) => ({
+      item: { kind: 'label' as const, id: name, name, count, path: [name] },
+      s: score(name, words, full),
+    })),
+    LIMITS.labels,
+  );
+
+  const people = rank(
+    (extras.people ?? []).map(({ person, count }) => ({
+      item: { kind: 'person' as const, id: person.id, person, count, path: [person.name] },
+      s: Math.max(score(person.name, words, full), score(person.email, words, full)),
+    })),
+    LIMITS.people,
+  );
+
+  return { projects, sections, tasks, labels, people, total: projects.length + sections.length + taskMatches.length + labels.length + people.length };
 }

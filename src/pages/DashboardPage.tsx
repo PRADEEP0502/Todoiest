@@ -1,17 +1,34 @@
-import { ArrowRight, Inbox } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
-import { Count, EmptyState, ProjectDot } from '../components/common/ui';
+import { Avatar, Count, EmptyState, MetricStrip, Panel, ProjectDot, type Metric } from '../components/common/ui';
 import { TaskRow } from '../components/tasks/TaskRow';
 import { useNow } from '../hooks/useNow';
 import { href } from '../hooks/useRoute';
-import { formatLongDate, greeting, startOfMonth, toDateKey } from '../lib/dates';
+import { describeActivity } from '../lib/activity';
+import { formatLongDate, formatTime, greeting, toDateKey } from '../lib/dates';
 import { taskPath } from '../lib/hierarchy';
-import { byPriorityThenTime, completedSince, dashboardStats, isDueToday, isOverdue } from '../lib/stats';
+import {
+  CATEGORIES,
+  DATE_CHECKS,
+  completedToday,
+  describeCategory,
+  describeDateCheck,
+  hasHolderData,
+  holderCounts,
+  isDateCheckConfigured,
+  metricTasks,
+  UNASSIGNED,
+} from '../lib/metrics';
+import { topProjectsByOpenTasks } from '../lib/projects';
+import { byPriorityThenTime, isDueToday, isOverdue } from '../lib/stats';
 import { useWorkspace } from '../store/workspace';
 
-const TODAY_LIMIT = 8;
+const IMPORTANT_LIMIT = 8;
+const DAY = 24 * 60 * 60 * 1000;
 
+/** Home stays the same size however many projects exist: numbers → top-5 charts → today → last 24h. */
 export function DashboardPage() {
   const { settings } = useWorkspace();
   const now = useNow(60_000);
@@ -19,19 +36,32 @@ export function DashboardPage() {
   return (
     <Gate>
       {({ snapshot, index }) => {
+        const rules = settings.rules;
         const todayKey = toDateKey(now);
-        const stats = dashboardStats(snapshot, now);
         const name = settings.displayName.trim() || snapshot.user.full_name.split(' ')[0] || 'there';
+        const count = (metric: Parameters<typeof metricTasks>[0]) => metricTasks(metric, snapshot, index, rules, now).length;
 
-        const todayWork = snapshot.tasks
+        const dueToday = snapshot.tasks.filter((t) => isDueToday(t, todayKey)).length;
+        const overdue = snapshot.tasks.filter((t) => isOverdue(t, todayKey)).length;
+
+        const projects = topProjectsByOpenTasks(index, 5);
+        const holderStats = hasHolderData(snapshot) ? holderCounts(snapshot, now) : new Map();
+        const unassigned = holderStats.get(UNASSIGNED)?.active ?? 0;
+        const holders = holderStats.size
+          ? [...holderStats]
+              .filter(([id, c]) => id !== UNASSIGNED && c.active > 0)
+              .sort((a, b) => b[1].active - a[1].active)
+              .slice(0, 5)
+          : [];
+
+        const important = snapshot.tasks
           .filter((t) => isDueToday(t, todayKey) || isOverdue(t, todayKey))
           .sort((a, b) => Number(isOverdue(b, todayKey)) - Number(isOverdue(a, todayKey)) || byPriorityThenTime(a, b));
 
-        const done = new Map<string, number>();
-        for (const t of completedSince(snapshot.completed, startOfMonth(now))) done.set(t.project_id, (done.get(t.project_id) ?? 0) + 1);
+        const recent = snapshot.activity.filter((e) => now.getTime() - Date.parse(e.event_date) <= DAY);
 
         return (
-          <div className="space-y-8">
+          <div className="space-y-5">
             <div>
               <h1 className="text-[24px] font-semibold leading-8 tracking-[-0.01em] text-ink">
                 {greeting(now)}, {name} 👋
@@ -39,59 +69,148 @@ export function DashboardPage() {
               <p className="mt-0.5 text-[13px] text-ink-2">{formatLongDate(now)}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-              <Stat to={href.projects()} label="Total Tasks" value={stats.total} note={`across ${index.orderedProjects.length} projects`} />
-              <Stat to={href.today()} label="Today" value={stats.today} note="due today" />
-              <Stat to={href.today()} label="Overdue" value={stats.overdue} note="past due date" tone={stats.overdue > 0 ? 'text-p1' : undefined} />
-              <Stat to={href.completed()} label="Completed" value={stats.completedToday} note={`today · ${stats.completedThisWeek} this week`} />
+            <MetricStrip
+              label="Workspace totals"
+              columns="grid-cols-2 sm:grid-cols-5"
+              items={[
+                { label: 'Total Active Tasks', value: snapshot.tasks.length, href: href.metric('active'), note: `in ${index.orderedProjects.length} projects`, wideOnMobile: true },
+                { label: 'Due Today', value: dueToday, href: href.today() },
+                { label: 'Overdue', value: overdue, href: href.overdue(), tone: 'danger' },
+                { label: 'No Due Date', value: count('no-due'), href: href.metric('no-due') },
+                { label: 'Completed', value: snapshot.completedStatus.ok ? completedToday(snapshot, now) : null, href: href.completed(), note: 'today' },
+              ]}
+            />
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+              <div>
+                <SubHeading title="Overdue categories" link={{ to: href.overdue(), label: 'Open Overdue' }} />
+                <MetricStrip
+                  label="Overdue categories"
+                  size="md"
+                  columns="grid-cols-4"
+                  items={CATEGORIES.map<Metric>((c) => ({
+                    label: c.label,
+                    value: count(c.id),
+                    href: href.metric(c.id),
+                    note: shortCategoryNote(c.id, rules),
+                    tone: 'danger',
+                  }))}
+                />
+              </div>
+              <div>
+                <SubHeading title="Date checks" link={{ to: href.settings(), label: 'Configure' }} />
+                <MetricStrip
+                  label="Date checks"
+                  size="md"
+                  columns="grid-cols-2"
+                  items={DATE_CHECKS.map<Metric>((c) => ({
+                    label: c.label,
+                    value: isDateCheckConfigured(rules[c.id]) ? count(c.id) : null,
+                    href: isDateCheckConfigured(rules[c.id]) ? href.metric(c.id) : href.settings(),
+                    note: isDateCheckConfigured(rules[c.id]) ? describeDateCheck(rules[c.id]) : 'Not set up yet',
+                  }))}
+                />
+              </div>
             </div>
 
-            <section>
-              <SectionHeading title="Today’s Work" count={todayWork.length} link={todayWork.length > TODAY_LIMIT ? { to: href.today(), label: 'View all' } : undefined} />
-              <div className="panel px-2 py-1.5 sm:px-3">
-                {todayWork.length === 0 ? (
-                  <EmptyState title="Nothing due today">No overdue or due-today tasks. Enjoy the clear day.</EmptyState>
+            <div className={`grid gap-4 ${holders.length ? 'lg:grid-cols-2' : ''}`}>
+              <Panel
+                title="Project-wise Active Tasks"
+                subtitle={`Top ${projects.length} of ${index.orderedProjects.length} projects by active tasks`}
+                footer={<FooterLink to={href.projects()}>View All Projects</FooterLink>}
+              >
+                {projects.length ? (
+                  <BarList
+                    label="Top projects by active tasks"
+                    unit="active tasks"
+                    entries={projects.map(({ project, open }) => ({
+                      id: project.id,
+                      label: project.name,
+                      value: open,
+                      href: href.project(project.id),
+                      mark: <ProjectDot color={project.color} />,
+                      detail: `${index.sectionsByProject.get(project.id)?.length ?? 0} sections`,
+                    }))}
+                  />
                 ) : (
-                  <>
-                    {todayWork.slice(0, TODAY_LIMIT).map((task) => (
-                      <TaskRow key={task.id} task={task} path={taskPath(index, task)} />
-                    ))}
-                    {todayWork.length > TODAY_LIMIT && (
-                      <a href={href.today()} className="flex items-center gap-1 px-7 py-2 text-[13px] font-medium text-accent hover:underline">
-                        {todayWork.length - TODAY_LIMIT} more in Today <ArrowRight size={13} />
-                      </a>
-                    )}
-                  </>
+                  <EmptyState title="No active tasks" />
                 )}
-              </div>
-            </section>
+              </Panel>
 
-            <section>
-              <SectionHeading title="Projects" count={index.orderedProjects.length} link={{ to: href.projects(), label: 'All projects' }} />
-              <div className="panel divide-y divide-line">
-                {index.orderedProjects.map(({ project, depth }) => {
-                  const open = index.openByProject.get(project.id) ?? 0;
-                  const finished = done.get(project.id) ?? 0;
-                  const pct = open + finished > 0 ? Math.round((finished / (open + finished)) * 100) : 0;
-                  return (
-                    <a key={project.id} href={href.project(project.id)} className="flex items-center gap-3 px-4 py-2.5 hover:bg-canvas">
-                      <span className="flex min-w-0 flex-1 items-center gap-2.5" style={{ paddingLeft: depth * 16 }}>
-                        {project.inbox_project ? <Inbox size={13} className="shrink-0 text-ink-3" /> : <ProjectDot color={project.color} />}
-                        <span className="truncate text-[13.5px] text-ink">{project.name}</span>
-                      </span>
-                      <span className="w-16 text-right text-[12px] tabular-nums text-ink-2">{open} open</span>
-                      <span className="hidden w-32 items-center gap-2 sm:flex" title={`${finished} completed this month`}>
-                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-hover">
-                          <span className="block h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
-                        </span>
-                        <span className="w-8 text-right text-2xs tabular-nums text-ink-3">{pct}%</span>
-                      </span>
-                    </a>
-                  );
-                })}
-              </div>
-              <p className="mt-2 text-2xs text-ink-3">Progress = tasks completed this month ÷ (completed this month + still open).</p>
-            </section>
+              {holders.length > 0 && (
+                <Panel title="Holder-wise Active Tasks" subtitle={`Top ${holders.length} people by active tasks${unassigned ? ` · ${unassigned} tasks have no holder` : ''}`} footer={<FooterLink to={href.holders()}>View All Holders</FooterLink>}>
+                  <BarList
+                    label="Top holders by active tasks"
+                    unit="active tasks"
+                    entries={holders.map(([id, c]) => {
+                      const personName = snapshot.people[id]?.name ?? 'Unknown person';
+                      return {
+                        id,
+                        label: personName,
+                        value: c.active,
+                        href: href.holder(id),
+                        mark: <Avatar id={id} name={personName} size={18} />,
+                        detail: `${c.overdue} overdue`,
+                      };
+                    })}
+                  />
+                </Panel>
+              )}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <Panel
+                title={
+                  <span className="flex items-center gap-2">
+                    Today’s Important Tasks <Count>{important.length}</Count>
+                  </span>
+                }
+                subtitle="Overdue first, then due today — most urgent priority first"
+                footer={important.length > IMPORTANT_LIMIT ? <FooterLink to={href.today()}>{`${important.length - IMPORTANT_LIMIT} more in Today`}</FooterLink> : undefined}
+              >
+                {important.length === 0 ? (
+                  <EmptyState title="Nothing due today">No overdue or due-today tasks.</EmptyState>
+                ) : (
+                  important.slice(0, IMPORTANT_LIMIT).map((task) => <TaskRow key={task.id} task={task} path={taskPath(index, task)} />)
+                )}
+              </Panel>
+
+              <Panel
+                title={
+                  <span className="flex items-center gap-2">
+                    Last 24 Hours <Count>{recent.length}</Count>
+                  </span>
+                }
+                subtitle="From the Todoist activity log"
+                footer={<FooterLink to={href.activity()}>Open Activity Logs</FooterLink>}
+              >
+                {!snapshot.activityStatus.ok ? (
+                  <p className="px-2 py-6 text-center text-[13px] text-ink-3">{snapshot.activityStatus.reason}</p>
+                ) : recent.length === 0 ? (
+                  <p className="px-2 py-6 text-center text-[13px] text-ink-3">No activity in the last 24 hours.</p>
+                ) : (
+                  <ul className="divide-y divide-line">
+                    {recent.slice(0, 6).map((event) => {
+                      const row = describeActivity(event, snapshot, index);
+                      return (
+                        <li key={row.id} className="grid grid-cols-[4.25rem_minmax(0,1fr)] gap-2 px-2 py-2">
+                          <span className="pt-px text-[12px] tabular-nums text-ink-3">{formatTime(row.at)}</span>
+                          <span className="min-w-0 text-[13px]">
+                            <span className="text-ink-2">
+                              {row.user} · <span className="font-medium text-ink">{row.action}</span>
+                            </span>
+                            <span className="block truncate text-ink">{row.kind === 'comment' ? `“${row.subject}”` : row.subject}</span>
+                            {(row.context || row.projectName) && (
+                              <span className="block truncate text-[12px] text-ink-3">{[row.context, row.projectName].filter(Boolean).join(' · ')}</span>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </Panel>
+            </div>
           </div>
         );
       }}
@@ -99,26 +218,27 @@ export function DashboardPage() {
   );
 }
 
-function Stat({ to, label, value, note, tone }: { to: string; label: string; value: number; note: string; tone?: string }) {
+/** Short note under a category number — the full rule is on the metric's own page. */
+function shortCategoryNote(id: (typeof CATEGORIES)[number]['id'], rules: Parameters<typeof describeCategory>[1]): string {
+  if (rules.categoryBasis !== 'days-overdue') return describeCategory(id, rules);
+  return { a5: '1–5 days', a10: '6–10 days', a30: '11–30 days', a30plus: '30+ days' }[id];
+}
+
+function SubHeading({ title, link }: { title: string; link: { to: string; label: string } }) {
   return (
-    <a href={to} className="panel block px-4 py-3 transition-colors hover:border-line-strong">
-      <div className="text-[12px] font-medium text-ink-2">{label}</div>
-      <div className={`mt-1 text-[26px] font-semibold leading-8 tabular-nums tracking-[-0.02em] ${tone ?? 'text-ink'}`}>{value}</div>
-      <div className="truncate text-2xs text-ink-3">{note}</div>
-    </a>
+    <div className="mb-2 flex items-baseline gap-2">
+      <h2 className="text-[13px] font-semibold text-ink-2">{title}</h2>
+      <a href={link.to} className="ml-auto text-[12px] text-ink-3 hover:text-accent">
+        {link.label}
+      </a>
+    </div>
   );
 }
 
-function SectionHeading({ title, count, link }: { title: string; count?: number; link?: { to: string; label: string } }): ReactNode {
+function FooterLink({ to, children }: { to: string; children: ReactNode }) {
   return (
-    <div className="mb-2.5 flex items-center gap-2">
-      <h2 className="text-[16px] font-semibold text-ink">{title}</h2>
-      {count !== undefined && <Count>{count}</Count>}
-      {link && (
-        <a href={link.to} className="ml-auto inline-flex items-center gap-1 text-[13px] text-ink-2 hover:text-accent">
-          {link.label} <ArrowRight size={13} />
-        </a>
-      )}
-    </div>
+    <a href={to} className="ml-auto inline-flex items-center gap-1 text-[13px] font-medium text-accent hover:underline">
+      {children} <ArrowRight size={13} />
+    </a>
   );
 }

@@ -1,12 +1,14 @@
-import { Check, ExternalLink, Flag, MessageSquare, Tag, Trash2, User } from 'lucide-react';
+import { Check, ExternalLink, Flag, MessageSquare, Send, Tag, Trash2, User } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
-import { addDays, dueDateKey, dueTime, startOfWeek, toDateKey } from '../../lib/dates';
+import { addDays, dueDateKey, dueTime, formatShortDate, formatTime, startOfWeek, toDateKey } from '../../lib/dates';
+import { plainText } from '../../lib/search';
 import { descendantsOf, PERSONAL_GROUP_ID, taskPath } from '../../lib/hierarchy';
 import { PRIORITY_STYLE, toUiPriority, type UiPriority } from '../../lib/priority';
 import { useUi, type NewTaskDefaults } from '../../store/ui';
 import { useWorkspace, type TaskForm } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { Modal } from '../common/Modal';
+import { Avatar } from '../common/ui';
 
 export function TaskDialog() {
   const { dialog, closeDialog } = useUi();
@@ -67,7 +69,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const dirty = (Object.keys(initial) as (keyof TaskForm)[]).some((k) => form[k] !== initial[k]);
   const valid = form.content.trim().length > 0 && index.projectById.has(form.projectId);
   const subtasks = task ? descendantsOf(index, task.id) : [];
-  const assignee = task?.responsible_uid ? snapshot?.collaborators[task.responsible_uid] : undefined;
+  const assignee = task?.responsible_uid ? snapshot?.people[task.responsible_uid] : undefined;
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -279,6 +281,69 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
         )}
         <button type="submit" hidden />
       </form>
+      {task && <TaskComments taskId={task.id} />}
     </Modal>
+  );
+}
+
+/** Comments on a task from Todoist, oldest first, with a box to add one. */
+function TaskComments({ taskId }: { taskId: string }) {
+  const { snapshot, addComment } = useWorkspace();
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const now = useMemo(() => new Date(), []);
+  if (!snapshot) return null;
+  const comments = snapshot.comments.filter((c) => c.task_id === taskId).sort((a, b) => (a.posted_at ?? '').localeCompare(b.posted_at ?? ''));
+
+  const send = async () => {
+    if (!draft.trim() || sending) return;
+    setSending(true);
+    const ok = await addComment(taskId, draft);
+    setSending(false);
+    if (ok) setDraft('');
+  };
+
+  return (
+    <section className="mt-4 border-t border-line pt-3" aria-label="Comments">
+      <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+        <MessageSquare size={13} /> Comments <span className="font-normal text-ink-3">{comments.length}</span>
+      </h3>
+      {comments.length > 0 && (
+        <ul className="mb-3 space-y-3">
+          {comments.map((c) => {
+            const author = c.posted_uid ? snapshot.people[c.posted_uid] : undefined;
+            const at = c.posted_at ? new Date(c.posted_at) : null;
+            return (
+              <li key={c.id} className="flex gap-2.5">
+                <Avatar id={c.posted_uid ?? 'unknown'} name={author?.name ?? '?'} size={22} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2 text-[12px]">
+                    <span className="font-semibold text-ink">{author?.name ?? 'Unknown person'}</span>
+                    {at && <span className="text-ink-3">{formatShortDate(at, now)}, {formatTime(at)}</span>}
+                  </div>
+                  <p className="whitespace-pre-wrap break-words text-[13px] text-ink">{plainText(c.content)}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="flex items-end gap-2">
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
+          }}
+          rows={Math.min(4, Math.max(1, draft.split('\n').length))}
+          placeholder="Write a comment…"
+          aria-label="New comment"
+          className="field h-auto min-h-9 resize-none py-2"
+        />
+        <button type="button" className="btn-secondary h-9" onClick={send} disabled={!draft.trim() || sending}>
+          <Send size={14} /> {sending ? 'Posting…' : 'Post'}
+        </button>
+      </div>
+    </section>
   );
 }

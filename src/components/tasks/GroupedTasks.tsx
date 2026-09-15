@@ -1,5 +1,5 @@
 import { ArrowUpRight } from 'lucide-react';
-import { useCollapse } from '../../hooks/useCollapse';
+import { useDisclosure } from '../../hooks/useDisclosure';
 import { href } from '../../hooks/useRoute';
 import { groupByProjectAndSection, type ProjectTaskGroup, type SectionGroup } from '../../lib/hierarchy';
 import { useWorkspace } from '../../store/workspace';
@@ -13,17 +13,19 @@ interface GroupedTasksProps {
   viewKey: string;
   compare?: (a: TodoistTask, b: TodoistTask) => number;
   hideDue?: boolean;
+  /** Whether project and section groups start open. Large lists start collapsed. */
+  defaultOpen?: boolean;
 }
 
 /** Any list of tasks, organised as Project → Section → Task (→ Subtask). */
-export function GroupedTasks({ tasks, viewKey, compare, hideDue }: GroupedTasksProps) {
+export function GroupedTasks({ tasks, viewKey, compare, hideDue, defaultOpen = true }: GroupedTasksProps) {
   const { index } = useWorkspace();
   if (!index) return null;
   const { groups, childrenOf } = groupByProjectAndSection(index, tasks, compare);
   return (
     <div className="space-y-1">
       {groups.map((group) => (
-        <ProjectBlock key={group.project.id} group={group} viewKey={viewKey} childrenOf={childrenOf} hideDue={hideDue} />
+        <ProjectBlock key={group.project.id} group={group} viewKey={viewKey} childrenOf={childrenOf} hideDue={hideDue} defaultOpen={defaultOpen} />
       ))}
     </div>
   );
@@ -34,13 +36,16 @@ function ProjectBlock({
   viewKey,
   childrenOf,
   hideDue,
+  defaultOpen,
 }: {
   group: ProjectTaskGroup;
   viewKey: string;
   childrenOf: (id: string) => TodoistTask[];
   hideDue?: boolean;
+  defaultOpen: boolean;
 }) {
-  const [collapsed, toggle] = useCollapse(`${viewKey}:project:${group.project.id}`);
+  const [open, toggle] = useDisclosure(`${viewKey}:project:${group.project.id}`, defaultOpen);
+  const collapsed = !open;
   return (
     <section>
       <div className="group flex items-center gap-1">
@@ -64,6 +69,7 @@ function ProjectBlock({
               viewKey={viewKey}
               childrenOf={childrenOf}
               hideDue={hideDue}
+              defaultOpen={defaultOpen}
             />
           ))}
         </div>
@@ -78,22 +84,25 @@ function SectionBlock({
   viewKey,
   childrenOf,
   hideDue,
+  defaultOpen,
 }: {
   group: SectionGroup;
   projectId: string;
   viewKey: string;
   childrenOf: (id: string) => TodoistTask[];
   hideDue?: boolean;
+  defaultOpen: boolean;
 }) {
-  const [collapsed, toggle] = useCollapse(`${viewKey}:section:${projectId}:${group.section?.id ?? 'none'}`);
-  if (!group.section) return <TaskTree tasks={group.roots} childrenOf={childrenOf} hideDue={hideDue} />;
+  const [open, toggle] = useDisclosure(`${viewKey}:section:${projectId}:${group.section?.id ?? 'none'}`, defaultOpen);
+  const collapsed = !open;
+  if (!group.section) return <TaskTree tasks={group.roots} childrenOf={childrenOf} hideDue={hideDue} subtasksOpen />;
   return (
     <div className="mt-1">
       <button type="button" onClick={toggle} aria-expanded={!collapsed} className="flex items-center gap-1.5 rounded px-1 py-1 text-left hover:bg-canvas">
         <Chevron collapsed={collapsed} className="!h-3.5 !w-3.5" />
         <span className="text-[12.5px] font-semibold text-ink-2">{group.section.name}</span>
       </button>
-      {!collapsed && <TaskTree tasks={group.roots} childrenOf={childrenOf} hideDue={hideDue} />}
+      {!collapsed && <TaskTree tasks={group.roots} childrenOf={childrenOf} hideDue={hideDue} subtasksOpen />}
     </div>
   );
 }

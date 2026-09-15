@@ -1,19 +1,9 @@
-import type { CreateTaskInput, MoveTaskInput, TodoistLabel, TodoistTask, UpdateTaskInput } from '../../types/todoist';
+import type { CreateTaskInput, MoveTaskInput, TodoistTask, UpdateTaskInput } from '../../types/todoist';
 import type { TodoistClient } from './client';
 
 const MAX_COMPLETED_PAGES = 20;
 
 const taskPath = (id: string) => `/tasks/${encodeURIComponent(id)}`;
-
-/** All active (not completed) tasks across every project, including subtasks. */
-export async function getTasks(client: TodoistClient, signal?: AbortSignal): Promise<TodoistTask[]> {
-  const tasks = await client.listAll<TodoistTask>('/tasks', {}, signal);
-  return tasks.filter((t) => !t.is_deleted);
-}
-
-export function getTask(client: TodoistClient, id: string): Promise<TodoistTask> {
-  return client.request<TodoistTask>(taskPath(id));
-}
 
 export function createTask(client: TodoistClient, input: CreateTaskInput): Promise<TodoistTask> {
   return client.request<TodoistTask>('/tasks', { method: 'POST', body: input });
@@ -63,8 +53,4 @@ export async function getCompletedTasks(
     if (!cursor) break;
   }
   return all;
-}
-
-export function getLabels(client: TodoistClient, signal?: AbortSignal): Promise<TodoistLabel[]> {
-  return client.listAll<TodoistLabel>('/labels', {}, signal);
 }

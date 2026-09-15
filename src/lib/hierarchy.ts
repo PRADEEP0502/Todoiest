@@ -235,14 +235,18 @@ export function groupByProjectAndSection(
   return { groups, childrenOf: (taskId) => children.get(taskId) ?? [] };
 }
 
-/** "Project › Section" (or "Project › Section › Parent task") for a task. */
+/** "Project › Section › Parent task › …" for a task: every level above it, top first. */
 export function taskPath(index: WorkspaceIndex, task: Pick<TodoistTask, 'project_id' | 'section_id' | 'parent_id'>): string[] {
   const path: string[] = [];
   const project = index.projectById.get(task.project_id);
   if (project) path.push(project.name);
   const section = task.section_id ? index.sectionById.get(task.section_id) : undefined;
   if (section) path.push(section.name);
-  const parent = task.parent_id ? index.taskById.get(task.parent_id) : undefined;
-  if (parent) path.push(parent.content);
-  return path;
+  const parents: string[] = [];
+  const seen = new Set<string>();
+  for (let p = task.parent_id ? index.taskById.get(task.parent_id) : undefined; p && !seen.has(p.id); p = p.parent_id ? index.taskById.get(p.parent_id) : undefined) {
+    seen.add(p.id);
+    parents.unshift(p.content);
+  }
+  return [...path, ...parents];
 }

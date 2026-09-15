@@ -1,132 +1,127 @@
-import { CalendarDays, CheckCircle2, FolderKanban, Inbox, LayoutDashboard, Settings, Sun } from 'lucide-react';
+import { AlarmClock, Bell, CalendarDays, CheckCircle2, FolderKanban, History, LayoutDashboard, MessageSquare, Settings, Sun, Tag, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useCollapse } from '../../hooks/useCollapse';
 import { useNow } from '../../hooks/useNow';
 import { href, type Route } from '../../hooks/useRoute';
 import { toDateKey } from '../../lib/dates';
-import type { ProjectGroup, ProjectNode } from '../../lib/hierarchy';
-import { isDueToday } from '../../lib/stats';
+import { isDueToday, isOverdue } from '../../lib/stats';
+import { useNotifications } from '../../store/notifications';
 import { useWorkspace } from '../../store/workspace';
-import { Chevron, Count, ProjectDot } from '../common/ui';
+import { Count } from '../common/ui';
 import { ConnectionBadge } from './SyncStatus';
 
-export function Sidebar({ route }: { route: Route }) {
+export interface NavLink {
+  to: string;
+  label: string;
+  icon: ReactNode;
+  active: boolean;
+  count?: number;
+  alert?: boolean;
+}
+
+/** The main navigation, shared by the desktop sidebar and the mobile "More" menu. */
+export interface NavGroup {
+  label: string | null;
+  links: NavLink[];
+}
+
+export function useNavLinks(route: Route): { main: NavLink[]; secondary: NavLink[]; groups: NavGroup[] } {
   const { index, snapshot } = useWorkspace();
+  const { unreadCount } = useNotifications();
   const now = useNow(60_000);
   const todayKey = toDateKey(now);
-  const todayCount = snapshot?.tasks.filter((t) => isDueToday(t, todayKey)).length;
+  const today = snapshot?.tasks.filter((t) => isDueToday(t, todayKey)).length;
+  const overdue = snapshot?.tasks.filter((t) => isOverdue(t, todayKey)).length;
+  const size = 16;
+
+  const main: NavLink[] = [
+      { to: href.dashboard(), label: 'Dashboard', icon: <LayoutDashboard size={size} />, active: route.name === 'dashboard' || route.name === 'metric' },
+      { to: href.projects(), label: 'Projects', icon: <FolderKanban size={size} />, active: route.name === 'projects' || route.name === 'project', count: index?.orderedProjects.length },
+      { to: href.today(), label: 'Today', icon: <Sun size={size} />, active: route.name === 'today', count: today },
+      { to: href.overdue(), label: 'Overdue', icon: <AlarmClock size={size} />, active: route.name === 'overdue', count: overdue, alert: !!overdue },
+      { to: href.holders(), label: 'Holder Wise', icon: <Users size={size} />, active: route.name === 'holders' || route.name === 'holder' },
+      { to: href.labels(), label: 'Label Wise', icon: <Tag size={size} />, active: route.name === 'labels' || route.name === 'label' },
+      { to: href.activity(), label: 'Activity Logs', icon: <History size={size} />, active: route.name === 'activity' },
+      { to: href.comments(), label: 'Comments', icon: <MessageSquare size={size} />, active: route.name === 'comments', count: snapshot?.comments.length },
+      { to: href.notifications(), label: 'Notifications', icon: <Bell size={size} />, active: route.name === 'notifications', count: unreadCount, alert: unreadCount > 0 },
+  ];
+  const secondary: NavLink[] = [
+    { to: href.upcoming(), label: 'Upcoming', icon: <CalendarDays size={size} />, active: route.name === 'upcoming' },
+    { to: href.completed(), label: 'Completed', icon: <CheckCircle2 size={size} />, active: route.name === 'completed' },
+  ];
+  // Same order as the main menu, split into small groups so it can be scanned at a glance.
+  const groups: NavGroup[] = [
+    { label: null, links: main.slice(0, 4) },
+    { label: 'People & labels', links: main.slice(4, 6) },
+    { label: 'Updates', links: main.slice(6) },
+    { label: 'More views', links: secondary },
+  ];
+  return { main, secondary, groups };
+}
+
+/** Workspace name from Todoist (team workspace, else the account owner's name). */
+export function Brand({ compact = false }: { compact?: boolean }) {
+  const { snapshot } = useWorkspace();
+  const first = snapshot?.user.full_name.split(' ')[0];
+  const name = snapshot?.workspaces[0]?.name ?? (first ? `${first}'s workspace` : 'Workspace');
+  const initials = name.replace(/'s workspace$/, '').split(/s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'W';
+  return (
+    <a href={href.dashboard()} className="flex min-w-0 items-center gap-2.5" aria-label={`${name} dashboard`}>
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-[12px] font-bold tracking-[0.02em] text-white">{initials}</span>
+      {!compact && (
+        <span className="min-w-0 leading-tight">
+          <span className="block truncate text-[14px] font-semibold text-ink">{name}</span>
+          <span className="block truncate text-2xs text-ink-3">Management dashboard</span>
+        </span>
+      )}
+    </a>
+  );
+}
+
+export function Sidebar({ route }: { route: Route }) {
+  const { groups } = useNavLinks(route);
 
   return (
-    <aside className="hidden w-[248px] shrink-0 flex-col border-r border-line bg-sidebar md:flex">
-      <div className="flex h-14 items-center gap-2.5 px-4">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-ink text-[13px] font-bold text-white">W</span>
-        <div className="leading-tight">
-          <div className="text-[14px] font-semibold text-ink">Workspace</div>
-          <div className="text-2xs text-ink-3">Todoist dashboard</div>
-        </div>
+    <aside className="hidden w-[232px] shrink-0 flex-col border-r border-line bg-sidebar md:flex">
+      <div className="flex h-14 items-center px-4">
+        <Brand />
       </div>
 
-      <nav className="space-y-0.5 px-2 pt-1" aria-label="Main">
-        <NavItem to={href.dashboard()} active={route.name === 'dashboard'} icon={<LayoutDashboard size={16} />}>Dashboard</NavItem>
-        <NavItem to={href.today()} active={route.name === 'today'} icon={<Sun size={16} />} count={todayCount}>Today</NavItem>
-        <NavItem to={href.upcoming()} active={route.name === 'upcoming'} icon={<CalendarDays size={16} />}>Upcoming</NavItem>
-        <NavItem to={href.projects()} active={route.name === 'projects'} icon={<FolderKanban size={16} />} count={index?.orderedProjects.length}>
-          Projects
-        </NavItem>
-        <NavItem to={href.completed()} active={route.name === 'completed'} icon={<CheckCircle2 size={16} />}>Completed</NavItem>
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-1" aria-label="Main">
+        {groups.map((group) => (
+          <div key={group.label ?? 'main'} className={group.label ? 'pt-4' : ''}>
+            {group.label && <div className="eyebrow px-2 pb-1">{group.label}</div>}
+            <div className="space-y-0.5">
+              {group.links.map((link) => (
+                <NavItem key={link.label} link={link} />
+              ))}
+            </div>
+          </div>
+        ))}
       </nav>
-
-      <div className="mt-5 flex min-h-0 flex-1 flex-col">
-        <div className="eyebrow px-4 pb-1.5">Projects</div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-          {!index && <div className="space-y-2 px-2 pt-1">{[70, 55, 80, 60].map((w) => <div key={w} className="h-4 animate-pulse rounded bg-hover" style={{ width: `${w}%` }} />)}</div>}
-          {index?.groups.map((group) => (
-            <SidebarGroup
-              key={group.id}
-              group={group}
-              single={index.groups.length === 1}
-              activeProjectId={route.name === 'project' ? route.projectId : null}
-              counts={index.openByProject}
-            />
-          ))}
-        </div>
-      </div>
 
       <div className="border-t border-line px-2 py-2">
         <div className="px-2 pb-1 pt-1">
           <div className="eyebrow mb-1">Todoist</div>
           <ConnectionBadge />
         </div>
-        <NavItem to={href.settings()} active={route.name === 'settings'} icon={<Settings size={16} />}>Settings</NavItem>
+        <NavItem link={{ to: href.settings(), label: 'Settings', icon: <Settings size={16} />, active: route.name === 'settings' }} />
       </div>
     </aside>
   );
 }
 
-function NavItem({ to, active, icon, count, children }: { to: string; active: boolean; icon: ReactNode; count?: number; children: ReactNode }) {
+export function NavItem({ link }: { link: NavLink }) {
   return (
     <a
-      href={to}
-      aria-current={active ? 'page' : undefined}
-      className={`flex h-8 items-center gap-2.5 rounded-md px-2 text-[13.5px] transition-colors ${active ? 'bg-surface font-medium text-ink shadow-[0_0_0_1px_theme(colors.line)]' : 'text-ink-2 hover:bg-hover hover:text-ink'}`}
+      href={link.to}
+      aria-current={link.active ? 'page' : undefined}
+      className={`flex h-8 items-center gap-2.5 rounded-md px-2 text-[13.5px] transition-colors ${link.active ? 'bg-surface font-medium text-ink shadow-[0_0_0_1px_theme(colors.line)]' : 'text-ink-2 hover:bg-hover hover:text-ink'}`}
     >
-      <span className={active ? 'text-accent' : 'text-ink-3'}>{icon}</span>
-      <span className="flex-1 truncate">{children}</span>
-      {count !== undefined && count > 0 && <Count>{count}</Count>}
+      <span className={link.active ? 'text-accent' : 'text-ink-3'}>{link.icon}</span>
+      <span className="flex-1 truncate">{link.label}</span>
+      {link.count !== undefined && link.count > 0 && (
+        <Count className={link.alert ? '!text-p1 font-semibold' : ''}>{link.count}</Count>
+      )}
     </a>
-  );
-}
-
-function SidebarGroup({
-  group,
-  single,
-  activeProjectId,
-  counts,
-}: {
-  group: ProjectGroup;
-  single: boolean;
-  activeProjectId: string | null;
-  counts: Map<string, number>;
-}) {
-  const [collapsed, toggle] = useCollapse(`sidebar:group:${group.id}`);
-  const nodes = group.roots.map((node) => <SidebarProject key={node.project.id} node={node} activeProjectId={activeProjectId} counts={counts} />);
-  if (single) return <div>{nodes}</div>;
-  return (
-    <div className="mb-1">
-      <button type="button" onClick={toggle} aria-expanded={!collapsed} className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left hover:bg-hover">
-        <Chevron collapsed={collapsed} className="!h-3.5 !w-3.5" />
-        <span className="flex-1 truncate text-[12.5px] font-semibold text-ink-2">{group.name}</span>
-        <Count>{group.projectCount}</Count>
-      </button>
-      {!collapsed && <div>{nodes}</div>}
-    </div>
-  );
-}
-
-function SidebarProject({ node, activeProjectId, counts }: { node: ProjectNode; activeProjectId: string | null; counts: Map<string, number> }) {
-  const [collapsed, toggle] = useCollapse(`sidebar:project:${node.project.id}`);
-  const active = activeProjectId === node.project.id;
-  const hasChildren = node.children.length > 0;
-  return (
-    <>
-      <div
-        className={`group flex h-8 items-center rounded-md pr-2 transition-colors ${active ? 'bg-surface shadow-[0_0_0_1px_theme(colors.line)]' : 'hover:bg-hover'}`}
-        style={{ paddingLeft: 8 + node.depth * 14 }}
-      >
-        <span className="flex w-4 shrink-0 justify-center">
-          {hasChildren && (
-            <button type="button" onClick={toggle} aria-label={collapsed ? 'Expand' : 'Collapse'} className="rounded">
-              <Chevron collapsed={collapsed} className="!h-3.5 !w-3.5" />
-            </button>
-          )}
-        </span>
-        <a href={href.project(node.project.id)} aria-current={active ? 'page' : undefined} className="flex min-w-0 flex-1 items-center gap-2 pl-1">
-          {node.project.inbox_project ? <Inbox size={13} className="shrink-0 text-ink-3" /> : <ProjectDot color={node.project.color} />}
-          <span className={`truncate text-[13.5px] ${active ? 'font-medium text-ink' : 'text-ink-2 group-hover:text-ink'}`}>{node.project.name}</span>
-        </a>
-        <Count className="pl-2">{counts.get(node.project.id) || ''}</Count>
-      </div>
-      {hasChildren && !collapsed && node.children.map((child) => <SidebarProject key={child.project.id} node={child} activeProjectId={activeProjectId} counts={counts} />)}
-    </>
   );
 }

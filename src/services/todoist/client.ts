@@ -22,7 +22,10 @@ type Query = Record<string, string | number | undefined | null>;
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'DELETE';
   query?: Query;
+  /** Sent as JSON. */
   body?: unknown;
+  /** Sent as `application/x-www-form-urlencoded` (the Sync API's format). */
+  form?: Record<string, string>;
   signal?: AbortSignal;
 }
 
@@ -51,21 +54,26 @@ export class TodoistClient {
     this.token = token.trim();
   }
 
-  async request<T>(path: string, { method = 'GET', query, body, signal }: RequestOptions = {}): Promise<T> {
+  async request<T>(path: string, { method = 'GET', query, body, form, signal }: RequestOptions = {}): Promise<T> {
     const url = new URL(TODOIST_API_BASE + path);
     for (const [key, value] of Object.entries(query ?? {})) {
       if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
     }
 
     const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    let payload: string | URLSearchParams | undefined;
+    if (form) payload = new URLSearchParams(form);
+    else if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      payload = JSON.stringify(body);
+    }
 
     let response: Response;
     try {
       response = await fetch(url, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: payload,
         signal,
       });
     } catch (err) {

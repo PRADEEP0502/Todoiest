@@ -32,7 +32,7 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
   const priority = toUiPriority(task.priority);
   const style = PRIORITY_STYLE[priority];
   const due = hideDue ? null : describeDue(task.due, now);
-  const assignee = task.responsible_uid ? snapshot?.collaborators[task.responsible_uid] : undefined;
+  const assignee = task.responsible_uid ? snapshot?.people[task.responsible_uid] : undefined;
 
   const meta: ReactNode[] = [];
   if (due) meta.push(<span key="due" className={`font-medium ${TONE_CLASS[due.tone]}`}>{due.label}</span>);
@@ -82,7 +82,8 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
 
   return (
     <div
-      className="group relative flex items-start gap-2 rounded-md py-2 pr-2 transition-colors hover:bg-canvas"
+      data-task-id={task.id}
+      className="group relative flex scroll-mt-24 items-start gap-2 rounded-md py-2 pr-2 transition-colors hover:bg-canvas"
       style={{ paddingLeft: depth * 28 + 4 }}
     >
       <span className="flex h-5 w-4 shrink-0 items-center justify-center">

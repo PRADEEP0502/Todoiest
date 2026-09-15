@@ -4,17 +4,25 @@ import { MobileNav, TopBar } from './components/layout/TopBar';
 import { Sidebar } from './components/layout/Sidebar';
 import { TaskDialog } from './components/tasks/TaskDialog';
 import { useRoute, type Route } from './hooks/useRoute';
+import { ActivityPage } from './pages/ActivityPage';
+import { CommentsPage } from './pages/CommentsPage';
 import { CompletedPage } from './pages/CompletedPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { HolderPage, HoldersPage } from './pages/HoldersPage';
+import { LabelPage, LabelsPage } from './pages/LabelsPage';
+import { MetricPage } from './pages/MetricPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { OverduePage } from './pages/OverduePage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TodayPage } from './pages/TodayPage';
 import { UpcomingPage } from './pages/UpcomingPage';
+import { NotificationsProvider } from './store/notifications';
 import { UiProvider } from './store/ui';
 import { WorkspaceProvider } from './store/workspace';
 
-function Page({ route }: { route: Route }) {
+function Page({ route, visit }: { route: Route; visit: number }) {
   switch (route.name) {
     case 'today':
       return <TodayPage />;
@@ -23,7 +31,25 @@ function Page({ route }: { route: Route }) {
     case 'projects':
       return <ProjectsPage />;
     case 'project':
-      return <ProjectDetailPage projectId={route.projectId} sectionId={route.sectionId} />;
+      return <ProjectDetailPage projectId={route.projectId} sectionId={route.sectionId} taskId={route.taskId} visit={visit} />;
+    case 'overdue':
+      return <OverduePage category={route.category} />;
+    case 'holders':
+      return <HoldersPage />;
+    case 'holder':
+      return <HolderPage holderId={route.holderId} />;
+    case 'labels':
+      return <LabelsPage />;
+    case 'label':
+      return <LabelPage label={route.label} />;
+    case 'metric':
+      return <MetricPage metric={route.metric} />;
+    case 'activity':
+      return <ActivityPage />;
+    case 'comments':
+      return <CommentsPage />;
+    case 'notifications':
+      return <NotificationsPage />;
     case 'completed':
       return <CompletedPage />;
     case 'settings':
@@ -33,14 +59,29 @@ function Page({ route }: { route: Route }) {
   }
 }
 
+function routeKey(route: Route): string {
+  switch (route.name) {
+    case 'project':
+      return `project:${route.projectId}`;
+    case 'holder':
+      return `holder:${route.holderId}`;
+    case 'label':
+      return `label:${route.label}`;
+    case 'metric':
+      return `metric:${route.metric}`;
+    default:
+      return route.name;
+  }
+}
+
 function Shell() {
-  const route = useRoute();
+  const { route, visit } = useRoute();
   const main = useRef<HTMLElement>(null);
-  const routeKey = route.name === 'project' ? `project:${route.projectId}` : route.name;
+  const key = routeKey(route);
 
   useEffect(() => {
     main.current?.scrollTo({ top: 0 });
-  }, [routeKey]);
+  }, [key]);
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -48,8 +89,9 @@ function Shell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar route={route} />
         <main ref={main} className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[920px] px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
-            <Page route={route} />
+          {/* One width for every page, so headings never jump sideways between views. */}
+          <div className="mx-auto w-full max-w-[1080px] px-4 pb-16 pt-6 sm:px-8 sm:pt-7">
+            <Page route={route} visit={visit} />
           </div>
         </main>
         <MobileNav route={route} />
@@ -64,7 +106,9 @@ export default function App() {
   return (
     <UiProvider>
       <WorkspaceProvider>
-        <Shell />
+        <NotificationsProvider>
+          <Shell />
+        </NotificationsProvider>
       </WorkspaceProvider>
     </UiProvider>
   );

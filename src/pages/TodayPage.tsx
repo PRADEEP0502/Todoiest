@@ -2,7 +2,7 @@ import { Sun } from 'lucide-react';
 import { Gate } from '../components/common/Gate';
 import { Chevron, Count, EmptyState, PageHeader } from '../components/common/ui';
 import { GroupedTasks } from '../components/tasks/GroupedTasks';
-import { useCollapse } from '../hooks/useCollapse';
+import { useDisclosure } from '../hooks/useDisclosure';
 import { useNow } from '../hooks/useNow';
 import { formatLongDate, toDateKey } from '../lib/dates';
 import { byPriorityThenTime, isDueToday, isOverdue } from '../lib/stats';
@@ -12,7 +12,8 @@ export function TodayPage() {
   const now = useNow(60_000);
   const { openNewTask } = useUi();
   // Overdue work is kept out of the main list and tucked into its own block, closed by default.
-  const [overdueCollapsed, toggleOverdue] = useCollapse('today:overdue', true);
+  const [overdueOpen, toggleOverdue] = useDisclosure('today:overdue', false);
+  const overdueCollapsed = !overdueOpen;
 
   return (
     <Gate>

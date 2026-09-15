@@ -57,6 +57,19 @@
   }
 }
 
+@keyframes reveal-flash {
+  0%,
+  35% {
+    background-color: #e6f0ec;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.reveal-flash {
+  animation: reveal-flash 1.8s ease-out;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

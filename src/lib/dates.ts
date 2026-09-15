@@ -135,6 +135,17 @@ export function formatRelative(iso: string | null, now: Date): string {
   return formatShortDate(new Date(iso), now);
 }
 
+/** "Today", "Yesterday", "3 days ago", "5 weeks ago" — for last-activity labels. */
+export function formatDaysAgo(timestamp: number, now: Date): string {
+  if (!timestamp) return '—';
+  const days = daysBetween(toDateKey(new Date(timestamp)), toDateKey(now));
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.round(days / 7)} weeks ago`;
+  return `${Math.round(days / 30)} months ago`;
+}
+
 export function greeting(now: Date): string {
   const h = now.getHours();
   return h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';

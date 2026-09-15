@@ -1,14 +1,20 @@
-import type { CreateTaskInput, MoveTaskInput, TodoistTask, UpdateTaskInput, WorkspaceSnapshot } from '../../types/todoist';
+import type {
+  CreateTaskInput,
+  MoveTaskInput,
+  TodoistComment,
+  TodoistTask,
+  UpdateTaskInput,
+  WorkspaceSnapshot,
+} from '../../types/todoist';
 
 export type DataMode = 'live' | 'demo';
 
-export type SyncStep = 'projects' | 'sections' | 'tasks' | 'completed';
+export type SyncStep = 'workspace' | 'completed' | 'activity';
 
 export const SYNC_STEP_LABEL: Record<SyncStep, string> = {
-  projects: 'Fetching projects…',
-  sections: 'Fetching sections…',
-  tasks: 'Fetching tasks…',
+  workspace: 'Fetching projects, sections & tasks…',
   completed: 'Fetching completed tasks…',
+  activity: 'Fetching activity log…',
 };
 
 /**
@@ -17,6 +23,8 @@ export const SYNC_STEP_LABEL: Record<SyncStep, string> = {
  */
 export interface DataSource {
   readonly mode: DataMode;
+  /** The last synced data saved on this device, for an instant first paint. */
+  loadCached(): Promise<WorkspaceSnapshot | null>;
   sync(onStep: (step: SyncStep) => void, signal?: AbortSignal): Promise<WorkspaceSnapshot>;
   createTask(input: CreateTaskInput): Promise<TodoistTask>;
   updateTask(id: string, input: UpdateTaskInput): Promise<TodoistTask>;
@@ -24,7 +32,10 @@ export interface DataSource {
   completeTask(id: string): Promise<void>;
   reopenTask(id: string): Promise<void>;
   deleteTask(id: string): Promise<void>;
+  addComment(taskId: string, content: string): Promise<TodoistComment>;
 }
+
+export const ACTIVITY_WINDOW_DAYS = 7;
 
 /** Start of the completed-task window loaded on every sync: this month, or this week if it began last month. */
 export function completedWindowStart(now: Date): Date {
@@ -37,4 +48,14 @@ export function completedWindowStart(now: Date): Date {
 /** Converts the dashboard's "section or no section" choice into the single destination `/move` expects. */
 export function toMoveInput(projectId: string, sectionId: string | null): MoveTaskInput {
   return sectionId ? { section_id: sectionId } : { project_id: projectId };
+}
+
+/** Todoist's Sync API does not send comment counts, so derive them from the loaded comments. */
+export function withCommentCounts(tasks: TodoistTask[], comments: TodoistComment[]): TodoistTask[] {
+  const counts = new Map<string, number>();
+  for (const c of comments) counts.set(c.task_id, (counts.get(c.task_id) ?? 0) + 1);
+  return tasks.map((t) => {
+    const n = counts.get(t.id) ?? 0;
+    return t.note_count === n ? t : { ...t, note_count: n };
+  });
 }

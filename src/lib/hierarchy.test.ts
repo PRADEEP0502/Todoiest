@@ -43,7 +43,8 @@ describe('buildIndex with the demo workspace', () => {
   it('groups team workspace projects before personal projects', () => {
     expect(index.groups.map((g) => g.name)).toEqual(['JPM', 'Personal']);
     const jpm = index.groups[0].roots.map((n) => n.project.name);
-    expect(jpm).toEqual(['RV', 'MANPOWER 🎯', 'PROJECTS 🎯🎯', 'Finance & Accounts']);
+    expect(jpm.slice(0, 4)).toEqual(['RV', 'MANPOWER 🎯', 'PROJECTS 🎯🎯', 'Finance & Accounts']);
+    expect(index.orderedProjects.length).toBeGreaterThanOrEqual(20);
     expect(index.groups[1].roots[0].project.name).toBe('Inbox');
   });
 
