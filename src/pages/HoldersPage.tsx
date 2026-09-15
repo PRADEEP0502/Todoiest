@@ -1,4 +1,4 @@
-import { ArrowLeft, Users } from 'lucide-react';
+import { AlarmClock, ArrowLeft, CalendarCheck, CalendarOff, CircleCheckBig, FolderKanban, ListChecks, ListTree, MessageSquare, Users } from 'lucide-react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
 import { Avatar, EmptyState, MetricStrip, Notice, PageHeader, Panel, ProjectDot } from '../components/common/ui';
@@ -48,7 +48,7 @@ export function HoldersPage() {
                 </select>
               </div>
 
-              <Panel title="Holder-wise Active Tasks">
+              <Panel title="Holder-wise Active Tasks" icon={<Users />} iconTone="info">
                 <BarList
                   label="Active tasks by holder"
                   unit="active tasks"
@@ -152,18 +152,18 @@ export function HolderPage({ holderId }: { holderId: string }) {
                 size="md"
                 columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
                 items={[
-                  { label: 'Active Tasks', value: counts.active, href: '#holder-tasks' },
-                  { label: 'Completed', value: counts.completed, href: href.completed(), note: 'this month' },
-                  { label: 'Overdue', value: counts.overdue, href: href.overdue(), tone: 'danger' },
-                  { label: 'Due Today', value: counts.today, href: href.today() },
-                  { label: 'No Due Date', value: counts.noDue, href: '#holder-tasks' },
-                  { label: 'Comments', value: holderId === UNASSIGNED ? null : counts.comments, href: href.comments(), note: 'written' },
+                  { label: 'Active Tasks', icon: <ListChecks />, value: counts.active, href: '#holder-tasks' },
+                  { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: counts.completed, href: href.completed(), note: 'this month' },
+                  { label: 'Overdue', icon: <AlarmClock />, value: counts.overdue, href: href.overdue(), tone: 'danger' },
+                  { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: counts.today, href: href.today() },
+                  { label: 'No Due Date', icon: <CalendarOff />, iconTone: 'warn', value: counts.noDue, href: '#holder-tasks' },
+                  { label: 'Comments', icon: <MessageSquare />, iconTone: 'info', value: holderId === UNASSIGNED ? null : counts.comments, href: href.comments(), note: 'written' },
                 ]}
               />
 
               {tasks.length > 0 && (
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <Panel title="Project-wise tasks">
+                  <Panel title="Project-wise tasks" icon={<FolderKanban />} iconTone="good">
                     <BarList
                       label={`${name}: tasks by project`}
                       unit="active tasks"
@@ -174,7 +174,7 @@ export function HolderPage({ holderId }: { holderId: string }) {
                       })}
                     />
                   </Panel>
-                  <Panel title="Section-wise tasks" subtitle={topSections.length ? undefined : 'These tasks are not in sections'}>
+                  <Panel title="Section-wise tasks" icon={<ListTree />} subtitle={topSections.length ? undefined : 'These tasks are not in sections'}>
                     {topSections.length > 0 && (
                       <BarList
                         label={`${name}: tasks by section`}

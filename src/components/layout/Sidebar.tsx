@@ -1,20 +1,4 @@
-import {
-  AlarmClock,
-  Bell,
-  CalendarDays,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  FolderKanban,
-  History,
-  LayoutDashboard,
-  ListChecks,
-  MessageSquare,
-  Settings,
-  Sun,
-  Tag,
-  Users,
-} from 'lucide-react';
+import { AlarmClock, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, FolderKanban, History, Inbox, Layers, LayoutDashboard, ListChecks, MessageSquare, Settings, Sun, Tag, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useDisclosure } from '../../hooks/useDisclosure';
 import { useNow } from '../../hooks/useNow';
@@ -23,6 +7,7 @@ import { toDateKey } from '../../lib/dates';
 import { isDueToday, isOverdue } from '../../lib/stats';
 import { useNotifications } from '../../store/notifications';
 import { useWorkspace } from '../../store/workspace';
+import { ProjectDot } from '../common/ui';
 import { StatusCard } from './SyncStatus';
 
 export interface NavLink {
@@ -171,6 +156,9 @@ function TreeGroup({ id, label, icon, to, items }: { id: string; label: string; 
                 aria-current={item.active ? 'page' : undefined}
                 className={`my-0.5 flex h-10 items-center gap-2 rounded-xl px-3 text-[14.5px] transition-[background-color,box-shadow,color] ${item.active ? 'bg-surface font-semibold text-ink shadow-pill' : 'text-ink-3 hover:text-ink'}`}
               >
+                {item.icon && (
+                  <span aria-hidden className={`shrink-0 [&_svg]:h-[15px] [&_svg]:w-[15px] ${item.active ? 'text-ink' : 'text-ink-3'}`}>{item.icon}</span>
+                )}
                 <span className="flex-1 truncate">{item.label}</span>
                 <Badge link={item} />
               </a>
@@ -204,8 +192,13 @@ export function Sidebar({ route }: { route: Route }) {
     if (extra) shown.push(extra);
   }
   const projectItems: NavLink[] = [
-    { to: href.projects(), label: 'All projects', icon: null, active: route.name === 'projects', count: index?.orderedProjects.length, badge: 'grey' },
-    ...shown.map((n) => ({ to: href.project(n.project.id), label: n.project.name, icon: null, active: activeRoot === n.project.id })),
+    { to: href.projects(), label: 'All projects', icon: <Layers />, active: route.name === 'projects', count: index?.orderedProjects.length, badge: 'grey' },
+    ...shown.map((n) => ({
+      to: href.project(n.project.id),
+      label: n.project.name,
+      icon: n.project.inbox_project ? <Inbox /> : <span className="flex h-[15px] w-[15px] items-center justify-center"><ProjectDot color={n.project.color} /></span>,
+      active: activeRoot === n.project.id,
+    })),
     ...(roots.length > shown.length ? [{ to: href.projects(), label: `+${roots.length - shown.length} more`, icon: null, active: false }] : []),
   ];
 

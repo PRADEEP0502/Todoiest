@@ -1,6 +1,7 @@
 import { History } from 'lucide-react';
 import { useState } from 'react';
 import { Gate } from '../components/common/Gate';
+import { ActivityIcon } from '../components/common/ActivityIcon';
 import { EmptyState, Notice, PageHeader, ShowMore, Tabs } from '../components/common/ui';
 import { usePaged } from '../hooks/usePaged';
 import { useNow } from '../hooks/useNow';
@@ -89,7 +90,7 @@ function ActivityTable({ rows, listKey, now, onTask }: { rows: ActivityRow[]; li
   const { visible, shown, total, more } = usePaged(rows, listKey);
   return (
     <>
-      <div className="hidden grid-cols-[5rem_9rem_9rem_minmax(0,1fr)_10rem] gap-3 border-b border-line bg-canvas px-4 py-2 text-2xs font-semibold uppercase tracking-[0.06em] text-ink-3 md:grid">
+      <div className="hidden grid-cols-[5rem_9rem_11rem_minmax(0,1fr)_10rem] gap-3 border-b border-line bg-canvas px-4 py-2 text-2xs font-semibold uppercase tracking-[0.06em] text-ink-3 md:grid">
         <span>Time</span>
         <span>User</span>
         <span>Action</span>
@@ -101,14 +102,22 @@ function ActivityTable({ rows, listKey, now, onTask }: { rows: ActivityRow[]; li
         return (
           <div key={row.id}>
             {heading && <div className="border-b border-line bg-canvas/60 px-4 py-1.5 text-[12px] font-semibold text-ink-2">{heading}</div>}
-            <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-0.5 border-b border-line px-4 py-2.5 last:border-b-0 md:grid-cols-[5rem_9rem_9rem_minmax(0,1fr)_10rem] md:items-start">
-              <span className="text-[12.5px] tabular-nums text-ink-3 md:row-auto">{formatTime(row.at)}</span>
+            <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-0.5 border-b border-line px-4 py-2.5 last:border-b-0 md:grid-cols-[5rem_9rem_11rem_minmax(0,1fr)_10rem] md:items-center">
+              <span className="flex items-center gap-2 text-[12.5px] tabular-nums text-ink-3 md:row-auto md:block">
+                <span className="md:hidden">
+                  <ActivityIcon row={row} />
+                </span>
+                {formatTime(row.at)}
+              </span>
               <span className="min-w-0 md:contents">
                 <span className="block truncate text-[13px] text-ink-2">
                   {row.user}
                   <span className="md:hidden"> · <span className={`font-medium ${ACTION_TONE[row.kind] ?? 'text-ink'}`}>{row.action}</span></span>
                 </span>
-                <span className={`hidden text-[13px] font-medium md:block ${ACTION_TONE[row.kind] ?? 'text-ink'}`}>{row.action}</span>
+                <span className={`hidden items-center gap-2 text-[13px] font-medium md:flex ${ACTION_TONE[row.kind] ?? 'text-ink'}`}>
+                  <ActivityIcon row={row} />
+                  {row.action}
+                </span>
                 <span className="block min-w-0">
                   {row.taskId ? (
                     <button type="button" onClick={() => onTask(row.taskId!)} className="text-left text-[13px] text-ink hover:underline">

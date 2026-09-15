@@ -1,6 +1,6 @@
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, PlugZap, RefreshCw, Smile } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { PageHeader } from '../components/common/ui';
+import { IconBadge, PageHeader } from '../components/common/ui';
 import { ConnectionBadge, ModeBadge, SyncButton } from '../components/layout/SyncStatus';
 import { MetricRulesCard } from '../components/settings/MetricRulesCard';
 import { useWorkspace } from '../store/workspace';
@@ -33,7 +33,7 @@ export function SettingsPage() {
     <>
       <PageHeader title="Settings" />
       <div className="space-y-4">
-        <Card title="Todoist connection" aside={<ModeBadge />}>
+        <Card title="Todoist connection" icon={<PlugZap />} aside={<ModeBadge />}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-canvas px-3 py-2.5">
             <ConnectionBadge withTime />
             <SyncButton />
@@ -103,7 +103,7 @@ export function SettingsPage() {
 
         <MetricRulesCard />
 
-        <Card title="Greeting">
+        <Card title="Greeting" icon={<Smile />}>
           <label className="label" htmlFor="display-name">Name shown on the dashboard</label>
           <input
             id="display-name"
@@ -115,7 +115,7 @@ export function SettingsPage() {
           <p className="mt-1.5 text-[12px] text-ink-3">Leave empty to use the Todoist account name.</p>
         </Card>
 
-        <Card title="How syncing works">
+        <Card title="How syncing works" icon={<RefreshCw />}>
           <ul className="list-disc space-y-1 pl-5 text-[13px] text-ink-2">
             <li>Todoist is the only source of truth — nothing is stored in a separate database.</li>
             <li>Every sync asks Todoist what changed, so new, renamed, moved, completed or deleted projects, sections, tasks and labels appear automatically.</li>
@@ -130,11 +130,14 @@ export function SettingsPage() {
   );
 }
 
-function Card({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
+function Card({ title, icon, aside, children }: { title: string; icon: ReactNode; aside?: ReactNode; children: ReactNode }) {
   return (
-    <section className="panel p-4 sm:p-5">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+    <section className="panel p-5 sm:p-6">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-3 text-[17px] font-semibold tracking-[-0.01em] text-ink">
+          <IconBadge icon={icon} />
+          {title}
+        </h2>
         {aside}
       </div>
       {children}

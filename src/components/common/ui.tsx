@@ -1,4 +1,4 @@
-import { ArrowUpRight, ChevronRight } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, Settings2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { projectColor } from '../../lib/priority';
 
@@ -94,8 +94,32 @@ export function LoadingRows({ rows = 6 }: { rows?: number }) {
   );
 }
 
+export type IconTone = 'neutral' | 'danger' | 'good' | 'warn' | 'info';
+
+const ICON_TONE: Record<IconTone, string> = {
+  neutral: 'bg-black/[0.05] text-ink-2',
+  danger: 'bg-[#fdecea] text-p1',
+  good: 'bg-[#e8f6ee] text-[#1f8a55]',
+  warn: 'bg-[#fdf1e3] text-[#b35c00]',
+  info: 'bg-[#eaf1fd] text-p3',
+};
+
+/** A round, softly tinted icon holder — the same visual anchor on every card. */
+export function IconBadge({ icon, tone = 'neutral', size = 'md' }: { icon: ReactNode; tone?: IconTone; size?: 'sm' | 'md' | 'lg' }) {
+  const dims = size === 'sm' ? 'h-7 w-7 [&_svg]:h-[15px] [&_svg]:w-[15px]' : size === 'lg' ? 'h-11 w-11 [&_svg]:h-5 [&_svg]:w-5' : 'h-9 w-9 [&_svg]:h-[17px] [&_svg]:w-[17px]';
+  return (
+    <span aria-hidden className={`inline-flex shrink-0 items-center justify-center rounded-full ${dims} ${ICON_TONE[tone]}`}>
+      {icon}
+    </span>
+  );
+}
+
 export interface Metric {
   label: string;
+  /** Shown in a round badge beside the label. */
+  icon?: ReactNode;
+  /** Badge tint when the value itself isn't alarming (e.g. green for "Completed"). */
+  iconTone?: IconTone;
   /** null = no data or rule yet; the card reads "Set up". */
   value: number | null;
   href: string;
@@ -110,26 +134,31 @@ export interface Metric {
  * out in full, e.g. "grid-cols-2 sm:grid-cols-5".
  */
 export function MetricStrip({ items, columns, size = 'lg', label }: { items: Metric[]; columns: string; size?: 'lg' | 'md'; label?: string }) {
+  const lg = size === 'lg';
   return (
     <div className={`grid gap-2.5 sm:gap-3 ${columns}`} role="list" aria-label={label}>
       {items.map((m) => {
         const danger = m.tone === 'danger' && (m.value ?? 0) > 0;
+        const tone: IconTone = m.value === null ? 'neutral' : danger ? 'danger' : (m.iconTone ?? 'neutral');
         return (
           <a
             key={m.label}
             role="listitem"
             href={m.href}
-            className={`panel group relative flex min-w-0 flex-col transition-shadow hover:shadow-pill ${size === 'lg' ? 'px-4 py-4 sm:px-5' : 'rounded-[20px] px-4 py-3'} ${m.wideOnMobile ? 'col-span-2 sm:col-span-1' : ''}`}
+            className={`panel group relative flex min-w-0 flex-col transition-shadow hover:shadow-pill ${lg ? 'px-4 py-4 sm:px-5' : 'rounded-[20px] px-3.5 py-3.5 sm:px-4'} ${m.wideOnMobile ? 'col-span-2 sm:col-span-1' : ''}`}
           >
-            <span className="flex items-center gap-1.5 pr-5 text-[12.5px] font-medium leading-4 text-ink-2">
-              {danger && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-p1" aria-hidden />}
-              <span className="truncate">{m.label}</span>
+            <span className="flex min-w-0 items-center gap-2.5 pr-5">
+              {m.icon && <IconBadge icon={m.icon} tone={tone} size={lg ? 'md' : 'sm'} />}
+              <span className={`truncate font-medium text-ink-2 ${lg ? 'text-[13px]' : 'text-[12.5px]'}`}>{m.label}</span>
             </span>
-            <span className={`font-semibold tracking-[-0.04em] ${size === 'lg' ? 'mt-2 text-[34px] leading-10' : 'mt-1.5 text-[26px] leading-8'}`}>
+            {/* Fixed-height value row, so a card that says "Set up" is exactly as tall as one with a number. */}
+            <span className={`flex items-center ${lg ? 'mt-3 h-10' : 'mt-2.5 h-8'}`}>
               {m.value === null ? (
-                <span className="text-[13px] font-medium tracking-normal text-ink-3">Set up →</span>
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-black/[0.05] px-2.5 text-[12.5px] font-medium text-ink-2 transition-colors group-hover:bg-black/[0.08]">
+                  <Settings2 size={13} aria-hidden /> Set up
+                </span>
               ) : (
-                <span className={danger ? 'text-p1' : 'num-fade'}>{m.value}</span>
+                <span className={`font-semibold tracking-[-0.04em] ${lg ? 'text-[34px] leading-10' : 'text-[26px] leading-8'} ${danger ? 'text-p1' : 'num-fade'}`}>{m.value}</span>
               )}
             </span>
             {m.note && <span className="mt-1 truncate text-2xs leading-4 text-ink-3">{m.note}</span>}
@@ -151,14 +180,35 @@ export function Chip({ tone = 'neutral', children }: { tone?: 'good' | 'bad' | '
   return <span className={`inline-flex h-7 items-center gap-1 rounded-lg border px-2 text-[12.5px] font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
-export function Panel({ title, subtitle, actions, children, footer, className = '' }: { title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; footer?: ReactNode; className?: string }) {
+export function Panel({
+  title,
+  subtitle,
+  icon,
+  iconTone = 'neutral',
+  actions,
+  children,
+  footer,
+  className = '',
+}: {
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  icon?: ReactNode;
+  iconTone?: IconTone;
+  actions?: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+  className?: string;
+}) {
   return (
     <section className={`panel ${className}`}>
       {(title || actions) && (
         <div className="flex flex-wrap items-start justify-between gap-2 px-5 pb-3 pt-5 sm:px-6">
-          <div className="min-w-0">
-            {title && <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-[#3a3a3a]">{title}</h2>}
-            {subtitle && <p className="mt-0.5 text-[12.5px] text-ink-3">{subtitle}</p>}
+          <div className="flex min-w-0 items-center gap-3">
+            {icon && <IconBadge icon={icon} tone={iconTone} />}
+            <div className="min-w-0">
+              {title && <h2 className="text-[18px] font-semibold leading-6 tracking-[-0.02em] text-[#3a3a3a]">{title}</h2>}
+              {subtitle && <p className="mt-0.5 text-[12.5px] text-ink-3">{subtitle}</p>}
+            </div>
           </div>
           {actions}
         </div>

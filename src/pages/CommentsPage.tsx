@@ -1,4 +1,4 @@
-import { MessageSquare, Search, X } from 'lucide-react';
+import { CalendarDays, Clock, MessageSquare, MessagesSquare, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import { Gate } from '../components/common/Gate';
 import { Avatar, EmptyState, MetricStrip, PageHeader, ProjectDot, ShowMore, Tabs } from '../components/common/ui';
@@ -50,9 +50,9 @@ export function CommentsPage() {
                   size="md"
                   columns="grid-cols-3"
                   items={[
-                    { label: 'Total Comments', value: comments.length, href: '#comments', note: 'on active tasks' },
-                    { label: 'Recent', value: last24, href: '#comments', note: 'last 24 hours' },
-                    { label: 'This week', value: lastWeek, href: '#comments', note: 'last 7 days' },
+                    { label: 'Total Comments', icon: <MessagesSquare />, iconTone: 'info', value: comments.length, href: '#comments', note: 'on active tasks' },
+                    { label: 'Recent', icon: <Clock />, iconTone: 'good', value: last24, href: '#comments', note: 'last 24 hours' },
+                    { label: 'This week', icon: <CalendarDays />, value: lastWeek, href: '#comments', note: 'last 7 days' },
                   ]}
                 />
               </div>

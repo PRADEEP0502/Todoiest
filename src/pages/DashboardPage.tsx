@@ -1,6 +1,25 @@
-import { ArrowRight, ArrowUpRight, ListChecks } from 'lucide-react';
+import {
+  AlarmClock,
+  ArrowRight,
+  ArrowUpRight,
+  CalendarCheck,
+  CalendarOff,
+  CalendarSearch,
+  CircleCheckBig,
+  Clock,
+  FolderKanban,
+  History,
+  Hourglass,
+  ListChecks,
+  Siren,
+  Timer,
+  TriangleAlert,
+  Users,
+  Zap,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BarList } from '../components/charts/BarList';
+import { ActivityIcon } from '../components/common/ActivityIcon';
 import { Gate } from '../components/common/Gate';
 import { Avatar, Chip, Count, EmptyState, Headline, MetricStrip, Panel, ProjectDot, type Metric } from '../components/common/ui';
 import { TaskRow } from '../components/tasks/TaskRow';
@@ -76,7 +95,7 @@ export function DashboardPage() {
                   <ArrowUpRight size={16} className="text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
                 </div>
                 <span className="mt-5 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-black/[0.045] text-ink-2">
-                  <ListChecks size={24} strokeWidth={1.75} />
+                  <ListChecks size={26} strokeWidth={1.75} />
                 </span>
                 <span className="mt-6 text-[15px] font-medium text-ink-2">Total active tasks</span>
                 <span className="mt-1 flex items-start gap-2">
@@ -93,23 +112,24 @@ export function DashboardPage() {
                 label="Workspace totals"
                 columns="grid-cols-2"
                 items={[
-                  { label: 'Due Today', value: dueToday, href: href.today(), note: 'tasks due today' },
-                  { label: 'Overdue', value: overdue, href: href.overdue(), tone: 'danger', note: 'past due date' },
-                  { label: 'No Due Date', value: count('no-due'), href: href.metric('no-due'), note: 'active tasks without a date' },
-                  { label: 'Completed', value: snapshot.completedStatus.ok ? completedToday(snapshot, now) : null, href: href.completed(), note: 'completed today' },
+                  { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: dueToday, href: href.today(), note: 'tasks due today' },
+                  { label: 'Overdue', icon: <AlarmClock />, value: overdue, href: href.overdue(), tone: 'danger', note: 'past due date' },
+                  { label: 'No Due Date', icon: <CalendarOff />, iconTone: 'warn', value: count('no-due'), href: href.metric('no-due'), note: 'active tasks without a date' },
+                  { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: snapshot.completedStatus.ok ? completedToday(snapshot, now) : null, href: href.completed(), note: 'completed today' },
                 ]}
               />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               <div>
-                <SubHeading title="Overdue categories" link={{ to: href.overdue(), label: 'Open Overdue' }} />
+                <SubHeading icon={<TriangleAlert />} title="Overdue categories" link={{ to: href.overdue(), label: 'Open Overdue' }} />
                 <MetricStrip
                   label="Overdue categories"
                   size="md"
                   columns="grid-cols-4"
                   items={CATEGORIES.map<Metric>((c) => ({
                     label: c.label,
+                    icon: CATEGORY_ICON[c.id],
                     value: count(c.id),
                     href: href.metric(c.id),
                     note: shortCategoryNote(c.id, rules),
@@ -118,16 +138,18 @@ export function DashboardPage() {
                 />
               </div>
               <div>
-                <SubHeading title="Date checks" link={{ to: href.settings(), label: 'Configure' }} />
+                <SubHeading icon={<CalendarSearch />} title="Date checks" link={{ to: href.settings(), label: 'Configure' }} />
                 <MetricStrip
                   label="Date checks"
                   size="md"
                   columns="grid-cols-2"
                   items={DATE_CHECKS.map<Metric>((c) => ({
                     label: c.label,
+                    icon: <CalendarSearch />,
+                    iconTone: 'warn',
                     value: isDateCheckConfigured(rules[c.id]) ? count(c.id) : null,
                     href: isDateCheckConfigured(rules[c.id]) ? href.metric(c.id) : href.settings(),
-                    note: isDateCheckConfigured(rules[c.id]) ? describeDateCheck(rules[c.id]) : 'Not set up yet',
+                    note: isDateCheckConfigured(rules[c.id]) ? describeDateCheck(rules[c.id]) : 'Choose a rule in Settings',
                   }))}
                 />
               </div>
@@ -136,6 +158,8 @@ export function DashboardPage() {
             <div className={`grid gap-4 ${holders.length ? 'lg:grid-cols-2' : ''}`}>
               <Panel
                 title="Project-wise Active Tasks"
+                icon={<FolderKanban />}
+                iconTone="good"
                 subtitle={`Top ${projects.length} of ${index.orderedProjects.length} projects by active tasks`}
                 actions={<HeaderLink to={href.projects()}>View all</HeaderLink>}
               >
@@ -161,6 +185,8 @@ export function DashboardPage() {
               {holders.length > 0 && (
                 <Panel
                   title="Holder-wise Active Tasks"
+                  icon={<Users />}
+                  iconTone="info"
                   subtitle={`Top ${holders.length} people by active tasks${unassigned ? ` · ${unassigned} tasks have no holder` : ''}`}
                   actions={<HeaderLink to={href.holders()}>View all</HeaderLink>}
                 >
@@ -191,6 +217,8 @@ export function DashboardPage() {
                     Today’s Important Tasks <Count>{important.length}</Count>
                   </span>
                 }
+                icon={<Zap />}
+                iconTone="warn"
                 subtitle="Overdue first, then due today — most urgent priority first"
                 actions={important.length > IMPORTANT_LIMIT ? <HeaderLink to={href.today()}>{`+${important.length - IMPORTANT_LIMIT} more`}</HeaderLink> : undefined}
               >
@@ -207,6 +235,7 @@ export function DashboardPage() {
                     Last 24 Hours <Count>{recent.length}</Count>
                   </span>
                 }
+                icon={<History />}
                 subtitle="From the Todoist activity log"
                 actions={<HeaderLink to={href.activity()}>View all</HeaderLink>}
               >
@@ -219,11 +248,16 @@ export function DashboardPage() {
                     {recent.slice(0, 6).map((event) => {
                       const row = describeActivity(event, snapshot, index);
                       return (
-                        <li key={row.id} className="grid grid-cols-[4.25rem_minmax(0,1fr)] gap-2 px-2 py-2">
-                          <span className="pt-px text-[12px] tabular-nums text-ink-3">{formatTime(row.at)}</span>
-                          <span className="min-w-0 text-[13px]">
-                            <span className="text-ink-2">
-                              {row.user} · <span className="font-medium text-ink">{row.action}</span>
+                        <li key={row.id} className="flex items-start gap-3 px-2 py-2.5">
+                          <span className="pt-0.5">
+                            <ActivityIcon row={row} />
+                          </span>
+                          <span className="min-w-0 flex-1 text-[13px]">
+                            <span className="flex items-baseline gap-2">
+                              <span className="min-w-0 flex-1 truncate text-ink-2">
+                                {row.user} · <span className="font-medium text-ink">{row.action}</span>
+                              </span>
+                              <span className="shrink-0 text-[12px] tabular-nums text-ink-3">{formatTime(row.at)}</span>
                             </span>
                             <span className="block truncate text-ink">{row.kind === 'comment' ? `“${row.subject}”` : row.subject}</span>
                             {(row.context || row.projectName) && (
@@ -244,18 +278,27 @@ export function DashboardPage() {
   );
 }
 
+/** Icons escalate with lateness: a clock, a timer, an hourglass, then a siren. */
+const CATEGORY_ICON: Record<(typeof CATEGORIES)[number]['id'], ReactNode> = {
+  a5: <Clock />,
+  a10: <Timer />,
+  a30: <Hourglass />,
+  a30plus: <Siren />,
+};
+
 /** Short note under a category number — the full rule is on the metric's own page. */
 function shortCategoryNote(id: (typeof CATEGORIES)[number]['id'], rules: Parameters<typeof describeCategory>[1]): string {
   if (rules.categoryBasis !== 'days-overdue') return describeCategory(id, rules);
   return { a5: '1–5 days', a10: '6–10 days', a30: '11–30 days', a30plus: '30+ days' }[id];
 }
 
-function SubHeading({ title, link }: { title: string; link: { to: string; label: string } }) {
+function SubHeading({ title, icon, link }: { title: string; icon: ReactNode; link: { to: string; label: string } }) {
   return (
-    <div className="mb-2 flex items-baseline gap-2">
-      <h2 className="text-[13px] font-semibold text-ink-2">{title}</h2>
-      <a href={link.to} className="ml-auto text-[12px] text-ink-3 hover:text-accent">
-        {link.label}
+    <div className="mb-2.5 flex items-center gap-2">
+      <span aria-hidden className="text-ink-3 [&_svg]:h-[15px] [&_svg]:w-[15px]">{icon}</span>
+      <h2 className="text-[13.5px] font-semibold text-ink-2">{title}</h2>
+      <a href={link.to} className="ml-auto inline-flex items-center gap-1 text-[12.5px] text-ink-3 hover:text-ink">
+        {link.label} <ArrowRight size={12} />
       </a>
     </div>
   );

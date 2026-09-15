@@ -1,4 +1,4 @@
-import { ArrowLeft, Tag } from 'lucide-react';
+import { AlarmClock, ArrowLeft, CircleCheckBig, ListChecks, Tag } from 'lucide-react';
 import { Gate } from '../components/common/Gate';
 import { EmptyState, MetricStrip, PageHeader } from '../components/common/ui';
 import { GroupedTasks } from '../components/tasks/GroupedTasks';
@@ -84,9 +84,9 @@ export function LabelPage({ label }: { label: string }) {
                 size="md"
                 columns="grid-cols-3"
                 items={[
-                  { label: 'Task count', value: row?.active ?? 0, href: '#label-tasks' },
-                  { label: 'Overdue', value: row?.overdue ?? 0, href: href.overdue(), tone: 'danger' },
-                  { label: 'Completed', value: snapshot.completedStatus.ok ? (row?.completed ?? 0) : null, href: href.completed(), note: 'this month' },
+                  { label: 'Task count', icon: <ListChecks />, value: row?.active ?? 0, href: '#label-tasks' },
+                  { label: 'Overdue', icon: <AlarmClock />, value: row?.overdue ?? 0, href: href.overdue(), tone: 'danger' },
+                  { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: snapshot.completedStatus.ok ? (row?.completed ?? 0) : null, href: href.completed(), note: 'this month' },
                 ]}
               />
             </div>

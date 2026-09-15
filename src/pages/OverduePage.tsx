@@ -1,4 +1,4 @@
-import { AlarmClock, Rows3, ListTree } from 'lucide-react';
+import { AlarmClock, ListTree, Rows3, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
@@ -52,7 +52,7 @@ export function OverduePage({ category }: { category: string | null }) {
               </div>
             ) : (
               <div className="space-y-4">
-                <Panel title="Overdue by category" subtitle={byDays ? 'Days past the due date' : `Categories from Todoist ${rules.categoryBasis === 'labels' ? 'labels' : 'section names'} (change in Settings)`}>
+                <Panel title="Overdue by category" icon={<TriangleAlert />} iconTone="danger" subtitle={byDays ? 'Days past the due date' : `Categories from Todoist ${rules.categoryBasis === 'labels' ? 'labels' : 'section names'} (change in Settings)`}>
                   <BarList
                     label="Overdue tasks by category"
                     unit="overdue tasks"

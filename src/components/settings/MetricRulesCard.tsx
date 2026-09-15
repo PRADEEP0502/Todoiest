@@ -1,3 +1,4 @@
+import { SlidersHorizontal } from 'lucide-react';
 import { useMemo } from 'react';
 import {
   CATEGORIES,
@@ -10,6 +11,7 @@ import {
   type MetricRules,
 } from '../../lib/metrics';
 import { useWorkspace } from '../../store/workspace';
+import { IconBadge } from '../common/ui';
 
 const BASES: { value: CategoryBasis; label: string; hint: string }[] = [
   { value: 'days-overdue', label: 'Days overdue (from due dates)', hint: 'A-5 = 1–5 days late, A-10 = 6–10, A-30 = 11–30, A30+ = over 30.' },
@@ -47,8 +49,11 @@ export function MetricRulesCard() {
   };
 
   return (
-    <section className="panel p-4 sm:p-5">
-      <h2 className="text-[15px] font-semibold text-ink">Metric rules</h2>
+    <section className="panel p-5 sm:p-6">
+      <h2 className="flex items-center gap-3 text-[17px] font-semibold tracking-[-0.01em] text-ink">
+        <IconBadge icon={<SlidersHorizontal />} tone="warn" />
+        Metric rules
+      </h2>
       <p className="mb-4 mt-0.5 text-[12.5px] text-ink-3">How the dashboard counts overdue categories and date checks from your Todoist data.</p>
 
       <datalist id="rule-suggestions">
