@@ -16,55 +16,71 @@ interface BarListProps {
   /** Accessible name for the list, e.g. "Top projects by active tasks". */
   label: string;
   unit: string;
+  /** When given, the tooltip also shows each value's share of this total. */
+  total?: number;
+  /** Kept for existing callers; labels now size to the longest one automatically. */
   labelWidth?: 'narrow' | 'wide';
 }
 
+/** Room kept at the end of the track for the value label, so the longest bar still fits. */
+const VALUE_ROOM = '3rem';
+
 /**
- * Horizontal bars for ranked counts. One series, so one color and no legend; bars grow from a
- * shared baseline and carry their value at the tip. Each row is a link to the underlying list.
+ * Horizontal bars for ranked counts. One series, so one colour and no legend. Bars grow from a
+ * shared baseline, are exactly proportional to their values, and carry the value at the tip.
+ * All rows share one label column sized to the longest label, so bars start at the same x.
+ * Each row links to the underlying list.
  */
-export function BarList({ entries, label, unit, labelWidth = 'wide' }: BarListProps) {
+export function BarList({ entries, label, unit, total }: BarListProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const max = Math.max(1, ...entries.map((e) => e.value));
-  const cols = labelWidth === 'wide' ? 'grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]' : 'grid-cols-[4rem_minmax(0,1fr)]';
 
   return (
-    <ol className="space-y-0.5" aria-label={label}>
+    <ol className="grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)] gap-x-5 gap-y-0.5" aria-label={label}>
       {entries.map((entry) => {
-        const pct = (entry.value / max) * 100;
+        const ratio = entry.value / max;
+        // Bar length = its share of the largest value, measured on the track minus the label room.
+        const barWidth = entry.value > 0 ? `max(6px, calc((100% - ${VALUE_ROOM}) * ${ratio}))` : '0px';
         const isHovered = hovered === entry.id;
+        const share = total ? Math.round((entry.value / total) * 100) : null;
         return (
-          <li key={entry.id}>
+          <li key={entry.id} className="col-span-2 grid grid-cols-subgrid">
             <a
               href={entry.href}
               onMouseEnter={() => setHovered(entry.id)}
               onMouseLeave={() => setHovered(null)}
               onFocus={() => setHovered(entry.id)}
               onBlur={() => setHovered(null)}
-              aria-label={`${entry.label}: ${entry.value} ${unit}`}
-              className={`grid ${cols} items-center gap-3 rounded-md px-2 py-1.5 transition-colors ${isHovered ? 'bg-canvas' : ''}`}
+              aria-label={`${entry.label}: ${entry.value} ${unit}${share !== null ? `, ${share}% of all` : ''}`}
+              className={`col-span-2 grid grid-cols-subgrid items-center rounded-xl px-3 py-2 transition-colors ${isHovered ? 'bg-black/[0.03]' : ''}`}
             >
-              <span className="flex min-w-0 items-center gap-2">
+              <span className="flex min-w-0 max-w-[11rem] items-center gap-2.5 sm:max-w-[15rem]">
                 {entry.mark}
-                <span className="truncate text-[13px] text-ink">{entry.label}</span>
+                <span className="truncate text-[13.5px] text-ink" title={entry.label}>
+                  {entry.label}
+                </span>
               </span>
-              <span className="relative flex min-w-0 items-center gap-2 border-l border-line">
+
+              <span className="relative flex h-7 min-w-0 items-center">
+                <span aria-hidden className="absolute inset-y-0.5 left-0 w-px bg-black/[0.08]" />
                 <span
-                  className={`block h-3.5 rounded-r-[4px] bg-chart ${isHovered ? 'brightness-90' : ''}`}
-                  style={{ width: entry.value ? `max(4px, calc(${pct}% - 2.5rem))` : '0px' }}
                   aria-hidden
+                  className={`block h-3 shrink-0 rounded-r-[4px] bg-chart transition-[filter] ${isHovered ? 'brightness-[0.92]' : ''}`}
+                  style={{ width: barWidth }}
                 />
-                <span className="shrink-0 text-[13px] font-semibold tabular-nums text-ink">{entry.value}</span>
+                <span className="ml-2.5 shrink-0 text-[13.5px] font-semibold tabular-nums text-ink">{entry.value}</span>
+
                 {isHovered && (
                   <span
                     role="tooltip"
-                    className="pointer-events-none absolute bottom-full z-10 mb-2 whitespace-nowrap rounded-md bg-ink px-2.5 py-1.5 text-[12px] text-white shadow-pop"
-                    style={pct <= 55 ? { left: `max(0px, calc(${pct}% - 2.5rem))` } : { right: `calc(${100 - pct}% + 2.5rem)` }}
+                    className="pointer-events-none absolute bottom-full z-10 mb-1.5 whitespace-nowrap rounded-lg bg-ink px-3 py-2 text-[12px] leading-4 text-white shadow-pop"
+                    // Anchored over the bar's start so it never covers the labels in the next rows.
+                    style={{ left: 0 }}
                   >
-                    <span className="font-semibold">{entry.label}</span>
-                    <span className="text-white/70">
-                      {' '}
-                      · {entry.value} {unit}
+                    <span className="block font-semibold">{entry.label}</span>
+                    <span className="block text-white/70">
+                      {entry.value} {unit}
+                      {share !== null ? ` · ${share}% of all` : ''}
                       {entry.detail ? ` · ${entry.detail}` : ''}
                     </span>
                   </span>

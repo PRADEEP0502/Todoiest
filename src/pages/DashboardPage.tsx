@@ -137,12 +137,13 @@ export function DashboardPage() {
               <Panel
                 title="Project-wise Active Tasks"
                 subtitle={`Top ${projects.length} of ${index.orderedProjects.length} projects by active tasks`}
-                footer={<FooterLink to={href.projects()}>View All Projects</FooterLink>}
+                actions={<HeaderLink to={href.projects()}>View all</HeaderLink>}
               >
                 {projects.length ? (
                   <BarList
                     label="Top projects by active tasks"
                     unit="active tasks"
+                    total={snapshot.tasks.length}
                     entries={projects.map(({ project, open }) => ({
                       id: project.id,
                       label: project.name,
@@ -158,10 +159,15 @@ export function DashboardPage() {
               </Panel>
 
               {holders.length > 0 && (
-                <Panel title="Holder-wise Active Tasks" subtitle={`Top ${holders.length} people by active tasks${unassigned ? ` · ${unassigned} tasks have no holder` : ''}`} footer={<FooterLink to={href.holders()}>View All Holders</FooterLink>}>
+                <Panel
+                  title="Holder-wise Active Tasks"
+                  subtitle={`Top ${holders.length} people by active tasks${unassigned ? ` · ${unassigned} tasks have no holder` : ''}`}
+                  actions={<HeaderLink to={href.holders()}>View all</HeaderLink>}
+                >
                   <BarList
                     label="Top holders by active tasks"
                     unit="active tasks"
+                    total={snapshot.tasks.length}
                     entries={holders.map(([id, c]) => {
                       const personName = snapshot.people[id]?.name ?? 'Unknown person';
                       return {
@@ -169,7 +175,7 @@ export function DashboardPage() {
                         label: personName,
                         value: c.active,
                         href: href.holder(id),
-                        mark: <Avatar id={id} name={personName} size={18} />,
+                        mark: <Avatar id={id} name={personName} size={22} />,
                         detail: `${c.overdue} overdue`,
                       };
                     })}
@@ -186,7 +192,7 @@ export function DashboardPage() {
                   </span>
                 }
                 subtitle="Overdue first, then due today — most urgent priority first"
-                footer={important.length > IMPORTANT_LIMIT ? <FooterLink to={href.today()}>{`${important.length - IMPORTANT_LIMIT} more in Today`}</FooterLink> : undefined}
+                actions={important.length > IMPORTANT_LIMIT ? <HeaderLink to={href.today()}>{`+${important.length - IMPORTANT_LIMIT} more`}</HeaderLink> : undefined}
               >
                 {important.length === 0 ? (
                   <EmptyState title="Nothing due today">No overdue or due-today tasks.</EmptyState>
@@ -202,7 +208,7 @@ export function DashboardPage() {
                   </span>
                 }
                 subtitle="From the Todoist activity log"
-                footer={<FooterLink to={href.activity()}>Open Activity Logs</FooterLink>}
+                actions={<HeaderLink to={href.activity()}>View all</HeaderLink>}
               >
                 {!snapshot.activityStatus.ok ? (
                   <p className="px-2 py-6 text-center text-[13px] text-ink-3">{snapshot.activityStatus.reason}</p>
@@ -255,9 +261,13 @@ function SubHeading({ title, link }: { title: string; link: { to: string; label:
   );
 }
 
-function FooterLink({ to, children }: { to: string; children: ReactNode }) {
+/** Small pill link in a card header — keeps cards compact instead of adding a footer strip. */
+function HeaderLink({ to, children }: { to: string; children: ReactNode }) {
   return (
-    <a href={to} className="ml-auto inline-flex items-center gap-1 text-[13px] font-medium text-accent hover:underline">
+    <a
+      href={to}
+      className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-black/[0.045] px-3 text-[12.5px] font-medium text-ink-2 transition-colors hover:bg-black/[0.08] hover:text-ink"
+    >
       {children} <ArrowRight size={13} />
     </a>
   );

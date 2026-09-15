@@ -56,6 +56,7 @@ export function OverduePage({ category }: { category: string | null }) {
                   <BarList
                     label="Overdue tasks by category"
                     unit="overdue tasks"
+                    total={overdue.length}
                     labelWidth="narrow"
                     entries={CATEGORIES.map((c) => ({ id: c.id, label: c.label, value: counts[c.id], href: href.overdue(c.id), detail: describeCategory(c.id, rules) }))}
                   />

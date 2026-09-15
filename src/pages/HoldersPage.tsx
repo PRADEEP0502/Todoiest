@@ -52,6 +52,7 @@ export function HoldersPage() {
                 <BarList
                   label="Active tasks by holder"
                   unit="active tasks"
+                  total={snapshot.tasks.length}
                   entries={people.map(([id, c]) => ({
                     id,
                     label: holderName(snapshot, id),
@@ -166,6 +167,7 @@ export function HolderPage({ holderId }: { holderId: string }) {
                     <BarList
                       label={`${name}: tasks by project`}
                       unit="active tasks"
+                      total={tasks.length}
                       entries={topProjects.map(([id, value]) => {
                         const project = index.projectById.get(id);
                         return { id, label: project?.name ?? 'Project', value, href: href.project(id), mark: <ProjectDot color={project?.color} /> };
@@ -177,6 +179,7 @@ export function HolderPage({ holderId }: { holderId: string }) {
                       <BarList
                         label={`${name}: tasks by section`}
                         unit="active tasks"
+                        total={tasks.length}
                         entries={topSections.map(([id, value]) => {
                           const section = index.sectionById.get(id)!;
                           const project = index.projectById.get(section.project_id);
