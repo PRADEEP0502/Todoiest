@@ -1,5 +1,5 @@
-import { CalendarDays, Clock, MessageSquare, MessagesSquare, Search, X } from 'lucide-react';
-import { useState } from 'react';
+import { CalendarDays, Clock, FolderKanban, MessageSquare, MessagesSquare, Search, User, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { Gate } from '../components/common/Gate';
 import { Avatar, EmptyState, MetricStrip, PageHeader, ProjectDot, ShowMore, Tabs } from '../components/common/ui';
 import { usePaged } from '../hooks/usePaged';
@@ -13,11 +13,15 @@ import type { TodoistComment, WorkspaceSnapshot } from '../types/todoist';
 
 type Range = 'all' | '24h' | 'week';
 const DAY = 24 * 60 * 60 * 1000;
+const ALL = 'all';
+const UNKNOWN = 'unknown';
 
 /** Comments on active tasks, as stored in Todoist. Newest first. */
 export function CommentsPage() {
   const now = useNow(60_000);
   const [range, setRange] = useState<Range>('all');
+  const [person, setPerson] = useState(ALL);
+  const [project, setProject] = useState(ALL);
   const [query, setQuery] = useState('');
 
   return (
@@ -29,16 +33,39 @@ export function CommentsPage() {
         const within = (c: TodoistComment, ms: number) => !!c.posted_at && now.getTime() - Date.parse(c.posted_at) <= ms;
         const last24 = comments.filter((c) => within(c, DAY)).length;
         const lastWeek = comments.filter((c) => within(c, 7 * DAY)).length;
+        const projectOf = (c: TodoistComment) => index.taskById.get(c.task_id)!.project_id;
+
+        // Only the people and projects that actually have comments, the busiest first.
+        const tally = (of: (c: TodoistComment) => string) => {
+          const counts = new Map<string, number>();
+          for (const c of comments) counts.set(of(c), (counts.get(of(c)) ?? 0) + 1);
+          return [...counts].sort((a, b) => b[1] - a[1]);
+        };
+        const people = tally((c) => c.posted_uid ?? UNKNOWN).map(([id, count]) => ({
+          id,
+          count,
+          name: id === UNKNOWN ? 'Unknown person' : (snapshot.people[id]?.name ?? 'Unknown person'),
+        }));
+        const projects = tally(projectOf).map(([id, count]) => ({ id, count, name: index.projectById.get(id)?.name ?? 'Unknown project' }));
 
         const q = query.trim().toLocaleLowerCase();
         const shown = comments.filter((c) => {
           if (range === '24h' && !within(c, DAY)) return false;
           if (range === 'week' && !within(c, 7 * DAY)) return false;
+          if (person !== ALL && (c.posted_uid ?? UNKNOWN) !== person) return false;
+          if (project !== ALL && projectOf(c) !== project) return false;
           if (!q) return true;
           const task = index.taskById.get(c.task_id)!;
           const author = c.posted_uid ? (snapshot.people[c.posted_uid]?.name ?? '') : '';
           return `${c.content} ${task.content} ${author}`.toLocaleLowerCase().includes(q);
         });
+        const filtered = range !== 'all' || person !== ALL || project !== ALL || q.length > 0;
+        const clearAll = () => {
+          setRange('all');
+          setPerson(ALL);
+          setProject(ALL);
+          setQuery('');
+        };
 
         return (
           <>
@@ -57,17 +84,48 @@ export function CommentsPage() {
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative min-w-0 flex-1 basis-60">
-                  <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
-                  <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search comments, tasks or people…" aria-label="Search comments" className="field pl-9 pr-9 [&::-webkit-search-cancel-button]:hidden" />
-                  {query && (
-                    <button type="button" className="icon-btn absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setQuery('')} aria-label="Clear">
-                      <X size={14} />
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative min-w-0 flex-1 basis-60">
+                    <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+                    <input
+                      type="search"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search comments, tasks or people…"
+                      aria-label="Search comments"
+                      className="field pl-9 pr-9 [&::-webkit-search-cancel-button]:hidden"
+                    />
+                    {query && (
+                      <button type="button" className="icon-btn absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setQuery('')} aria-label="Clear">
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <Tabs
+                    label="Time range"
+                    value={range}
+                    onChange={setRange}
+                    options={[
+                      { value: 'all', label: 'All' },
+                      { value: '24h', label: 'Last 24 hours' },
+                      { value: 'week', label: 'Last 7 days' },
+                    ]}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <FilterSelect id="comment-person" icon={<User size={14} />} label="Filter by person" value={person} onChange={setPerson} all={`Everyone (${comments.length})`} options={people} />
+                  <FilterSelect id="comment-project" icon={<FolderKanban size={14} />} label="Filter by project" value={project} onChange={setProject} all={`All projects (${comments.length})`} options={projects} />
+                  <span className="ml-auto text-[12.5px] font-medium text-ink-2">
+                    {filtered ? `${shown.length} of ${comments.length} comments` : `${comments.length} comments`}
+                  </span>
+                  {filtered && (
+                    <button type="button" className="btn-ghost h-8" onClick={clearAll}>
+                      <X size={14} /> Clear filters
                     </button>
                   )}
                 </div>
-                <Tabs label="Time range" value={range} onChange={setRange} options={[{ value: 'all', label: 'All' }, { value: '24h', label: 'Last 24 hours' }, { value: 'week', label: 'Last 7 days' }]} />
               </div>
 
               <div id="comments" className="panel overflow-hidden">
@@ -76,7 +134,7 @@ export function CommentsPage() {
                     {comments.length ? null : 'Comments added to tasks in Todoist appear here after the next sync.'}
                   </EmptyState>
                 ) : (
-                  <CommentList comments={shown} listKey={`${range}:${q}`} snapshot={snapshot} index={index} now={now} />
+                  <CommentList comments={shown} listKey={`${range}:${person}:${project}:${q}`} snapshot={snapshot} index={index} now={now} />
                 )}
               </div>
             </div>
@@ -84,6 +142,41 @@ export function CommentsPage() {
         );
       }}
     </Gate>
+  );
+}
+
+/** One dropdown of the people or projects that have comments, each with how many it holds. */
+function FilterSelect({
+  id,
+  icon,
+  label,
+  value,
+  onChange,
+  all,
+  options,
+}: {
+  id: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  all: string;
+  options: { id: string; name: string; count: number }[];
+}) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <span aria-hidden className="shrink-0 text-ink-3">
+        {icon}
+      </span>
+      <select id={id} aria-label={label} className="field h-8 w-auto max-w-[14rem] py-0 text-[13px]" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value={ALL}>{all}</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name} ({o.count})
+          </option>
+        ))}
+      </select>
+    </span>
   );
 }
 
