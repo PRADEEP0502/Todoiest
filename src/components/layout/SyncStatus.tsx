@@ -133,8 +133,20 @@ export function WriteStatus({ compact = false }: { compact?: boolean }) {
 }
 
 /** Sidebar footer card: connection state and last sync, opens Settings. */
-export function StatusCard() {
+export function StatusCard({ compact = false }: { compact?: boolean }) {
   const c = useConnection();
+  if (compact) {
+    return (
+      <a
+        href={href.settings()}
+        title={`${c.title} — ${c.detail}`}
+        aria-label={`${c.title}. ${c.detail}`}
+        className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-black/[0.04] bg-surface shadow-card transition-shadow hover:shadow-pill"
+      >
+        <span className={`h-2.5 w-2.5 rounded-full ${c.dot}`} />
+      </a>
+    );
+  }
   return (
     <a href={href.settings()} className="mb-2 flex items-center gap-3 rounded-2xl border border-black/[0.04] bg-surface px-3.5 py-3 shadow-card transition-shadow hover:shadow-pill" title={c.detail}>
       <span className="relative flex h-2.5 w-2.5 shrink-0">

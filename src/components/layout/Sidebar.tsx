@@ -1,4 +1,4 @@
-import { AlarmClock, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, FolderKanban, History, Inbox, Layers, LayoutDashboard, ListChecks, MessageSquare, Settings, Sun, Tag, Users } from 'lucide-react';
+import { AlarmClock, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, FolderKanban, History, Inbox, Layers, LayoutDashboard, ListChecks, MessageSquare, PanelLeftClose, PanelLeftOpen, Settings, Sun, Tag, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useDisclosure } from '../../hooks/useDisclosure';
 import { useNow } from '../../hooks/useNow';
@@ -75,17 +75,19 @@ export function Brand({ compact = false }: { compact?: boolean }) {
       .slice(0, 2)
       .toUpperCase() || 'W';
   return (
-    <a href={href.dashboard()} className="flex min-w-0 items-center gap-3" aria-label={`${name} dashboard`}>
+    <a href={href.dashboard()} className="flex min-w-0 items-center gap-2.5" aria-label={`${name} dashboard`}>
       <span
-        className={`flex shrink-0 items-center justify-center font-semibold tracking-[0.02em] text-white shadow-pill ${compact ? 'h-8 w-8 rounded-[11px] text-[12px]' : 'h-11 w-11 rounded-[15px] text-[14px]'}`}
+        className={`flex shrink-0 items-center justify-center font-semibold tracking-[0.02em] text-white shadow-pill ${compact ? 'h-9 w-9 rounded-[12px] text-[13px]' : 'h-10 w-10 rounded-[14px] text-[13px]'}`}
         style={{ backgroundImage: 'linear-gradient(145deg, #5a5a5a 0%, #262626 55%, #0f0f0f 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 4px 12px -4px rgba(0,0,0,0.35)' }}
       >
         {initials}
       </span>
       {!compact && (
         <span className="min-w-0 leading-tight">
-          <span className="block truncate text-[15px] font-semibold tracking-[-0.01em] text-ink">{name}</span>
-          <span className="block truncate text-[12px] text-ink-3">Management dashboard</span>
+          <span className="block truncate text-[15px] font-semibold tracking-[-0.01em] text-ink" title={name}>
+            {name}
+          </span>
+          <span className="block truncate text-[11.5px] text-ink-3">Management dashboard</span>
         </span>
       )}
     </a>
@@ -99,12 +101,30 @@ function Badge({ link }: { link: Pick<NavLink, 'count' | 'badge'> }) {
 }
 
 /** A top-level row: icon + label; the current page is raised as a white pill. */
-export function NavItem({ link }: { link: NavLink }) {
+export function NavItem({ link, collapsed = false }: { link: NavLink; collapsed?: boolean }) {
+  const surface = link.active ? 'bg-surface font-semibold text-ink shadow-pill' : 'font-medium text-ink-2 hover:bg-black/[0.035] hover:text-ink';
+  if (collapsed) {
+    return (
+      <a
+        href={link.to}
+        aria-current={link.active ? 'page' : undefined}
+        title={link.count ? `${link.label} (${link.count})` : link.label}
+        aria-label={link.count ? `${link.label}, ${link.count}` : link.label}
+        className={`relative mx-auto flex h-11 w-11 items-center justify-center rounded-2xl transition-[background-color,box-shadow,color] ${surface}`}
+      >
+        <span className={link.active ? 'text-ink' : 'text-ink-2'}>{link.icon}</span>
+        {/* Counts have no room here, so attention shows as a small dot. */}
+        {!!link.count && link.badge !== 'grey' && (
+          <span className={`absolute right-1.5 top-1.5 h-2 w-2 rounded-full ${link.badge === 'orange' ? 'bg-[#e8853f]' : 'bg-[#35a56a]'}`} />
+        )}
+      </a>
+    );
+  }
   return (
     <a
       href={link.to}
       aria-current={link.active ? 'page' : undefined}
-      className={`flex h-11 items-center gap-3.5 rounded-2xl px-3 text-[15px] transition-[background-color,box-shadow,color] ${link.active ? 'bg-surface font-semibold text-ink shadow-pill' : 'font-medium text-ink-2 hover:bg-black/[0.035] hover:text-ink'}`}
+      className={`flex h-11 items-center gap-3.5 rounded-2xl px-3 text-[15px] transition-[background-color,box-shadow,color] ${surface}`}
     >
       <span className={`shrink-0 ${link.active ? 'text-ink' : 'text-ink-2'}`}>{link.icon}</span>
       <span className="flex-1 truncate">{link.label}</span>
@@ -117,10 +137,19 @@ export function NavItem({ link }: { link: NavLink }) {
  * An expandable group whose items hang off a curved tree line. Like the reference design, only the
  * group holding the current page opens by itself; others stay closed until clicked.
  */
-function TreeGroup({ id, label, icon, to, items }: { id: string; label: string; icon: ReactNode; to?: string; items: NavLink[] }) {
+function TreeGroup({ id, label, icon, to, items, collapsed = false }: { id: string; label: string; icon: ReactNode; to?: string; items: NavLink[]; collapsed?: boolean }) {
   const [open, toggle] = useDisclosure(`nav:${id}`, false);
   const containsActive = items.some((i) => i.active);
-  const expanded = open || containsActive;
+  const expanded = !collapsed && (open || containsActive);
+  if (collapsed) {
+    const urgentItem = items.find((i) => i.badge === 'orange' && i.count);
+    return (
+      <NavItem
+        collapsed
+        link={{ to: to ?? items[0]?.to ?? '#/', label, icon, active: containsActive, count: urgentItem?.count, badge: urgentItem?.badge }}
+      />
+    );
+  }
   // A closed group still surfaces what needs attention (e.g. overdue, unread) on its own row.
   const urgent = expanded ? undefined : items.find((i) => i.badge === 'orange' && i.count);
 
@@ -175,6 +204,8 @@ const PROJECTS_IN_SIDEBAR = 8;
 export function Sidebar({ route }: { route: Route }) {
   const { main, secondary } = useNavLinks(route);
   const { index } = useWorkspace();
+  // Opening and closing the sidebar is remembered on this device.
+  const [open, toggleSidebar] = useDisclosure('sidebar:expanded', true);
   const [dashboard, projects, today, overdue, holders, labels, activity, comments, notifications] = main;
   const [upcoming, completed] = secondary;
 
@@ -202,24 +233,37 @@ export function Sidebar({ route }: { route: Route }) {
     ...(roots.length > shown.length ? [{ to: href.projects(), label: `+${roots.length - shown.length} more`, icon: null, active: false }] : []),
   ];
 
+  const settingsLink: NavLink = { to: href.settings(), label: 'Settings', icon: <Settings size={ICON} />, active: route.name === 'settings' };
+
   return (
-    <aside className="hidden w-[276px] shrink-0 flex-col md:flex">
-      <div className="px-6 pb-5 pt-7">
-        <Brand />
+    <aside className={`hidden shrink-0 flex-col transition-[width] duration-200 md:flex ${open ? 'w-[276px]' : 'w-[84px]'}`}>
+      <div className={`relative flex items-center pb-5 pt-7 ${open ? 'px-5 pr-11' : 'flex-col gap-3 px-4'}`}>
+        <Brand compact={!open} />
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-expanded={open}
+          aria-controls="sidebar-nav"
+          title={open ? 'Close the menu' : 'Open the menu'}
+          aria-label={open ? 'Close the menu' : 'Open the menu'}
+          className={`icon-btn shrink-0 ${open ? 'absolute right-3 top-[26px]' : ''}`}
+        >
+          {open ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+        </button>
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 pb-4" aria-label="Main">
-        <NavItem link={dashboard} />
-        <TreeGroup id="projects" label="Projects" icon={projects.icon} to={href.projects()} items={projectItems} />
-        <TreeGroup id="tasks" label="Tasks" icon={<ListChecks size={ICON} />} to={href.today()} items={[today, overdue, upcoming, completed]} />
-        <NavItem link={holders} />
-        <NavItem link={labels} />
-        <TreeGroup id="updates" label="Updates" icon={activity.icon} to={href.activity()} items={[activity, comments, notifications]} />
+      <nav id="sidebar-nav" className={`min-h-0 flex-1 space-y-1 overflow-y-auto pb-4 ${open ? 'px-4' : 'px-3'}`} aria-label="Main">
+        <NavItem link={dashboard} collapsed={!open} />
+        <TreeGroup id="projects" label="Projects" icon={projects.icon} to={href.projects()} items={projectItems} collapsed={!open} />
+        <TreeGroup id="tasks" label="Tasks" icon={<ListChecks size={ICON} />} to={href.today()} items={[today, overdue, upcoming, completed]} collapsed={!open} />
+        <NavItem link={holders} collapsed={!open} />
+        <NavItem link={labels} collapsed={!open} />
+        <TreeGroup id="updates" label="Updates" icon={activity.icon} to={href.activity()} items={[activity, comments, notifications]} collapsed={!open} />
       </nav>
 
-      <div className="space-y-1 px-4 pb-5 pt-2">
-        <StatusCard />
-        <NavItem link={{ to: href.settings(), label: 'Settings', icon: <Settings size={ICON} />, active: route.name === 'settings' }} />
+      <div className={`space-y-1 pb-5 pt-2 ${open ? 'px-4' : 'px-3'}`}>
+        <StatusCard compact={!open} />
+        <NavItem link={settingsLink} collapsed={!open} />
       </div>
     </aside>
   );
