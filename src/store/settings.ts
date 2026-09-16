@@ -75,8 +75,9 @@ export function resolveSettings(stored: Partial<StoredSettings>, env: string): S
     rules: {
       ...DEFAULT_RULES,
       ...stored.rules,
-      // "Not set up" means never chosen, so the built-in creation-date rule applies.
+      // "Not set up" means never chosen, so the built-in title-date rules apply.
       noCd: !stored.rules?.noCd || stored.rules.noCd.kind === 'unset' ? DEFAULT_RULES.noCd : stored.rules.noCd,
+      noIdd: !stored.rules?.noIdd || stored.rules.noIdd.kind === 'unset' ? DEFAULT_RULES.noIdd : stored.rules.noIdd,
       categoryNames: { ...DEFAULT_RULES.categoryNames, ...stored.rules?.categoryNames },
     },
     notifyOwnActions: stored.notifyOwnActions ?? false,

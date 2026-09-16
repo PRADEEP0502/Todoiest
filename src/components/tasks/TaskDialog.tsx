@@ -1,6 +1,6 @@
 import { Check, ExternalLink, Flag, MessageSquare, Send, Tag, Trash2, User } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
-import { formatCd, splitCd } from '../../lib/cd';
+import { cdFromApiDate, parseTitle, titleForNewTask } from '../../lib/cd';
 import { addDays, dueDateKey, dueTime, formatShortDate, formatTime, startOfWeek, toDateKey } from '../../lib/dates';
 import { plainText } from '../../lib/search';
 import { descendantsOf, PERSONAL_GROUP_ID, taskPath } from '../../lib/hierarchy';
@@ -8,6 +8,7 @@ import { PRIORITY_STYLE, toUiPriority, type UiPriority } from '../../lib/priorit
 import { isUncompletable } from '../../lib/text';
 import { useUi, type NewTaskDefaults } from '../../store/ui';
 import { useWorkspace, type TaskForm } from '../../store/workspace';
+import type { TitleDates } from '../../lib/cd';
 import type { TodoistTask } from '../../types/todoist';
 import { Modal } from '../common/Modal';
 import { Avatar } from '../common/ui';
@@ -20,6 +21,17 @@ export function TaskDialog() {
   const task = index.taskById.get(dialog.taskId);
   if (!task) return <MissingTask onClose={closeDialog} />;
   return <TaskEditor key={task.id} task={task} onClose={closeDialog} />;
+}
+
+/** What the two dates in the title mean for the task being edited, and what saving will add. */
+function datesNote(dates: TitleDates, task: TodoistTask, form: TaskForm): string {
+  const created = dates.cd ?? cdFromApiDate(task.added_at);
+  const firstDue = dates.idd ?? (!task.due && form.dueDate ? cdFromApiDate(form.dueDate) : null);
+  const parts = [created ? `Created ${created}` : 'No creation date on record'];
+  if (firstDue) parts.push(`first due ${firstDue}`);
+  else if (task.due) parts.push('no first due date on record');
+  parts.push(dates.cd && dates.idd ? 'both stay in the title' : 'kept in the title from now on');
+  return parts.join(' · ');
 }
 
 function MissingTask({ onClose }: { onClose: () => void }) {
@@ -37,8 +49,8 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const initial = useMemo<TaskForm>(() => {
     if (task) {
       return {
-        // The creation date is shown separately, so editing the title cannot disturb it.
-        content: splitCd(task.content).title,
+        // Both dates are shown separately, so editing the title cannot disturb them.
+        content: parseTitle(task.content).title,
         description: task.description,
         projectId: task.project_id,
         sectionId: task.section_id && index?.sectionById.has(task.section_id) ? task.section_id : null,
@@ -72,7 +84,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const dirty = (Object.keys(initial) as (keyof TaskForm)[]).some((k) => form[k] !== initial[k]);
   const valid = form.content.trim().length > 0 && index.projectById.has(form.projectId);
   const subtasks = task ? descendantsOf(index, task.id) : [];
-  const createdOn = task ? splitCd(task.content).cd : null;
+  const dates = task ? parseTitle(task.content) : null;
   const assignee = task?.responsible_uid ? snapshot?.people[task.responsible_uid] : undefined;
 
   const submit = async (e?: FormEvent) => {
@@ -161,11 +173,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
             aria-label="Task name"
           />
           <p className="mt-1 text-[12px] text-ink-3">
-            {task
-              ? createdOn
-                ? `Created ${createdOn} · this date stays with the task`
-                : 'This task has no creation date'
-              : `Saved in Todoist as “${formatCd(now)}, ${form.content.trim() || 'Task name'}”`}
+            {task ? datesNote(dates!, task, form) : `Saved in Todoist as “${titleForNewTask(form.content.trim() || 'Task name', now, form.dueDate)}”`}
           </p>
           <textarea
             className="mt-2 w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-5 text-ink-2 placeholder:text-ink-3 focus:outline-none focus:ring-0"

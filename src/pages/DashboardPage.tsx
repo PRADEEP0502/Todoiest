@@ -303,6 +303,8 @@ function shortDateCheckNote(rule: Parameters<typeof describeDateCheck>[0]): stri
   switch (rule.kind) {
     case 'no-cd':
       return 'missing DD.MM.YY';
+    case 'no-idd':
+      return 'no first due date';
     case 'without-label':
       return `without the “${rule.value}” label`;
     case 'with-label':

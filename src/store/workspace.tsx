@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { splitCd, titleWithCreationDate, withCd } from '../lib/cd';
+import { titleForNewTask, titleForSavedTask } from '../lib/cd';
 import { dueDateKey } from '../lib/dates';
 import { buildIndex, descendantsOf, type WorkspaceIndex } from '../lib/hierarchy';
 import { toApiPriority, type UiPriority } from '../lib/priority';
@@ -295,8 +295,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       try {
         const task = await write('create', () =>
           source.createTask({
-            // The title reaching Todoist already carries the creation date: "16.09.26, Task".
-            content: titleWithCreationDate(form.content, new Date()),
+            // The title reaching Todoist already carries both dates: "16.09.26, Task, 20.09.26".
+            content: titleForNewTask(form.content, new Date(), form.dueDate),
             description: form.description.trim() || undefined,
             project_id: form.projectId,
             section_id: form.sectionId,
@@ -318,9 +318,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const saveTask = useCallback(
     async (task: TodoistTask, form: TaskForm) => {
       const changes: UpdateTaskInput = {};
-      // The creation date the task was given stays exactly as it is, whatever the title becomes.
-      const created = splitCd(task.content).cd;
-      const nextContent = created ? withCd(form.content, created) : form.content.trim();
+      // Both dates in the title stay exactly as they are, whatever the title or the due date becomes.
+      const nextContent = titleForSavedTask({ content: task.content, addedAt: task.added_at, hasDueDate: !!task.due }, form.content, form.dueDate);
       if (nextContent !== task.content) changes.content = nextContent;
       if (form.description.trim() !== task.description.trim()) changes.description = form.description.trim();
       if (toApiPriority(form.priority) !== task.priority) changes.priority = toApiPriority(form.priority);

@@ -1,4 +1,4 @@
-import { hasCd } from './cd';
+import { hasCd, hasIdd } from './cd';
 import type { TodoistTask, WorkspaceSnapshot } from '../types/todoist';
 import { daysBetween, dueDateKey, startOfDay, startOfMonth, toDateKey } from './dates';
 import type { WorkspaceIndex } from './hierarchy';
@@ -28,6 +28,8 @@ export type DateCheckRule =
   | { kind: 'unset' }
   /** Title does not start with a creation date, e.g. "16.09.26, Task". */
   | { kind: 'no-cd' }
+  /** Title does not end with an initial due date, e.g. "Task, 20.09.26". */
+  | { kind: 'no-idd' }
   | { kind: 'without-label'; value: string }
   | { kind: 'with-label'; value: string }
   | { kind: 'in-section'; value: string }
@@ -53,7 +55,7 @@ export const DEFAULT_RULES: MetricRules = {
   categoryBasis: 'days-overdue',
   categoryNames: { a5: 'A-5', a10: 'A-10', a30: 'A-30', a30plus: 'A30+' },
   noCd: { kind: 'no-cd' },
-  noIdd: { kind: 'unset' },
+  noIdd: { kind: 'no-idd' },
 };
 
 const same = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
@@ -98,6 +100,8 @@ export function matchesDateCheck(task: TodoistTask, rule: DateCheckRule, index: 
       return false;
     case 'no-cd':
       return !hasCd(task.content);
+    case 'no-idd':
+      return !hasIdd(task.content);
     case 'without-label':
       return !task.labels.some((l) => same(l, rule.value));
     case 'with-label':
@@ -119,6 +123,8 @@ export function describeDateCheck(rule: DateCheckRule): string {
       return 'Not set up yet';
     case 'no-cd':
       return 'Active tasks whose title has no creation date (DD.MM.YY)';
+    case 'no-idd':
+      return 'Active tasks whose title has no initial due date (…, DD.MM.YY)';
     case 'without-label':
       return `Active tasks without the label “${rule.value}”`;
     case 'with-label':

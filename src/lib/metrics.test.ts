@@ -85,13 +85,17 @@ describe('overdue categories', () => {
 });
 
 describe('date checks (No CD / No IDD)', () => {
-  it('counts titles with no creation date, and counts nothing else until a rule is chosen', () => {
-    const tasks = [task('a', { labels: ['CD'], content: '16.09.26, Task a' }), task('b', { deadline: { date: '2026-09-20' } }), task('c', { description: 'IDD: 20 Sep' })];
+  it('reads both dates out of the title, and follows a chosen rule instead when there is one', () => {
+    const tasks = [
+      task('a', { labels: ['CD'], content: '16.09.26, Task a, 20.09.26' }),
+      task('b', { content: '16.09.26, Task b', deadline: { date: '2026-09-20' } }),
+      task('c', { description: 'IDD: 20 Sep' }),
+    ];
     const snap = snapshotWith(tasks);
     const index = buildIndex(snap);
-    // "No CD" reads the creation date the dashboard writes into the title; "No IDD" has no rule yet.
-    expect(metricTasks('noCd', snap, index, DEFAULT_RULES, NOW).map((t) => t.id)).toEqual(['b', 'c']);
-    expect(metricTasks('noIdd', snap, index, DEFAULT_RULES, NOW)).toEqual([]);
+    // Out of the box both checks read the dates the dashboard writes into the title.
+    expect(metricTasks('noCd', snap, index, DEFAULT_RULES, NOW).map((t) => t.id)).toEqual(['c']);
+    expect(metricTasks('noIdd', snap, index, DEFAULT_RULES, NOW).map((t) => t.id)).toEqual(['b', 'c']);
 
     expect(tasks.filter((t) => matchesDateCheck(t, { kind: 'without-label', value: 'cd' }, index)).map((t) => t.id)).toEqual(['b', 'c']);
     expect(tasks.filter((t) => matchesDateCheck(t, { kind: 'no-deadline' }, index)).map((t) => t.id)).toEqual(['a', 'c']);
