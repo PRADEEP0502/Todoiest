@@ -90,7 +90,7 @@ export function NotificationsPage() {
                           <span className="min-w-0 flex-1">
                             <span className={`block text-[13px] ${read ? 'text-ink-2' : 'font-semibold text-ink'}`}>{n.title}</span>
                             <span className="block break-words text-[13px] text-ink">{n.body}</span>
-                            {n.detail && <span className="block truncate text-[12px] text-ink-3">{n.detail}</span>}
+                            {n.detail && <span className="block break-words text-[12px] text-ink-3">{n.detail}</span>}
                           </span>
                           {!read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" aria-label="Unread" />}
                         </button>

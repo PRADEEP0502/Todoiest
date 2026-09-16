@@ -20,7 +20,7 @@ function BellLink({ className = '' }: { className?: string }) {
     <a href={href.notifications()} className={`icon-btn relative h-8 w-8 ${className}`} aria-label={`Notifications, ${unreadCount} unread`}>
       <Bell size={17} />
       {unreadCount > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-p1 px-1 text-[10px] font-semibold leading-none text-white">
+        <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-p1 px-1 text-[10px] font-semibold leading-none text-white">
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}
@@ -37,16 +37,23 @@ export function TopBar({ route }: { route: Route }) {
     <>
       {/* Desktop */}
       <header className="hidden h-[76px] shrink-0 items-center gap-4 pl-4 pr-8 pt-3 md:flex lg:pr-10">
-        <div className="max-w-md flex-1">
+        <div className="min-w-0 max-w-md flex-1">
           <SearchBox />
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2">
           <WriteStatus />
           <StatusPill />
-          <SyncButton />
+          {/* A tablet has no room for the wording, so the Sync button shrinks to its icon. */}
+          <span className="lg:hidden">
+            <SyncButton compact />
+          </span>
+          <span className="hidden lg:inline-flex">
+            <SyncButton />
+          </span>
           <BellLink className="mx-0.5" />
           <button type="button" className="btn-primary" onClick={() => openNewTask(defaults())}>
-            <Plus size={15} strokeWidth={2.5} /> Add task
+            <Plus size={15} strokeWidth={2.5} />
+            <span className="hidden lg:inline">Add task</span>
           </button>
         </div>
       </header>

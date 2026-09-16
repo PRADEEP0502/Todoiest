@@ -120,13 +120,13 @@ export function DashboardPage() {
               />
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               <div>
                 <SubHeading icon={<TriangleAlert />} title="Overdue categories" link={{ to: href.overdue(), label: 'Open Overdue' }} />
                 <MetricStrip
                   label="Overdue categories"
                   size="md"
-                  columns="grid-cols-4"
+                  columns="grid-cols-2 xl:grid-cols-4"
                   items={CATEGORIES.map<Metric>((c) => ({
                     label: c.label,
                     icon: CATEGORY_ICON[c.id],

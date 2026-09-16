@@ -70,7 +70,7 @@ export function StatusPill() {
           Live
         </span>
       )}
-      {c.synced && <span className="hidden truncate text-ink-3 lg:inline">· synced {c.synced.toLowerCase()}</span>}
+      {c.synced && <span className="hidden truncate text-ink-3 xl:inline">· synced {c.synced.toLowerCase()}</span>}
     </a>
   );
 }

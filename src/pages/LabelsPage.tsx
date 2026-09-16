@@ -22,7 +22,36 @@ export function LabelsPage() {
                 <EmptyState icon={<Tag size={26} />} title="No labels">Labels created in Todoist appear here after the next sync.</EmptyState>
               </div>
             ) : (
-              <div className="panel overflow-x-auto">
+              <>
+              {/* Phones: one card per label instead of a table that needs sideways scrolling. */}
+              <ul className="space-y-2.5 sm:hidden">
+                {rows.map((row) => (
+                  <li key={row.name}>
+                    <a href={href.label(row.name)} className="panel block px-4 py-3.5">
+                      <span className="flex items-center gap-2">
+                        <Tag size={14} style={{ color: projectColor(row.color ?? 'grey') }} />
+                        <span className="min-w-0 break-words text-[14px] font-semibold text-ink">{row.name}</span>
+                      </span>
+                      <span className="mt-3 grid grid-cols-3 gap-3">
+                        {[
+                          ['Task count', row.active, false],
+                          ['Overdue', row.overdue, true],
+                          ['Completed', snapshot.completedStatus.ok ? row.completed : null, false],
+                        ].map(([label, value, danger]) => (
+                          <span key={String(label)} className="block">
+                            <span className="block text-2xs leading-4 text-ink-3">{label}</span>
+                            <span className={`block text-[17px] font-semibold tabular-nums ${danger && Number(value) > 0 ? 'text-p1' : value ? 'text-ink' : 'text-ink-3'}`}>
+                              {value === null ? '—' : Number(value)}
+                            </span>
+                          </span>
+                        ))}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="panel hidden overflow-x-auto sm:block">
                 <table className="w-full min-w-[520px] text-[13px]">
                   <thead>
                     <tr className="border-b border-line bg-canvas text-left text-2xs font-semibold uppercase tracking-[0.06em] text-ink-3">
@@ -49,6 +78,7 @@ export function LabelsPage() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </>
         );
@@ -82,7 +112,7 @@ export function LabelPage({ label }: { label: string }) {
               <MetricStrip
                 label="Label totals"
                 size="md"
-                columns="grid-cols-3"
+                columns="grid-cols-1 sm:grid-cols-3"
                 items={[
                   { label: 'Task count', icon: <ListChecks />, value: row?.active ?? 0, href: '#label-tasks' },
                   { label: 'Overdue', icon: <AlarmClock />, value: row?.overdue ?? 0, href: href.overdue(), tone: 'danger' },

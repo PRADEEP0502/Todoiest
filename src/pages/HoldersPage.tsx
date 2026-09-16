@@ -64,7 +64,38 @@ export function HoldersPage() {
                 />
               </Panel>
 
-              <div className="panel overflow-x-auto">
+              {/* Phones: one card per person, so every figure is readable without scrolling sideways. */}
+              <ul className="space-y-2.5 sm:hidden">
+                {rows.map(([id, c]) => (
+                  <li key={id}>
+                    <a href={href.holder(id)} className="panel block px-4 py-3.5">
+                      <span className="flex items-center gap-2.5">
+                        <Avatar id={id} name={holderName(snapshot, id)} size={26} />
+                        <span className="min-w-0 break-words text-[14px] font-semibold text-ink">{holderName(snapshot, id)}</span>
+                      </span>
+                      <span className="mt-3 grid grid-cols-3 gap-x-3 gap-y-3">
+                        {[
+                          ['Active', c.active, false],
+                          ['Overdue', c.overdue, true],
+                          ['Due today', c.today, false],
+                          ['No due date', c.noDue, false],
+                          ['Completed', c.completed, false],
+                          ['Comments', c.comments, false],
+                        ].map(([label, value, danger]) => (
+                          <span key={String(label)} className="block">
+                            <span className="block text-2xs leading-4 text-ink-3">{label}</span>
+                            <span className={`block text-[17px] font-semibold tabular-nums ${danger && Number(value) > 0 ? 'text-p1' : Number(value) ? 'text-ink' : 'text-ink-3'}`}>
+                              {Number(value)}
+                            </span>
+                          </span>
+                        ))}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="panel hidden overflow-x-auto sm:block">
                 <table className="w-full min-w-[640px] text-[13px]">
                   <thead>
                     <tr className="border-b border-line bg-canvas text-left text-2xs font-semibold uppercase tracking-[0.06em] text-ink-3">

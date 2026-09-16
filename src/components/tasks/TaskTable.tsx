@@ -53,7 +53,7 @@ export function TaskTable({ tasks, listKey, extra }: TaskTableProps) {
               <button type="button" onClick={() => openTask(task.id)} className="min-w-0 text-left">
                 <span className="block break-words text-[13.5px] text-ink hover:underline">{plainText(task.content)}</span>
                 {parent && <span className="block truncate text-[12px] text-ink-3">↳ {plainText(parent.content)}</span>}
-                <span className="mt-0.5 block truncate text-[12px] text-ink-3 md:hidden">
+                <span className="mt-0.5 block break-words text-[12px] text-ink-3 md:hidden">
                   {[project?.name, section?.name].filter(Boolean).join(' › ')}
                   {due ? ` · ${due.label}` : ''}
                   {priority < 4 ? ` · P${priority}` : ''}

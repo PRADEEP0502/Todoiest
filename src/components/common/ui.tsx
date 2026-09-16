@@ -136,7 +136,7 @@ export interface Metric {
 export function MetricStrip({ items, columns, size = 'lg', label }: { items: Metric[]; columns: string; size?: 'lg' | 'md'; label?: string }) {
   const lg = size === 'lg';
   return (
-    <div className={`grid gap-2.5 sm:gap-3 ${columns}`} role="list" aria-label={label}>
+    <div className={`grid min-w-0 gap-2.5 sm:gap-3 ${columns}`} role="list" aria-label={label}>
       {items.map((m) => {
         const danger = m.tone === 'danger' && (m.value ?? 0) > 0;
         const tone: IconTone = m.value === null ? 'neutral' : danger ? 'danger' : (m.iconTone ?? 'neutral');
@@ -147,9 +147,10 @@ export function MetricStrip({ items, columns, size = 'lg', label }: { items: Met
             href={m.href}
             className={`panel group relative flex min-w-0 flex-col transition-shadow hover:shadow-pill ${lg ? 'px-4 py-4 sm:px-5' : 'rounded-[20px] px-3.5 py-3.5 sm:px-4'} ${m.wideOnMobile ? 'col-span-2 sm:col-span-1' : ''}`}
           >
-            <span className="flex min-w-0 items-center gap-2.5 pr-5">
+            <span className="flex min-w-0 items-start gap-2 pr-4 sm:gap-2.5">
               {m.icon && <IconBadge icon={m.icon} tone={tone} size={lg ? 'md' : 'sm'} />}
-              <span className={`truncate font-medium text-ink-2 ${lg ? 'text-[13px]' : 'text-[12.5px]'}`}>{m.label}</span>
+              {/* Wraps rather than clipping: no label is ever half-shown on a narrow screen. */}
+              <span className={`min-w-0 break-words font-medium leading-tight text-ink-2 [hyphens:none] ${lg ? 'text-[13px]' : 'text-[12.5px]'}`}>{m.label}</span>
             </span>
             {/* Fixed-height value row, so a card that says "Set up" is exactly as tall as one with a number. */}
             <span className={`flex items-center ${lg ? 'mt-3 h-10' : 'mt-2.5 h-8'}`}>
@@ -161,7 +162,7 @@ export function MetricStrip({ items, columns, size = 'lg', label }: { items: Met
                 <span className={`font-semibold tracking-[-0.04em] ${lg ? 'text-[34px] leading-10' : 'text-[26px] leading-8'} ${danger ? 'text-p1' : 'num-fade'}`}>{m.value}</span>
               )}
             </span>
-            {m.note && <span className="mt-1 truncate text-2xs leading-4 text-ink-3">{m.note}</span>}
+            {m.note && <span className="mt-1 break-words text-2xs leading-4 text-ink-3">{m.note}</span>}
             <ArrowUpRight size={14} aria-hidden className="absolute right-3.5 top-3.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
           </a>
         );
@@ -200,7 +201,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={`panel ${className}`}>
+    <section className={`panel min-w-0 ${className}`}>
       {(title || actions) && (
         <div className="flex flex-wrap items-start justify-between gap-2 px-5 pb-3 pt-5 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">

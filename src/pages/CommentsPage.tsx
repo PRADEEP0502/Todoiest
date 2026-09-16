@@ -48,7 +48,7 @@ export function CommentsPage() {
                 <MetricStrip
                   label="Comment totals"
                   size="md"
-                  columns="grid-cols-3"
+                  columns="grid-cols-1 sm:grid-cols-3"
                   items={[
                     { label: 'Total Comments', icon: <MessagesSquare />, iconTone: 'info', value: comments.length, href: '#comments', note: 'on active tasks' },
                     { label: 'Recent', icon: <Clock />, iconTone: 'good', value: last24, href: '#comments', note: 'last 24 hours' },
