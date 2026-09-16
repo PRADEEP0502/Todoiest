@@ -39,6 +39,11 @@ export interface DataSource {
   addComment(taskId: string, content: string): Promise<TodoistComment>;
   /** Re-reads one task, e.g. a recurring task after completion moved it to its next date. */
   getTask(id: string): Promise<TodoistTask>;
+  /**
+   * Subscribes to live change notices, if the backend offers them. Returns a stop function,
+   * or null when live updates are not available (then polling alone keeps things fresh).
+   */
+  watch?(handlers: { onChange: () => void; onStatus: (connected: boolean) => void }): (() => void) | null;
   createProject(input: CreateProjectInput): Promise<TodoistProject>;
   createSection(input: CreateSectionInput): Promise<TodoistSection>;
 }

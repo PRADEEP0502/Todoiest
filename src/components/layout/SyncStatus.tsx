@@ -19,12 +19,18 @@ export function ModeBadge() {
 }
 
 function useConnection() {
-  const { mode, sync } = useWorkspace();
+  const { mode, sync, liveUpdates } = useWorkspace();
   const now = useNow(15_000);
   const synced = sync.lastSyncedAt ? formatRelative(sync.lastSyncedAt, now) : null;
-  if (mode === 'demo') return { dot: 'bg-amber-500', title: 'Demo Mode', detail: 'Sample data — not connected', synced };
-  if (sync.status === 'error') return { dot: 'bg-red-500', title: 'Todoist connection problem', detail: sync.error ?? 'Sync failed', synced };
-  return { dot: 'bg-emerald-500', title: 'Todoist Connected', detail: 'Live Todoist data', synced };
+  if (mode === 'demo') return { dot: 'bg-amber-500', title: 'Demo Mode', detail: 'Sample data — not connected', synced, live: false };
+  if (sync.status === 'error') return { dot: 'bg-red-500', title: 'Todoist connection problem', detail: sync.error ?? 'Sync failed', synced, live: false };
+  return {
+    dot: 'bg-emerald-500',
+    title: 'Todoist Connected',
+    detail: liveUpdates ? 'Live updates on — changes in Todoist appear within seconds' : 'Live Todoist data, refreshed every few minutes',
+    synced,
+    live: liveUpdates,
+  };
 }
 
 /** Sidebar footer: connection state on two short lines. */
@@ -55,6 +61,15 @@ export function StatusPill() {
     >
       <span className={`h-2 w-2 shrink-0 rounded-full ${c.dot}`} aria-hidden />
       <span className={`shrink-0 font-semibold ${mode === 'demo' ? 'tracking-[0.04em] text-amber-900' : 'text-ink'}`}>{mode === 'demo' ? 'DEMO MODE' : 'LIVE TODOIST'}</span>
+      {c.live && (
+        <span className="hidden shrink-0 items-center gap-1 rounded-full bg-[#effaf3] px-1.5 text-[11px] font-semibold text-[#1f8a55] sm:inline-flex">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inset-0 animate-ping rounded-full bg-[#1f8a55] opacity-60 [animation-duration:2s]" />
+            <span className="relative h-1.5 w-1.5 rounded-full bg-[#1f8a55]" />
+          </span>
+          Live
+        </span>
+      )}
       {c.synced && <span className="hidden truncate text-ink-3 lg:inline">· synced {c.synced.toLowerCase()}</span>}
     </a>
   );
@@ -128,7 +143,10 @@ export function StatusCard() {
       </span>
       <span className="min-w-0 leading-tight">
         <span className="block truncate text-[13px] font-semibold text-ink">{c.title}</span>
-        <span className="block truncate text-[11.5px] text-ink-3">{c.synced ? `Synced ${c.synced.toLowerCase()}` : 'Not synced yet'}</span>
+        <span className="block truncate text-[11.5px] text-ink-3">
+          {c.live ? 'Live · ' : ''}
+          {c.synced ? `synced ${c.synced.toLowerCase()}` : 'not synced yet'}
+        </span>
       </span>
     </a>
   );

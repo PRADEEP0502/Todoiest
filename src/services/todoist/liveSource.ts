@@ -3,6 +3,7 @@ import { createComment, getActivity, getUser, getWorkspaceUsers } from './activi
 import { cacheGet, cacheSet, tokenFingerprint } from './cache';
 import { TodoistApiError, TodoistClient } from './client';
 import { ACTIVITY_WINDOW_DAYS, completedWindowStart, toMoveInput, withCommentCounts, type DataSource } from './dataSource';
+import { connectRealtime } from './realtime';
 import { applySync, readSync, type SyncState } from './syncApi';
 import { createProject, createSection } from './projects';
 import { closeTask, createTask, deleteTask, getCompletedTasks, getTask, moveTask, reopenTask, updateTask } from './tasks';
@@ -131,6 +132,14 @@ export function createLiveSource(token: string): DataSource {
       const cached: CachedWorkspace = { version: 1, state, completed, completedStatus, activity, activityStatus, workspacePeople, syncedAt };
       void cacheKey.then((key) => cacheSet(key, cached));
       return snapshot();
+    },
+
+    watch(handlers) {
+      // Todoist sends this URL with the account on every sync.
+      const url = state?.user.websocket_url;
+      if (!url) return null;
+      const handle = connectRealtime(url, handlers);
+      return () => handle.close();
     },
 
     createTask: (input) => createTask(client, input),

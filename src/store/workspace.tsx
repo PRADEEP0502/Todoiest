@@ -73,6 +73,8 @@ interface WorkspaceContextValue {
   snapshot: WorkspaceSnapshot | null;
   index: WorkspaceIndex | null;
   sync: SyncState;
+  /** True while Todoist's live channel is connected and pushing changes to us. */
+  liveUpdates: boolean;
   /** Progress of changes being sent to Todoist: Saving… → Saved ✓. */
   writeState: WriteState;
   syncNow: () => Promise<void>;
@@ -98,6 +100,8 @@ const AUTO_SYNC_MS = 5 * 60 * 1000;
 const FOCUS_SYNC_AFTER_MS = 60 * 1000;
 /** After a change, sync shortly so activity, counts and notifications catch up. */
 const AFTER_WRITE_SYNC_MS = 1500;
+/** Small pause after a live notice, so a burst of changes becomes one sync. */
+const LIVE_SYNC_DEBOUNCE_MS = 800;
 const DONE_VISIBLE_MS = 3000;
 const ERROR_VISIBLE_MS = 5000;
 
@@ -201,6 +205,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', onFocus);
     };
   }, [syncNow]);
+
+  // Live updates: Todoist pushes a notice when the account changes, and we sync straight away.
+  const [liveUpdates, setLiveUpdates] = useState(false);
+  const liveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const websocketUrl = snapshot?.user.websocket_url ?? null;
+  useEffect(() => {
+    if (!websocketUrl || !source.watch) return;
+    const stop = source.watch({
+      onChange: () => {
+        clearTimeout(liveTimer.current);
+        liveTimer.current = setTimeout(() => void syncNow(), LIVE_SYNC_DEBOUNCE_MS);
+      },
+      onStatus: setLiveUpdates,
+    });
+    return () => {
+      clearTimeout(liveTimer.current);
+      stop?.();
+      setLiveUpdates(false);
+    };
+  }, [source, websocketUrl, syncNow]);
 
   const index = useMemo(() => (snapshot ? buildIndex(snapshot) : null), [snapshot]);
   // Write handlers read the latest index without re-creating every callback on each sync.
@@ -502,6 +526,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     snapshot,
     index,
     sync,
+    liveUpdates,
     writeState,
     syncNow,
     createProject,

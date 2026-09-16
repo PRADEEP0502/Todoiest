@@ -18,6 +18,8 @@ export interface TodoistUser {
   email: string;
   full_name: string;
   inbox_project_id?: string | null;
+  /** Personal WebSocket URL Todoist uses to push "something changed" notices. Contains the token. */
+  websocket_url?: string | null;
 }
 
 export interface TodoistWorkspace {

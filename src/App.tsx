@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Toasts } from './components/common/Toasts';
+import { ConnectBanner } from './components/layout/ConnectBanner';
 import { MobileNav, TopBar } from './components/layout/TopBar';
 import { Sidebar } from './components/layout/Sidebar';
 import { TaskDialog } from './components/tasks/TaskDialog';
@@ -93,6 +94,7 @@ function Shell() {
           <main ref={main} className="flex-1 overflow-y-auto">
             {/* One width for every page, so headings never jump sideways between views. */}
             <div className="mx-auto w-full max-w-[1120px] px-4 pb-16 pt-5 sm:px-8 md:pl-4 md:pr-8 lg:pr-10">
+              <ConnectBanner />
               <Page route={route} visit={visit} />
             </div>
           </main>
