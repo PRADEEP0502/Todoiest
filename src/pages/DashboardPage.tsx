@@ -114,10 +114,10 @@ export function DashboardPage() {
                 label="Workspace totals"
                 columns="grid-cols-2"
                 items={[
-                  { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: dueToday, href: href.today(), note: 'tasks due today' },
-                  { label: 'Overdue', icon: <AlarmClock />, value: overdue, href: href.overdue(), tone: 'danger', note: 'past due date' },
-                  { label: 'No Due Date', icon: <CalendarOff />, iconTone: 'warn', value: count('no-due'), href: href.metric('no-due'), note: 'active tasks without a date' },
-                  { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: snapshot.completedStatus.ok ? completedToday(snapshot, now) : null, href: href.completed(), note: 'completed today' },
+                  { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: dueToday, href: href.today(), note: 'on today’s date' },
+                  { label: 'Overdue', icon: <AlarmClock />, value: overdue, href: href.overdue(), tone: 'danger', note: 'past their due date' },
+                  { label: 'No Due Date', icon: <CalendarOff />, iconTone: 'warn', value: count('no-due'), href: href.metric('no-due'), note: 'never scheduled' },
+                  { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: snapshot.completedStatus.ok ? completedToday(snapshot, now) : null, href: href.completed(), note: 'finished since midnight' },
                 ]}
               />
             </div>
@@ -156,7 +156,7 @@ export function DashboardPage() {
                     iconTone: 'warn',
                     value: isDateCheckConfigured(rules[c.id]) ? count(c.id) : null,
                     href: isDateCheckConfigured(rules[c.id]) ? href.metric(c.id) : href.settings(),
-                    note: isDateCheckConfigured(rules[c.id]) ? shortDateCheckNote(rules[c.id]) : 'no rule chosen yet',
+                    note: isDateCheckConfigured(rules[c.id]) ? shortDateCheckNote(rules[c.id]) : 'waiting for a rule',
                   }))}
                 />
               </div>
@@ -302,7 +302,7 @@ const DATE_CHECK_ICON: Record<(typeof DATE_CHECKS)[number]['id'], ReactNode> = {
 function shortDateCheckNote(rule: Parameters<typeof describeDateCheck>[0]): string {
   switch (rule.kind) {
     case 'no-cd':
-      return 'no DD.MM.YY in the title';
+      return 'missing DD.MM.YY';
     case 'without-label':
       return `without the “${rule.value}” label`;
     case 'with-label':
@@ -314,14 +314,14 @@ function shortDateCheckNote(rule: Parameters<typeof describeDateCheck>[0]): stri
     case 'description-missing':
       return `description without “${rule.value}”`;
     case 'unset':
-      return 'no rule chosen yet';
+      return 'waiting for a rule';
   }
 }
 
 /** Short note under a category number — the full rule is on the metric's own page. */
 function shortCategoryNote(id: (typeof CATEGORIES)[number]['id'], rules: Parameters<typeof describeCategory>[1]): string {
   if (rules.categoryBasis !== 'days-overdue') return describeCategory(id, rules);
-  return { a5: '1–5 days', a10: '6–10 days', a30: '11–30 days', a30plus: '30+ days' }[id];
+  return { a5: '1–5 days late', a10: '6–10 days late', a30: '11–30 days late', a30plus: 'over a month late' }[id];
 }
 
 function SubHeading({ title, icon, hint, link }: { title: string; icon: ReactNode; hint?: string; link: { to: string; label: string } }) {
@@ -329,7 +329,7 @@ function SubHeading({ title, icon, hint, link }: { title: string; icon: ReactNod
     <div className="mb-2.5 flex items-center gap-2">
       <span aria-hidden className="text-ink-3 [&_svg]:h-[15px] [&_svg]:w-[15px]">{icon}</span>
       <h2 className="text-[13.5px] font-semibold text-ink-2">{title}</h2>
-      {hint && <span className="hidden text-[12px] text-ink-3 sm:inline">· {hint}</span>}
+      {hint && <span className="hidden text-[12.5px] font-medium text-ink-3 sm:inline">· {hint}</span>}
       <a href={link.to} className="ml-auto inline-flex items-center gap-1 text-[12.5px] text-ink-3 hover:text-ink">
         {link.label} <ArrowRight size={12} />
       </a>
