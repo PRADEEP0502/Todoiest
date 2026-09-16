@@ -3,7 +3,9 @@ import {
   ArrowRight,
   ArrowUpRight,
   CalendarCheck,
+  CalendarClock,
   CalendarOff,
+  CalendarPlus,
   CalendarSearch,
   CircleCheckBig,
   Clock,
@@ -121,12 +123,12 @@ export function DashboardPage() {
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-              <div>
-                <SubHeading icon={<TriangleAlert />} title="Overdue categories" link={{ to: href.overdue(), label: 'Open Overdue' }} />
+              <div className="flex flex-col">
+                <SubHeading icon={<TriangleAlert />} title="Overdue categories" hint={`${overdue} late`} link={{ to: href.overdue(), label: 'Open Overdue' }} />
                 <MetricStrip
                   label="Overdue categories"
                   size="md"
-                  columns="grid-cols-2 xl:grid-cols-4"
+                  columns="grid-cols-2 xl:grid-cols-4 flex-1"
                   items={CATEGORIES.map<Metric>((c) => ({
                     label: c.label,
                     icon: CATEGORY_ICON[c.id],
@@ -137,19 +139,24 @@ export function DashboardPage() {
                   }))}
                 />
               </div>
-              <div>
-                <SubHeading icon={<CalendarSearch />} title="Date checks" link={{ to: href.settings(), label: 'Configure' }} />
+              <div className="flex flex-col">
+                <SubHeading
+                  icon={<CalendarSearch />}
+                  title="Date checks"
+                  hint={`${DATE_CHECKS.filter((c) => isDateCheckConfigured(rules[c.id])).length} of ${DATE_CHECKS.length} set up`}
+                  link={{ to: href.settings(), label: 'Configure' }}
+                />
                 <MetricStrip
                   label="Date checks"
                   size="md"
-                  columns="grid-cols-2"
+                  columns="grid-cols-2 flex-1"
                   items={DATE_CHECKS.map<Metric>((c) => ({
                     label: c.label,
-                    icon: <CalendarSearch />,
+                    icon: DATE_CHECK_ICON[c.id],
                     iconTone: 'warn',
                     value: isDateCheckConfigured(rules[c.id]) ? count(c.id) : null,
                     href: isDateCheckConfigured(rules[c.id]) ? href.metric(c.id) : href.settings(),
-                    note: isDateCheckConfigured(rules[c.id]) ? describeDateCheck(rules[c.id]) : 'Choose a rule in Settings',
+                    note: isDateCheckConfigured(rules[c.id]) ? shortDateCheckNote(rules[c.id]) : 'no rule chosen yet',
                   }))}
                 />
               </div>
@@ -286,17 +293,43 @@ const CATEGORY_ICON: Record<(typeof CATEGORIES)[number]['id'], ReactNode> = {
   a30plus: <Siren />,
 };
 
+const DATE_CHECK_ICON: Record<(typeof DATE_CHECKS)[number]['id'], ReactNode> = {
+  noCd: <CalendarPlus />,
+  noIdd: <CalendarClock />,
+};
+
+/** Short note under a date-check number — the full wording is on the metric's own page. */
+function shortDateCheckNote(rule: Parameters<typeof describeDateCheck>[0]): string {
+  switch (rule.kind) {
+    case 'no-cd':
+      return 'no DD.MM.YY in the title';
+    case 'without-label':
+      return `without the “${rule.value}” label`;
+    case 'with-label':
+      return `with the “${rule.value}” label`;
+    case 'in-section':
+      return `in “${rule.value}” sections`;
+    case 'no-deadline':
+      return 'no Todoist deadline';
+    case 'description-missing':
+      return `description without “${rule.value}”`;
+    case 'unset':
+      return 'no rule chosen yet';
+  }
+}
+
 /** Short note under a category number — the full rule is on the metric's own page. */
 function shortCategoryNote(id: (typeof CATEGORIES)[number]['id'], rules: Parameters<typeof describeCategory>[1]): string {
   if (rules.categoryBasis !== 'days-overdue') return describeCategory(id, rules);
   return { a5: '1–5 days', a10: '6–10 days', a30: '11–30 days', a30plus: '30+ days' }[id];
 }
 
-function SubHeading({ title, icon, link }: { title: string; icon: ReactNode; link: { to: string; label: string } }) {
+function SubHeading({ title, icon, hint, link }: { title: string; icon: ReactNode; hint?: string; link: { to: string; label: string } }) {
   return (
     <div className="mb-2.5 flex items-center gap-2">
       <span aria-hidden className="text-ink-3 [&_svg]:h-[15px] [&_svg]:w-[15px]">{icon}</span>
       <h2 className="text-[13.5px] font-semibold text-ink-2">{title}</h2>
+      {hint && <span className="hidden text-[12px] text-ink-3 sm:inline">· {hint}</span>}
       <a href={link.to} className="ml-auto inline-flex items-center gap-1 text-[12.5px] text-ink-3 hover:text-ink">
         {link.label} <ArrowRight size={12} />
       </a>
