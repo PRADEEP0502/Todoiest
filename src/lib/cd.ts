@@ -57,24 +57,28 @@ export function buildTitle({ cd, title, idd }: TitleDates): string {
 export const hasCd = (content: string) => parseTitle(content).cd !== null;
 export const hasIdd = (content: string) => parseTitle(content).idd !== null;
 
-/** The title to send to Todoist for a task being created now, with the due date it is being given. */
-export function titleForNewTask(title: string, now: Date, dueDate: string | null): string {
+/**
+ * The title to send to Todoist for a task being created now, with the due date it is being given.
+ * Routine work is left alone — a task that repeats has no single creation or first due date.
+ */
+export function titleForNewTask(title: string, now: Date, dueDate: string | null, routine = false): string {
   const typed = parseTitle(title);
   return buildTitle({
     // Someone typing their own dates keeps them; otherwise the clock and the due date supply them.
-    cd: typed.cd ?? formatCd(now),
+    cd: typed.cd ?? (routine ? null : formatCd(now)),
     title: typed.title,
-    idd: typed.idd ?? cdFromApiDate(dueDate),
+    idd: typed.idd ?? (routine ? null : cdFromApiDate(dueDate)),
   });
 }
 
 /**
  * The title to send to Todoist for a task being saved. The dates already in the title win; a
  * missing CD is filled in from when Todoist says the task was added, and a missing IDD only from a
- * due date being set on a task that had none — the dashboard never guesses a date it did not see.
+ * due date being set on a task that had none — the dashboard never guesses a date it did not see,
+ * and it adds nothing at all to routine work.
  */
 export function titleForSavedTask(
-  stored: { content: string; addedAt: string | null; hasDueDate: boolean },
+  stored: { content: string; addedAt: string | null; hasDueDate: boolean; routine?: boolean },
   typedTitle: string,
   dueDate: string | null,
 ): string {
@@ -82,8 +86,8 @@ export function titleForSavedTask(
   const typed = parseTitle(typedTitle);
   const firstDueDate = !stored.hasDueDate && dueDate ? cdFromApiDate(dueDate) : null;
   return buildTitle({
-    cd: current.cd ?? typed.cd ?? cdFromApiDate(stored.addedAt),
+    cd: current.cd ?? typed.cd ?? (stored.routine ? null : cdFromApiDate(stored.addedAt)),
     title: typed.title,
-    idd: current.idd ?? typed.idd ?? firstDueDate,
+    idd: current.idd ?? typed.idd ?? (stored.routine ? null : firstDueDate),
   });
 }

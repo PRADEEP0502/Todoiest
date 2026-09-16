@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { titleForNewTask, titleForSavedTask } from '../lib/cd';
+import { isRoutineSection, isRoutineTask } from '../lib/routine';
 import { dueDateKey } from '../lib/dates';
 import { buildIndex, descendantsOf, type WorkspaceIndex } from '../lib/hierarchy';
 import { toApiPriority, type UiPriority } from '../lib/priority';
@@ -290,13 +291,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [syncNow],
   );
 
+  /** A task filed under one of the workspace's routine sections is routine work too. */
+  const isRoutineForm = useCallback(
+    (form: TaskForm) => {
+      const section = form.sectionId && index ? index.sectionById.get(form.sectionId) : undefined;
+      return !!section && isRoutineSection(section.name);
+    },
+    [index],
+  );
+
   const createTask = useCallback(
     async (form: TaskForm) => {
       try {
         const task = await write('create', () =>
           source.createTask({
             // The title reaching Todoist already carries both dates: "16.09.26, Task, 20.09.26".
-            content: titleForNewTask(form.content, new Date(), form.dueDate),
+            content: titleForNewTask(form.content, new Date(), form.dueDate, isRoutineForm(form)),
             description: form.description.trim() || undefined,
             project_id: form.projectId,
             section_id: form.sectionId,
@@ -312,14 +322,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [source, write, reportWriteFailure],
+    [source, write, reportWriteFailure, isRoutineForm],
   );
 
   const saveTask = useCallback(
     async (task: TodoistTask, form: TaskForm) => {
       const changes: UpdateTaskInput = {};
       // Both dates in the title stay exactly as they are, whatever the title or the due date becomes.
-      const nextContent = titleForSavedTask({ content: task.content, addedAt: task.added_at, hasDueDate: !!task.due }, form.content, form.dueDate);
+      const routine = (index ? isRoutineTask(task, index) : false) || isRoutineForm(form);
+      const nextContent = titleForSavedTask({ content: task.content, addedAt: task.added_at, hasDueDate: !!task.due, routine }, form.content, form.dueDate);
       if (nextContent !== task.content) changes.content = nextContent;
       if (form.description.trim() !== task.description.trim()) changes.description = form.description.trim();
       if (toApiPriority(form.priority) !== task.priority) changes.priority = toApiPriority(form.priority);
@@ -358,7 +369,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [source, write, reportWriteFailure],
+    [source, write, reportWriteFailure, index, isRoutineForm],
   );
 
   const reopenTask = useCallback(

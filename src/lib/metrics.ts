@@ -2,6 +2,7 @@ import { hasCd, hasIdd } from './cd';
 import type { TodoistTask, WorkspaceSnapshot } from '../types/todoist';
 import { daysBetween, dueDateKey, startOfDay, startOfMonth, toDateKey } from './dates';
 import type { WorkspaceIndex } from './hierarchy';
+import { isRoutineTask } from './routine';
 import { completedSince, isDueToday, isOverdue } from './stats';
 
 // Management metrics computed from Todoist data. The meaning of the A-categories and of
@@ -98,10 +99,11 @@ export function matchesDateCheck(task: TodoistTask, rule: DateCheckRule, index: 
   switch (rule.kind) {
     case 'unset':
       return false;
+    // Routine work repeats, so it has no one creation date or first due date to carry.
     case 'no-cd':
-      return !hasCd(task.content);
+      return !isRoutineTask(task, index) && !hasCd(task.content);
     case 'no-idd':
-      return !hasIdd(task.content);
+      return !isRoutineTask(task, index) && !hasIdd(task.content);
     case 'without-label':
       return !task.labels.some((l) => same(l, rule.value));
     case 'with-label':
@@ -122,9 +124,9 @@ export function describeDateCheck(rule: DateCheckRule): string {
     case 'unset':
       return 'Not set up yet';
     case 'no-cd':
-      return 'Active tasks whose title has no creation date (DD.MM.YY)';
+      return 'Active tasks with no creation date in the title — routine tasks excluded';
     case 'no-idd':
-      return 'Active tasks whose title has no initial due date (…, DD.MM.YY)';
+      return 'Active tasks with no first due date in the title — routine tasks excluded';
     case 'without-label':
       return `Active tasks without the label “${rule.value}”`;
     case 'with-label':

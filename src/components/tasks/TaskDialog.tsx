@@ -1,6 +1,7 @@
 import { Check, ExternalLink, Flag, MessageSquare, Send, Tag, Trash2, User } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { cdFromApiDate, parseTitle, titleForNewTask } from '../../lib/cd';
+import { isRoutineSection, isRoutineTask } from '../../lib/routine';
 import { addDays, dueDateKey, dueTime, formatShortDate, formatTime, startOfWeek, toDateKey } from '../../lib/dates';
 import { plainText } from '../../lib/search';
 import { descendantsOf, PERSONAL_GROUP_ID, taskPath } from '../../lib/hierarchy';
@@ -85,6 +86,8 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const valid = form.content.trim().length > 0 && index.projectById.has(form.projectId);
   const subtasks = task ? descendantsOf(index, task.id) : [];
   const dates = task ? parseTitle(task.content) : null;
+  const sectionName = form.sectionId ? (index.sectionById.get(form.sectionId)?.name ?? '') : '';
+  const routine = (task ? isRoutineTask(task, index) : false) || isRoutineSection(sectionName);
   const assignee = task?.responsible_uid ? snapshot?.people[task.responsible_uid] : undefined;
 
   const submit = async (e?: FormEvent) => {
@@ -173,7 +176,11 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
             aria-label="Task name"
           />
           <p className="mt-1 text-[12px] text-ink-3">
-            {task ? datesNote(dates!, task, form) : `Saved in Todoist as “${titleForNewTask(form.content.trim() || 'Task name', now, form.dueDate)}”`}
+            {routine
+              ? 'Routine work — the dashboard keeps no creation or first due date for it'
+              : task
+                ? datesNote(dates!, task, form)
+                : `Saved in Todoist as “${titleForNewTask(form.content.trim() || 'Task name', now, form.dueDate)}”`}
           </p>
           <textarea
             className="mt-2 w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-5 text-ink-2 placeholder:text-ink-3 focus:outline-none focus:ring-0"

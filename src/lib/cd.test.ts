@@ -59,6 +59,15 @@ describe('dates in the task title (CD and IDD)', () => {
     expect(titleForSavedTask(stored('No record'), 'No record', null)).toBe('No record');
   });
 
+  it('writes no dates at all on routine work', () => {
+    expect(titleForNewTask('Daily report', new Date(2026, 8, 16), '2026-09-20', true)).toBe('Daily report');
+    const routine = { ...stored('Daily report', { addedAt: '2025-03-12T08:15:00.000000Z' }), routine: true };
+    expect(titleForSavedTask(routine, 'Daily report renamed', '2026-09-20')).toBe('Daily report renamed');
+    // Dates already in the title are never stripped, even from routine work.
+    const dated = { ...stored('16.09.26, Daily report, 20.09.26'), routine: true };
+    expect(titleForSavedTask(dated, 'Daily report', '2026-09-25')).toBe('16.09.26, Daily report, 20.09.26');
+  });
+
   it('recognises which tasks carry which date', () => {
     expect(hasCd('16.09.26, Task')).toBe(true);
     expect(hasCd('Task, 20.09.26')).toBe(false);

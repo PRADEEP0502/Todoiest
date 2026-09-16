@@ -39,6 +39,7 @@ function snapshotWith(tasks: TodoistTask[], extra: Partial<WorkspaceSnapshot> = 
     sections: [
       { id: 's1', project_id: 'p1', name: 'A-10', section_order: 1 },
       { id: 's2', project_id: 'p1', name: 'OUR REQUIREMENTS', section_order: 2 },
+      { id: 's3', project_id: 'p1', name: 'ROUTINES ♻️', section_order: 3 },
     ],
     tasks,
     completed: [],
@@ -101,6 +102,24 @@ describe('date checks (No CD / No IDD)', () => {
     expect(tasks.filter((t) => matchesDateCheck(t, { kind: 'no-deadline' }, index)).map((t) => t.id)).toEqual(['a', 'c']);
     expect(tasks.filter((t) => matchesDateCheck(t, { kind: 'description-missing', value: 'IDD:' }, index)).map((t) => t.id)).toEqual(['a', 'b']);
     expect(metricTasks('noIdd', snap, index, { ...DEFAULT_RULES, noIdd: { kind: 'no-deadline' } }, NOW).map((t) => t.id)).toEqual(['a', 'c']);
+  });
+});
+
+describe('routine work', () => {
+  it('stays out of both date checks, whether it repeats or sits in a routine section', () => {
+    const tasks = [
+      task('plain'),
+      task('repeats', { due: { date: toDateKey(NOW), is_recurring: true } }),
+      task('in-routines', { section_id: 's3' }),
+      task('heading-in-routines', { section_id: 's3', content: '* **DAILY♻️**' }),
+    ];
+    const snap = snapshotWith(tasks);
+    const index = buildIndex(snap);
+    expect(metricTasks('noCd', snap, index, DEFAULT_RULES, NOW).map((t) => t.id)).toEqual(['plain']);
+    expect(metricTasks('noIdd', snap, index, DEFAULT_RULES, NOW).map((t) => t.id)).toEqual(['plain']);
+    // A rule chosen by hand still applies to every task, routine or not.
+    const byLabel = { ...DEFAULT_RULES, noCd: { kind: 'without-label', value: 'cd' } as const };
+    expect(metricTasks('noCd', snap, index, byLabel, NOW).length).toBe(4);
   });
 });
 
