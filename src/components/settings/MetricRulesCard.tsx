@@ -21,6 +21,7 @@ const BASES: { value: CategoryBasis; label: string; hint: string }[] = [
 
 const CHECK_KINDS: { value: DateCheckRule['kind']; label: string; needsValue: boolean }[] = [
   { value: 'unset', label: 'Not set up (hide the count)', needsValue: false },
+  { value: 'no-cd', label: 'Tasks with no creation date (DD.MM.YY, …)', needsValue: false },
   { value: 'without-label', label: 'Tasks WITHOUT a label…', needsValue: true },
   { value: 'with-label', label: 'Tasks WITH a label…', needsValue: true },
   { value: 'in-section', label: 'Tasks in a section named…', needsValue: true },

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { splitCd, titleWithCreationDate, withCd } from '../lib/cd';
 import { dueDateKey } from '../lib/dates';
 import { buildIndex, descendantsOf, type WorkspaceIndex } from '../lib/hierarchy';
 import { toApiPriority, type UiPriority } from '../lib/priority';
@@ -294,7 +295,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       try {
         const task = await write('create', () =>
           source.createTask({
-            content: form.content.trim(),
+            // The title reaching Todoist already carries the creation date: "16.09.26, Task".
+            content: titleWithCreationDate(form.content, new Date()),
             description: form.description.trim() || undefined,
             project_id: form.projectId,
             section_id: form.sectionId,
@@ -316,7 +318,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const saveTask = useCallback(
     async (task: TodoistTask, form: TaskForm) => {
       const changes: UpdateTaskInput = {};
-      if (form.content.trim() !== task.content) changes.content = form.content.trim();
+      // The creation date the task was given stays exactly as it is, whatever the title becomes.
+      const created = splitCd(task.content).cd;
+      const nextContent = created ? withCd(form.content, created) : form.content.trim();
+      if (nextContent !== task.content) changes.content = nextContent;
       if (form.description.trim() !== task.description.trim()) changes.description = form.description.trim();
       if (toApiPriority(form.priority) !== task.priority) changes.priority = toApiPriority(form.priority);
       const currentDue = dueDateKey(task.due);

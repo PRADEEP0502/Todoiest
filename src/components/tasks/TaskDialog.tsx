@@ -1,5 +1,6 @@
 import { Check, ExternalLink, Flag, MessageSquare, Send, Tag, Trash2, User } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
+import { formatCd, splitCd } from '../../lib/cd';
 import { addDays, dueDateKey, dueTime, formatShortDate, formatTime, startOfWeek, toDateKey } from '../../lib/dates';
 import { plainText } from '../../lib/search';
 import { descendantsOf, PERSONAL_GROUP_ID, taskPath } from '../../lib/hierarchy';
@@ -36,7 +37,8 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const initial = useMemo<TaskForm>(() => {
     if (task) {
       return {
-        content: task.content,
+        // The creation date is shown separately, so editing the title cannot disturb it.
+        content: splitCd(task.content).title,
         description: task.description,
         projectId: task.project_id,
         sectionId: task.section_id && index?.sectionById.has(task.section_id) ? task.section_id : null,
@@ -70,6 +72,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const dirty = (Object.keys(initial) as (keyof TaskForm)[]).some((k) => form[k] !== initial[k]);
   const valid = form.content.trim().length > 0 && index.projectById.has(form.projectId);
   const subtasks = task ? descendantsOf(index, task.id) : [];
+  const createdOn = task ? splitCd(task.content).cd : null;
   const assignee = task?.responsible_uid ? snapshot?.people[task.responsible_uid] : undefined;
 
   const submit = async (e?: FormEvent) => {
@@ -157,8 +160,15 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
             onChange={(e) => set('content', e.target.value)}
             aria-label="Task name"
           />
+          <p className="mt-1 text-[12px] text-ink-3">
+            {task
+              ? createdOn
+                ? `Created ${createdOn} · this date stays with the task`
+                : 'This task has no creation date'
+              : `Saved in Todoist as “${formatCd(now)}, ${form.content.trim() || 'Task name'}”`}
+          </p>
           <textarea
-            className="mt-1.5 w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-5 text-ink-2 placeholder:text-ink-3 focus:outline-none focus:ring-0"
+            className="mt-2 w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-5 text-ink-2 placeholder:text-ink-3 focus:outline-none focus:ring-0"
             placeholder="Description"
             rows={Math.min(6, Math.max(2, form.description.split('\n').length))}
             value={form.description}
