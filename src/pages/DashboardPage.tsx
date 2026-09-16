@@ -114,8 +114,8 @@ export function DashboardPage() {
                 label="Workspace totals"
                 columns="grid-cols-2"
                 items={[
-                  { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: dueToday, href: href.today(), note: 'on today’s date' },
                   { label: 'Overdue', icon: <AlarmClock />, value: overdue, href: href.overdue(), tone: 'danger', note: 'past their due date' },
+                  { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: dueToday, href: href.today(), note: 'on today’s date' },
                   { label: 'No Due Date', icon: <CalendarOff />, iconTone: 'warn', value: count('no-due'), href: href.metric('no-due'), note: 'never scheduled' },
                   { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: snapshot.completedStatus.ok ? completedToday(snapshot, now) : null, href: href.completed(), note: 'finished since midnight' },
                 ]}
