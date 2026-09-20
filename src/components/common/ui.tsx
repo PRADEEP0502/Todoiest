@@ -122,7 +122,12 @@ export interface Metric {
   iconTone?: IconTone;
   /** null = no data or rule yet; the card reads "Set up". */
   value: number | null;
-  href: string;
+  /** Where the card leads. Omit when `onSelect` filters the current page instead. */
+  href?: string;
+  /** Filters the current page instead of navigating. */
+  onSelect?: () => void;
+  /** Marks the card whose filter is currently applied. */
+  selected?: boolean;
   note?: string;
   tone?: 'danger';
   /** Span the full row on phones (used to avoid a lone card at the end of a 2-column grid). */
@@ -140,13 +145,9 @@ export function MetricStrip({ items, columns, size = 'lg', label }: { items: Met
       {items.map((m) => {
         const danger = m.tone === 'danger' && (m.value ?? 0) > 0;
         const tone: IconTone = m.value === null ? 'neutral' : danger ? 'danger' : (m.iconTone ?? 'neutral');
-        return (
-          <a
-            key={m.label}
-            role="listitem"
-            href={m.href}
-            className={`panel group relative flex min-w-0 flex-col transition-shadow hover:shadow-pill ${lg ? 'px-4 py-4 sm:px-5' : 'rounded-[20px] px-3.5 py-3.5 sm:px-4'} ${m.wideOnMobile ? 'col-span-2 sm:col-span-1' : ''}`}
-          >
+        const cardClass = `panel group relative flex h-full w-full min-w-0 flex-col text-left transition-shadow hover:shadow-pill ${lg ? 'px-4 py-4 sm:px-5' : 'rounded-[20px] px-3.5 py-3.5 sm:px-4'} ${m.selected ? 'shadow-pill ring-2 ring-ink/80' : ''}`;
+        const body = (
+          <>
             <span className="flex min-w-0 items-start gap-2 pr-4 sm:gap-2.5">
               {m.icon && <IconBadge icon={m.icon} tone={tone} size={lg ? 'md' : 'sm'} />}
               {/* Wraps rather than clipping: no label is ever half-shown on a narrow screen. */}
@@ -163,8 +164,21 @@ export function MetricStrip({ items, columns, size = 'lg', label }: { items: Met
               )}
             </span>
             {m.note && <span className="mt-1 break-words text-[12px] font-medium leading-[17px] text-ink-2">{m.note}</span>}
-            <ArrowUpRight size={14} aria-hidden className="absolute right-3.5 top-3.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />
-          </a>
+            {m.onSelect ? null : <ArrowUpRight size={14} aria-hidden className="absolute right-3.5 top-3.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />}
+          </>
+        );
+        return (
+          <div key={m.label} role="listitem" className={`min-w-0 ${m.wideOnMobile ? 'col-span-2 sm:col-span-1' : ''}`}>
+            {m.onSelect ? (
+              <button type="button" onClick={m.onSelect} aria-pressed={!!m.selected} className={cardClass}>
+                {body}
+              </button>
+            ) : (
+              <a href={m.href} aria-current={m.selected ? 'true' : undefined} className={cardClass}>
+                {body}
+              </a>
+            )}
+          </div>
         );
       })}
     </div>

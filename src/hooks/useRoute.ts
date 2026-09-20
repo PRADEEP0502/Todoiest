@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
 
+/** What a holder's page lists: their tasks by state, what they completed, or what they wrote. */
+export const HOLDER_VIEWS = ['active', 'overdue', 'today', 'no-due', 'completed', 'comments'] as const;
+export type HolderView = (typeof HOLDER_VIEWS)[number];
+
+/** A holder's page, optionally narrowed to one of their projects and/or sections. */
+export interface HolderFilter {
+  show?: HolderView;
+  projectId?: string | null;
+  sectionId?: string | null;
+}
+
 export type Route =
   | { name: 'dashboard' }
   | { name: 'today' }
@@ -8,7 +19,7 @@ export type Route =
   | { name: 'project'; projectId: string; sectionId: string | null; taskId: string | null }
   | { name: 'overdue'; category: string | null }
   | { name: 'holders' }
-  | { name: 'holder'; holderId: string }
+  | { name: 'holder'; holderId: string; show: HolderView; projectId: string | null; sectionId: string | null }
   | { name: 'labels' }
   | { name: 'label'; label: string }
   | { name: 'metric'; metric: string }
@@ -38,7 +49,14 @@ export function parseHash(hash: string): Route {
     case 'overdue':
       return { name: 'overdue', category: query.get('category') };
     case 'holders':
-      return parts[1] ? { name: 'holder', holderId: parts[1] } : { name: 'holders' };
+      if (!parts[1]) return { name: 'holders' };
+      return {
+        name: 'holder',
+        holderId: parts[1],
+        show: (HOLDER_VIEWS as readonly string[]).includes(query.get('show') ?? '') ? (query.get('show') as HolderView) : 'active',
+        projectId: query.get('project'),
+        sectionId: query.get('section'),
+      };
     case 'labels':
       return parts[1] ? { name: 'label', label: parts[1] } : { name: 'labels' };
     case 'tasks':
@@ -65,7 +83,14 @@ export const href = {
   },
   overdue: (category?: string | null) => `#/overdue${category ? `?category=${enc(category)}` : ''}`,
   holders: () => '#/holders',
-  holder: (id: string) => `#/holders/${enc(id)}`,
+  holder: (id: string, filter: HolderFilter = {}) => {
+    const query = new URLSearchParams();
+    if (filter.show && filter.show !== 'active') query.set('show', filter.show);
+    if (filter.projectId) query.set('project', filter.projectId);
+    if (filter.sectionId) query.set('section', filter.sectionId);
+    const qs = query.toString();
+    return `#/holders/${enc(id)}${qs ? `?${qs}` : ''}`;
+  },
   labels: () => '#/labels',
   label: (name: string) => `#/labels/${enc(name)}`,
   metric: (metric: string) => `#/tasks/${enc(metric)}`,

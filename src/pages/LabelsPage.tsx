@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AlarmClock, ArrowLeft, CircleCheckBig, ListChecks, Tag } from 'lucide-react';
 import { Gate } from '../components/common/Gate';
 import { EmptyState, MetricStrip, PageHeader } from '../components/common/ui';
@@ -6,7 +7,9 @@ import { useNow } from '../hooks/useNow';
 import { href, navigate } from '../hooks/useRoute';
 import { labelRows } from '../lib/metrics';
 import { projectColor } from '../lib/priority';
-import { byPriorityThenTime } from '../lib/stats';
+import { CompletedList } from '../components/tasks/CompletedList';
+import { startOfMonth, toDateKey } from '../lib/dates';
+import { byPriorityThenTime, completedSince, isOverdue } from '../lib/stats';
 
 export function LabelsPage() {
   const now = useNow(60_000);
@@ -87,14 +90,22 @@ export function LabelsPage() {
   );
 }
 
+type LabelView = 'active' | 'overdue' | 'completed';
+const LABEL_VIEW_TITLE: Record<LabelView, string> = { active: 'Active tasks', overdue: 'Overdue tasks', completed: 'Completed this month' };
+
 export function LabelPage({ label }: { label: string }) {
   const now = useNow(60_000);
+  const [show, setShow] = useState<LabelView>('active');
   return (
     <Gate>
-      {({ snapshot }) => {
+      {({ snapshot, index }) => {
         const same = (l: string) => l.toLocaleLowerCase() === label.toLocaleLowerCase();
         const row = labelRows(snapshot, now).find((r) => same(r.name));
         const tasks = snapshot.tasks.filter((t) => t.labels.some(same));
+        const overdue = tasks.filter((t) => isOverdue(t, toDateKey(now)));
+        const completed = completedSince(snapshot.completed, startOfMonth(now)).filter((t) => t.labels.some(same));
+        const listed = show === 'overdue' ? overdue : tasks;
+        const count = show === 'completed' ? completed.length : listed.length;
         return (
           <>
             <a href={href.labels()} className="mb-2 inline-flex items-center gap-1 text-[12.5px] text-ink-3 hover:text-ink">
@@ -114,17 +125,30 @@ export function LabelPage({ label }: { label: string }) {
                 size="md"
                 columns="grid-cols-1 sm:grid-cols-3"
                 items={[
-                  { label: 'Task count', icon: <ListChecks />, value: row?.active ?? 0, href: '#label-tasks' },
-                  { label: 'Overdue', icon: <AlarmClock />, value: row?.overdue ?? 0, href: href.overdue(), tone: 'danger' },
-                  { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: snapshot.completedStatus.ok ? (row?.completed ?? 0) : null, href: href.completed(), note: 'this month' },
+                  { label: 'Task count', icon: <ListChecks />, value: tasks.length, onSelect: () => setShow('active'), selected: show === 'active' },
+                  { label: 'Overdue', icon: <AlarmClock />, value: overdue.length, tone: 'danger', onSelect: () => setShow('overdue'), selected: show === 'overdue' },
+                  {
+                    label: 'Completed',
+                    icon: <CircleCheckBig />,
+                    iconTone: 'good',
+                    value: snapshot.completedStatus.ok ? completed.length : null,
+                    note: 'this month',
+                    onSelect: () => setShow('completed'),
+                    selected: show === 'completed',
+                  },
                 ]}
               />
             </div>
-            <div id="label-tasks" className="panel px-3 py-2">
-              {tasks.length ? (
-                <GroupedTasks tasks={tasks} viewKey={`label:${label}`} compare={byPriorityThenTime} defaultOpen={tasks.length <= 30} />
+            <h2 className="mb-2.5 text-[15px] font-semibold text-ink">
+              {LABEL_VIEW_TITLE[show]} <span className="font-normal text-ink-3">· {count}</span>
+            </h2>
+            <div className="panel px-3 py-2">
+              {count === 0 ? (
+                <EmptyState title={`${LABEL_VIEW_TITLE[show]}: none with this label`} />
+              ) : show === 'completed' ? (
+                <CompletedList tasks={completed} index={index} listKey={`label:${label}`} />
               ) : (
-                <EmptyState title="No active tasks with this label" />
+                <GroupedTasks tasks={listed} viewKey={`label:${label}:${show}`} compare={byPriorityThenTime} defaultOpen={listed.length <= 30} />
               )}
             </div>
           </>

@@ -20,6 +20,8 @@ interface BarListProps {
   total?: number;
   /** Kept for existing callers; labels now size to the longest one automatically. */
   labelWidth?: 'narrow' | 'wide';
+  /** The row whose filter is currently applied. */
+  selectedId?: string | null;
 }
 
 /** Room kept at the end of the track for the value label, so the longest bar still fits. */
@@ -31,7 +33,7 @@ const VALUE_ROOM = '3rem';
  * All rows share one label column sized to the longest label, so bars start at the same x.
  * Each row links to the underlying list.
  */
-export function BarList({ entries, label, unit, total }: BarListProps) {
+export function BarList({ entries, label, unit, total, selectedId }: BarListProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const max = Math.max(1, ...entries.map((e) => e.value));
 
@@ -42,6 +44,7 @@ export function BarList({ entries, label, unit, total }: BarListProps) {
         // Bar length = its share of the largest value, measured on the track minus the label room.
         const barWidth = entry.value > 0 ? `max(6px, calc((100% - ${VALUE_ROOM}) * ${ratio}))` : '0px';
         const isHovered = hovered === entry.id;
+        const isSelected = selectedId === entry.id;
         const share = total ? Math.round((entry.value / total) * 100) : null;
         return (
           <li key={entry.id} className="col-span-2 grid grid-cols-subgrid">
@@ -52,11 +55,12 @@ export function BarList({ entries, label, unit, total }: BarListProps) {
               onFocus={() => setHovered(entry.id)}
               onBlur={() => setHovered(null)}
               aria-label={`${entry.label}: ${entry.value} ${unit}${share !== null ? `, ${share}% of all` : ''}`}
-              className={`col-span-2 grid grid-cols-subgrid items-center rounded-xl px-3 py-2 transition-colors ${isHovered ? 'bg-black/[0.03]' : ''}`}
+              aria-current={isSelected ? 'true' : undefined}
+              className={`col-span-2 grid grid-cols-subgrid items-center rounded-xl px-3 py-2 transition-colors ${isSelected ? 'bg-black/[0.06] ring-1 ring-black/10' : isHovered ? 'bg-black/[0.03]' : ''}`}
             >
               <span className="flex min-w-0 max-w-[11rem] items-center gap-2.5 sm:max-w-[15rem]">
                 {entry.mark}
-                <span className="truncate text-[13.5px] text-ink" title={entry.label}>
+                <span className={`truncate text-[13.5px] text-ink ${isSelected ? 'font-semibold' : ''}`} title={entry.label}>
                   {entry.label}
                 </span>
               </span>

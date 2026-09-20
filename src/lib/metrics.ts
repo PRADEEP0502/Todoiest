@@ -191,7 +191,11 @@ export function holderCounts(snapshot: WorkspaceSnapshot, now: Date): Map<string
     if (!t.due) c.noDue++;
   }
   for (const t of completedSince(snapshot.completed, startOfMonth(now))) get(t.responsible_uid ?? UNASSIGNED).completed++;
-  for (const comment of snapshot.comments) if (comment.posted_uid && byHolder.has(comment.posted_uid)) get(comment.posted_uid).comments++;
+  // Only comments on tasks that are still open, the same set the holder page and Comments list show.
+  const openTaskIds = new Set(snapshot.tasks.map((t) => t.id));
+  for (const comment of snapshot.comments) {
+    if (comment.posted_uid && byHolder.has(comment.posted_uid) && openTaskIds.has(comment.task_id)) get(comment.posted_uid).comments++;
+  }
   return byHolder;
 }
 

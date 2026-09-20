@@ -77,9 +77,9 @@ export function CommentsPage() {
                   size="md"
                   columns="grid-cols-1 sm:grid-cols-3"
                   items={[
-                    { label: 'Total Comments', icon: <MessagesSquare />, iconTone: 'info', value: comments.length, href: '#comments', note: 'on active tasks' },
-                    { label: 'Recent', icon: <Clock />, iconTone: 'good', value: last24, href: '#comments', note: 'last 24 hours' },
-                    { label: 'This week', icon: <CalendarDays />, value: lastWeek, href: '#comments', note: 'last 7 days' },
+                    { label: 'Total Comments', icon: <MessagesSquare />, iconTone: 'info', value: comments.length, note: 'on active tasks', onSelect: () => setRange('all'), selected: range === 'all' },
+                    { label: 'Recent', icon: <Clock />, iconTone: 'good', value: last24, note: 'last 24 hours', onSelect: () => setRange('24h'), selected: range === '24h' },
+                    { label: 'This week', icon: <CalendarDays />, value: lastWeek, note: 'last 7 days', onSelect: () => setRange('week'), selected: range === 'week' },
                   ]}
                 />
               </div>

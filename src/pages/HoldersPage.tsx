@@ -1,13 +1,20 @@
-import { AlarmClock, ArrowLeft, CalendarCheck, CalendarOff, CircleCheckBig, FolderKanban, ListChecks, ListTree, MessageSquare, Users } from 'lucide-react';
+import { AlarmClock, ArrowLeft, CalendarCheck, CalendarOff, CircleCheckBig, FolderKanban, ListChecks, ListTree, MessageSquare, Users, X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
-import { Avatar, EmptyState, MetricStrip, Notice, PageHeader, Panel, ProjectDot } from '../components/common/ui';
+import { Avatar, EmptyState, MetricStrip, Notice, PageHeader, Panel, ProjectDot, ShowMore } from '../components/common/ui';
+import { CompletedList } from '../components/tasks/CompletedList';
 import { GroupedTasks } from '../components/tasks/GroupedTasks';
 import { useNow } from '../hooks/useNow';
-import { href, navigate } from '../hooks/useRoute';
-import { hasHolderData, holderCounts, UNASSIGNED, type TaskCounts } from '../lib/metrics';
-import { byPriorityThenTime } from '../lib/stats';
-import type { WorkspaceSnapshot } from '../types/todoist';
+import { usePaged } from '../hooks/usePaged';
+import { href, navigate, type HolderView } from '../hooks/useRoute';
+import { formatShortDate, formatTime, startOfMonth, toDateKey } from '../lib/dates';
+import { taskPath, type WorkspaceIndex } from '../lib/hierarchy';
+import { plainText } from '../lib/text';
+import { useUi } from '../store/ui';
+import { hasHolderData, holderCounts, UNASSIGNED } from '../lib/metrics';
+import { byPriorityThenTime, completedSince, isDueToday, isOverdue } from '../lib/stats';
+import type { TodoistComment, TodoistTask, WorkspaceSnapshot } from '../types/todoist';
 
 const holderName = (snapshot: WorkspaceSnapshot, id: string) => (id === UNASSIGNED ? 'No holder' : (snapshot.people[id]?.name ?? 'Unknown person'));
 
@@ -114,12 +121,12 @@ export function HoldersPage() {
                             {holderName(snapshot, id)}
                           </a>
                         </td>
-                        <Num v={c.active} />
-                        <Num v={c.overdue} danger />
-                        <Num v={c.today} />
-                        <Num v={c.noDue} />
-                        <Num v={c.completed} />
-                        <Num v={c.comments} />
+                        <Num v={c.active} to={href.holder(id)} />
+                        <Num v={c.overdue} danger to={href.holder(id, { show: 'overdue' })} />
+                        <Num v={c.today} to={href.holder(id, { show: 'today' })} />
+                        <Num v={c.noDue} to={href.holder(id, { show: 'no-due' })} />
+                        <Num v={c.completed} to={href.holder(id, { show: 'completed' })} />
+                        <Num v={c.comments} to={href.holder(id, { show: 'comments' })} />
                       </tr>
                     ))}
                   </tbody>
@@ -133,27 +140,106 @@ export function HoldersPage() {
   );
 }
 
-function Num({ v, danger }: { v: number; danger?: boolean }) {
-  return <td className={`px-3 py-2.5 text-right tabular-nums ${danger && v > 0 ? 'font-medium text-p1' : v ? 'text-ink' : 'text-ink-3'}`}>{v}</td>;
+/** A figure in the holders table that opens that person's page already filtered to it. */
+function Num({ v, danger, to }: { v: number; danger?: boolean; to: string }) {
+  return (
+    <td className="px-1.5 py-1 text-right">
+      <a
+        href={to}
+        // The row itself also opens the person; this link wins with its own filter.
+        onClick={(e) => e.stopPropagation()}
+        className={`inline-flex h-8 min-w-10 items-center justify-end rounded-lg px-2 tabular-nums transition-colors hover:bg-black/[0.05] ${danger && v > 0 ? 'font-medium text-p1' : v ? 'text-ink' : 'text-ink-3'}`}
+      >
+        {v}
+      </a>
+    </td>
+  );
 }
 
-/** Selected user metrics: counts, then their work as Project → Section → Task. */
-export function HolderPage({ holderId }: { holderId: string }) {
+const VIEW_TITLE: Record<HolderView, string> = {
+  active: 'All active tasks',
+  overdue: 'Overdue tasks',
+  today: 'Due today',
+  'no-due': 'Tasks with no due date',
+  completed: 'Completed this month',
+  comments: 'Comments written',
+};
+
+interface HolderPageProps {
+  holderId: string;
+  show: HolderView;
+  projectId: string | null;
+  sectionId: string | null;
+}
+
+/**
+ * One person's work. Everything on this page is limited to that holder: the cards filter the list
+ * below by state, and the project and section bars narrow it further — nothing opens the
+ * company-wide views.
+ */
+export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageProps) {
   const now = useNow(60_000);
+  const listRef = useRef<HTMLElement>(null);
+  const firstRender = useRef(true);
+
+  // After picking a card or a bar, bring the filtered list into view.
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [show, projectId, sectionId]);
+
   return (
     <Gate>
       {({ snapshot, index }) => {
         const name = holderName(snapshot, holderId);
-        const counts: TaskCounts = holderCounts(snapshot, now).get(holderId) ?? { active: 0, overdue: 0, today: 0, noDue: 0, completed: 0, comments: 0 };
-        const tasks = snapshot.tasks.filter((t) => (t.responsible_uid ?? UNASSIGNED) === holderId);
+        const todayKey = toDateKey(now);
+        const isHolder = (t: TodoistTask) => (t.responsible_uid ?? UNASSIGNED) === holderId;
+        const section = sectionId ? index.sectionById.get(sectionId) : undefined;
+        // A section implies its project, so a section link alone is enough.
+        const scopeProjectId = section?.project_id ?? projectId;
+        const project = scopeProjectId ? index.projectById.get(scopeProjectId) : undefined;
+        const inScope = (t: Pick<TodoistTask, 'project_id' | 'section_id'>) =>
+          (!scopeProjectId || t.project_id === scopeProjectId) && (!sectionId || t.section_id === sectionId);
+
+        const allTasks = snapshot.tasks.filter(isHolder);
+        const tasks = allTasks.filter(inScope);
+        const completed = completedSince(snapshot.completed, startOfMonth(now)).filter((t) => isHolder(t) && inScope(t));
+        const comments =
+          holderId === UNASSIGNED
+            ? []
+            : snapshot.comments.filter((c) => {
+                if (c.posted_uid !== holderId) return false;
+                const task = index.taskById.get(c.task_id);
+                return !!task && inScope(task);
+              });
+
+        const lists: Record<Exclude<HolderView, 'completed' | 'comments'>, TodoistTask[]> = {
+          active: tasks,
+          overdue: tasks.filter((t) => isOverdue(t, todayKey)),
+          today: tasks.filter((t) => isDueToday(t, todayKey)),
+          'no-due': tasks.filter((t) => !t.due),
+        };
+
+        // Bars: the person's projects, and the sections of the chosen project (or of all of them).
         const byProject = new Map<string, number>();
         const bySection = new Map<string, number>();
-        for (const t of tasks) {
+        for (const t of allTasks) {
           byProject.set(t.project_id, (byProject.get(t.project_id) ?? 0) + 1);
-          if (t.section_id && index.sectionById.has(t.section_id)) bySection.set(t.section_id, (bySection.get(t.section_id) ?? 0) + 1);
+          if (t.section_id && index.sectionById.has(t.section_id) && (!scopeProjectId || t.project_id === scopeProjectId)) {
+            bySection.set(t.section_id, (bySection.get(t.section_id) ?? 0) + 1);
+          }
         }
-        const topProjects = [...byProject].sort((a, b) => b[1] - a[1]).slice(0, 5);
-        const topSections = [...bySection].sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const topProjects = [...byProject].sort((a, b) => b[1] - a[1]).slice(0, 6);
+        const topSections = [...bySection].sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+        const link = (filter: { show?: HolderView; projectId?: string | null; sectionId?: string | null }) =>
+          href.holder(holderId, { show, projectId: scopeProjectId, sectionId, ...filter });
+        const card = (view: HolderView) => ({ href: link({ show: view }), selected: show === view });
+        const scoped = !!scopeProjectId || !!sectionId;
+        const count = show === 'completed' ? completed.length : show === 'comments' ? comments.length : lists[show].length;
 
         return (
           <>
@@ -181,40 +267,51 @@ export function HolderPage({ holderId }: { holderId: string }) {
               <MetricStrip
                 label={`${name}: totals`}
                 size="md"
-                columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
+                columns={holderId === UNASSIGNED ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'}
                 items={[
-                  { label: 'Active Tasks', icon: <ListChecks />, value: counts.active, href: '#holder-tasks' },
-                  { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: counts.completed, href: href.completed(), note: 'this month' },
-                  { label: 'Overdue', icon: <AlarmClock />, value: counts.overdue, href: href.overdue(), tone: 'danger' },
-                  { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: counts.today, href: href.today() },
-                  { label: 'No Due Date', icon: <CalendarOff />, iconTone: 'warn', value: counts.noDue, href: '#holder-tasks' },
-                  { label: 'Comments', icon: <MessageSquare />, iconTone: 'info', value: holderId === UNASSIGNED ? null : counts.comments, href: href.comments(), note: 'written' },
+                  { label: 'Active Tasks', icon: <ListChecks />, value: lists.active.length, ...card('active') },
+                  { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: completed.length, note: 'this month', ...card('completed') },
+                  { label: 'Overdue', icon: <AlarmClock />, value: lists.overdue.length, tone: 'danger', ...card('overdue') },
+                  { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: lists.today.length, ...card('today') },
+                  { label: 'No Due Date', icon: <CalendarOff />, iconTone: 'warn', value: lists['no-due'].length, ...card('no-due') },
+                  ...(holderId === UNASSIGNED
+                    ? []
+                    : [{ label: 'Comments', icon: <MessageSquare />, iconTone: 'info' as const, value: comments.length, note: 'written', ...card('comments') }]),
                 ]}
               />
 
-              {tasks.length > 0 && (
+              {allTasks.length > 0 && (
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <Panel title="Project-wise tasks" icon={<FolderKanban />} iconTone="good">
+                  <Panel title="Project-wise tasks" icon={<FolderKanban />} iconTone="good" subtitle="Click a project to show only its tasks">
                     <BarList
                       label={`${name}: tasks by project`}
                       unit="active tasks"
-                      total={tasks.length}
+                      total={allTasks.length}
+                      selectedId={scopeProjectId}
                       entries={topProjects.map(([id, value]) => {
-                        const project = index.projectById.get(id);
-                        return { id, label: project?.name ?? 'Project', value, href: href.project(id), mark: <ProjectDot color={project?.color} /> };
+                        const p = index.projectById.get(id);
+                        // Clicking the selected project again clears it.
+                        const to = id === scopeProjectId ? link({ projectId: null, sectionId: null }) : link({ projectId: id, sectionId: null });
+                        return { id, label: p?.name ?? 'Project', value, href: to, mark: <ProjectDot color={p?.color} /> };
                       })}
                     />
                   </Panel>
-                  <Panel title="Section-wise tasks" icon={<ListTree />} subtitle={topSections.length ? undefined : 'These tasks are not in sections'}>
+                  <Panel
+                    title="Section-wise tasks"
+                    icon={<ListTree />}
+                    subtitle={topSections.length ? (project ? `Sections in ${project.name}` : 'Click a section to show only its tasks') : 'These tasks are not in sections'}
+                  >
                     {topSections.length > 0 && (
                       <BarList
                         label={`${name}: tasks by section`}
                         unit="active tasks"
-                        total={tasks.length}
+                        total={allTasks.length}
+                        selectedId={sectionId}
                         entries={topSections.map(([id, value]) => {
-                          const section = index.sectionById.get(id)!;
-                          const project = index.projectById.get(section.project_id);
-                          return { id, label: section.name, value, href: href.project(section.project_id, { sectionId: id }), mark: <ProjectDot color={project?.color} />, detail: project?.name };
+                          const s = index.sectionById.get(id)!;
+                          const p = index.projectById.get(s.project_id);
+                          const to = id === sectionId ? link({ sectionId: null }) : link({ projectId: s.project_id, sectionId: id });
+                          return { id, label: s.name, value, href: to, mark: <ProjectDot color={p?.color} />, detail: p?.name };
                         })}
                       />
                     )}
@@ -222,14 +319,46 @@ export function HolderPage({ holderId }: { holderId: string }) {
                 </div>
               )}
 
-              <section id="holder-tasks" className="scroll-mt-4">
-                <h2 className="mb-2 text-[15px] font-semibold text-ink">Tasks by project and section</h2>
-                {holderId === UNASSIGNED && <div className="mb-2"><Notice>Todoist has no holder for these tasks (they are unassigned, or in projects that are not shared).</Notice></div>}
+              <section ref={listRef} className="scroll-mt-4">
+                <div className="mb-2.5 flex flex-wrap items-center gap-2">
+                  <h2 className="text-[15px] font-semibold text-ink">
+                    {VIEW_TITLE[show]} <span className="font-normal text-ink-3">· {count}</span>
+                  </h2>
+                  {project && (
+                    <a href={link({ projectId: null, sectionId: null })} className="filter-chip" title="Remove this filter">
+                      <ProjectDot color={project.color} /> {project.name} <X size={12} />
+                    </a>
+                  )}
+                  {section && (
+                    <a href={link({ sectionId: null })} className="filter-chip" title="Remove this filter">
+                      <ListTree size={12} /> {section.name} <X size={12} />
+                    </a>
+                  )}
+                  {(scoped || show !== 'active') && (
+                    <a href={href.holder(holderId)} className="ml-auto text-[12.5px] font-medium text-ink-3 hover:text-ink">
+                      Clear filters
+                    </a>
+                  )}
+                </div>
+                {holderId === UNASSIGNED && show !== 'completed' && (
+                  <div className="mb-2">
+                    <Notice>Todoist has no holder for these tasks (they are unassigned, or in projects that are not shared).</Notice>
+                  </div>
+                )}
                 <div className="panel px-3 py-2">
-                  {tasks.length ? (
-                    <GroupedTasks tasks={tasks} viewKey={`holder:${holderId}`} compare={byPriorityThenTime} defaultOpen={tasks.length <= 30} />
+                  {count === 0 ? (
+                    <EmptyState title={`${VIEW_TITLE[show]}: none for ${name}${scoped ? ' here' : ''}`} />
+                  ) : show === 'completed' ? (
+                    <CompletedList tasks={completed} index={index} listKey={`${holderId}:${scopeProjectId}:${sectionId}`} />
+                  ) : show === 'comments' ? (
+                    <HolderComments comments={comments} index={index} now={now} />
                   ) : (
-                    <EmptyState title="No active tasks" />
+                    <GroupedTasks
+                      tasks={lists[show]}
+                      viewKey={`holder:${holderId}:${show}`}
+                      compare={byPriorityThenTime}
+                      defaultOpen={lists[show].length <= 30}
+                    />
                   )}
                 </div>
               </section>
@@ -238,5 +367,40 @@ export function HolderPage({ holderId }: { holderId: string }) {
         );
       }}
     </Gate>
+  );
+}
+
+/** Comments this person wrote, newest first, each with the task it belongs to. */
+function HolderComments({ comments, index, now }: { comments: TodoistComment[]; index: WorkspaceIndex; now: Date }) {
+  const { openTask } = useUi();
+  const sorted = [...comments].sort((a, b) => (b.posted_at ?? '').localeCompare(a.posted_at ?? ''));
+  const { visible, shown, total, more } = usePaged(sorted, 'holder-comments');
+  return (
+    <>
+      <ul className="divide-y divide-black/[0.05]">
+        {visible.map((c) => {
+          const task = index.taskById.get(c.task_id)!;
+          const at = c.posted_at ? new Date(c.posted_at) : null;
+          return (
+            <li key={c.id} className="flex items-start gap-3 px-2 py-2.5">
+              <MessageSquare size={16} className="mt-0.5 shrink-0 text-p3" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block whitespace-pre-wrap break-words text-[13.5px] text-ink">{plainText(c.content)}</span>
+                <button type="button" onClick={() => openTask(task.id)} className="mt-0.5 block max-w-full truncate text-left text-[12px] text-ink-3 hover:text-ink hover:underline">
+                  on {plainText(task.content)} · {taskPath(index, task).join(' › ')}
+                </button>
+              </span>
+              {at && (
+                <span className="shrink-0 text-right text-[12px] tabular-nums text-ink-3">
+                  {formatShortDate(at, now)}
+                  <span className="block">{formatTime(at)}</span>
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <ShowMore shown={shown} total={total} onMore={more} />
+    </>
   );
 }
