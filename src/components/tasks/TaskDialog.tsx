@@ -1,6 +1,7 @@
-import { Check, ExternalLink, Flag, MessageSquare, Send, Tag, Trash2, User } from 'lucide-react';
-import { useMemo, useState, type FormEvent } from 'react';
-import { cdFromApiDate, parseTitle, titleForNewTask } from '../../lib/cd';
+import { Check, ExternalLink, Flag, MessageSquare, Pencil, Send, Tag, Trash2, User } from 'lucide-react';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
+import { formatCd, parseTitle, titleForNewTask } from '../../lib/cd';
+import { longFromDateKey, longFromTitleDate, taskDates, type TaskDates } from '../../lib/taskDates';
 import { isRoutineSection, isRoutineTask } from '../../lib/routine';
 import { addDays, dueDateKey, dueTime, formatShortDate, formatTime, startOfWeek, toDateKey } from '../../lib/dates';
 import { plainText } from '../../lib/search';
@@ -9,9 +10,9 @@ import { PRIORITY_STYLE, toUiPriority, type UiPriority } from '../../lib/priorit
 import { isUncompletable } from '../../lib/text';
 import { useUi, type NewTaskDefaults } from '../../store/ui';
 import { useWorkspace, type TaskForm } from '../../store/workspace';
-import type { TitleDates } from '../../lib/cd';
 import type { TodoistTask } from '../../types/todoist';
 import { Modal } from '../common/Modal';
+import { TaskDateCards } from './TaskDates';
 import { Avatar } from '../common/ui';
 
 export function TaskDialog() {
@@ -22,17 +23,6 @@ export function TaskDialog() {
   const task = index.taskById.get(dialog.taskId);
   if (!task) return <MissingTask onClose={closeDialog} />;
   return <TaskEditor key={task.id} task={task} onClose={closeDialog} />;
-}
-
-/** What the two dates in the title mean for the task being edited, and what saving will add. */
-function datesNote(dates: TitleDates, task: TodoistTask, form: TaskForm): string {
-  const created = dates.cd ?? cdFromApiDate(task.added_at);
-  const firstDue = dates.idd ?? (!task.due && form.dueDate ? cdFromApiDate(form.dueDate) : null);
-  const parts = [created ? `Created ${created}` : 'No creation date on record'];
-  if (firstDue) parts.push(`first due ${firstDue}`);
-  else if (task.due) parts.push('no first due date on record');
-  parts.push(dates.cd && dates.idd ? 'both stay in the title' : 'kept in the title from now on');
-  return parts.join(' · ');
 }
 
 function MissingTask({ onClose }: { onClose: () => void }) {
@@ -56,6 +46,8 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
         projectId: task.project_id,
         sectionId: task.section_id && index?.sectionById.has(task.section_id) ? task.section_id : null,
         dueDate: dueDateKey(task.due),
+        // Never pre-filled: a stored IDD is shown locked, and a missing one is entered here once.
+        idd: null,
         priority: toUiPriority(task.priority),
       };
     }
@@ -67,6 +59,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
       projectId,
       sectionId: defaults?.sectionId ?? null,
       dueDate: defaults?.dueDate ?? null,
+      idd: null,
       priority: 4,
     };
   }, [task, defaults, index, snapshot]);
@@ -74,6 +67,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const [form, setForm] = useState<TaskForm>(initial);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const dueInput = useRef<HTMLInputElement>(null);
 
   if (!index) return null;
   const set = <K extends keyof TaskForm>(key: K, value: TaskForm[K]) => {
@@ -85,10 +79,31 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const dirty = (Object.keys(initial) as (keyof TaskForm)[]).some((k) => form[k] !== initial[k]);
   const valid = form.content.trim().length > 0 && index.projectById.has(form.projectId);
   const subtasks = task ? descendantsOf(index, task.id) : [];
-  const dates = task ? parseTitle(task.content) : null;
   const sectionName = form.sectionId ? (index.sectionById.get(form.sectionId)?.name ?? '') : '';
   const routine = (task ? isRoutineTask(task, index) : false) || isRoutineSection(sectionName);
   const assignee = task?.responsible_uid ? snapshot?.people[task.responsible_uid] : undefined;
+
+  // The three dates as they stand, and what saving will newly record. CD and IDD, once written,
+  // are only ever shown; nothing in this form can edit them. A task with no IDD yet gets a one-time
+  // box for it, and that is the only way an IDD is ever recorded.
+  const chosenDue = longFromDateKey(form.dueDate);
+  const storedDates: TaskDates | null = task ? taskDates(task) : null;
+  const iddOpen = !routine && (storedDates ? !storedDates.iddKey : true);
+  const iddEntered = iddOpen && !!form.idd;
+  const cardDates: TaskDates = storedDates
+    ? { ...storedDates, idd: iddEntered ? longFromDateKey(form.idd) : storedDates.idd, iddKey: iddEntered ? form.idd : storedDates.iddKey, dd: chosenDue, ddKey: form.dueDate }
+    : {
+        title: '',
+        cd: longFromTitleDate(formatCd(now)),
+        cdKey: toDateKey(now),
+        cdTime: formatTime(now),
+        cdFrom: 'title',
+        idd: iddEntered ? longFromDateKey(form.idd) : null,
+        iddKey: iddEntered ? form.idd : null,
+        dd: chosenDue,
+        ddKey: form.dueDate,
+        ddTime: null,
+      };
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -175,13 +190,20 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
             onChange={(e) => set('content', e.target.value)}
             aria-label="Task name"
           />
-          <p className="mt-1 text-[12px] text-ink-3">
-            {routine
-              ? 'Routine work — the dashboard keeps no creation or first due date for it'
-              : task
-                ? datesNote(dates!, task, form)
-                : `Saved in Todoist as “${titleForNewTask(form.content.trim() || 'Task name', now, form.dueDate)}”`}
-          </p>
+          <div className="mt-3">
+            <TaskDateCards
+              dates={cardDates}
+              cdTime={task ? cardDates.cdTime : null}
+              routine={routine}
+              pending={task ? { idd: iddEntered } : { cd: true, idd: iddEntered }}
+              iddEditor={iddOpen ? { value: form.idd, onChange: (v) => set('idd', v), dueDate: form.dueDate } : undefined}
+              ddPreview={chosenDue}
+              onEditDue={() => dueInput.current?.focus()}
+            />
+            {!task && !routine && (
+              <p className="mt-2 text-[11.5px] text-ink-3">Saved in Todoist as “{titleForNewTask(form.content.trim() || 'Task name', now, form.idd)}”</p>
+            )}
+          </div>
           <textarea
             className="mt-2 w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-5 text-ink-2 placeholder:text-ink-3 focus:outline-none focus:ring-0"
             placeholder="Description"
@@ -233,10 +255,14 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
         </div>
 
         <div>
-          <label className="label" htmlFor="task-due">Due date</label>
+          <label className="label inline-flex items-center gap-1.5" htmlFor="task-due">
+            DD · Due date <Pencil size={11} strokeWidth={2.25} className="text-accent" aria-hidden />
+            <span className="font-normal text-ink-3">editable</span>
+          </label>
           <div className="flex flex-wrap items-center gap-2">
             <input
               id="task-due"
+              ref={dueInput}
               type="date"
               className="field w-auto"
               value={form.dueDate ?? ''}

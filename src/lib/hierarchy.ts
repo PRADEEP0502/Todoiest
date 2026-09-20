@@ -1,5 +1,5 @@
 import type { TodoistProject, TodoistSection, TodoistTask, WorkspaceSnapshot } from '../types/todoist';
-import { plainText } from './text';
+import { taskTitle } from './text';
 
 // Builds the Workspace → Project → Section → Task → Subtask structure from flat API lists.
 // Every relationship is resolved by ID; names are only ever used for display.
@@ -247,7 +247,7 @@ export function taskPath(index: WorkspaceIndex, task: Pick<TodoistTask, 'project
   const seen = new Set<string>();
   for (let p = task.parent_id ? index.taskById.get(task.parent_id) : undefined; p && !seen.has(p.id); p = p.parent_id ? index.taskById.get(p.parent_id) : undefined) {
     seen.add(p.id);
-    parents.unshift(plainText(p.content));
+    parents.unshift(taskTitle(p.content));
   }
   return [...path, ...parents];
 }

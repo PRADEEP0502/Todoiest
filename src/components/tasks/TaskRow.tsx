@@ -3,11 +3,14 @@ import { useState, type ReactNode } from 'react';
 import { useNow } from '../../hooks/useNow';
 import { describeDue, dueTime } from '../../lib/dates';
 import { PRIORITY_STYLE, toUiPriority } from '../../lib/priority';
+import { isRoutineTask } from '../../lib/routine';
+import { taskDates } from '../../lib/taskDates';
 import { isUncompletable, plainText } from '../../lib/text';
 import { useUi } from '../../store/ui';
 import { useWorkspace } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { Chevron } from '../common/ui';
+import { TaskDateLine } from './TaskDates';
 
 interface TaskRowProps {
   task: TodoistTask;
@@ -24,12 +27,15 @@ interface TaskRowProps {
 const TONE_CLASS = { overdue: 'text-p1', today: 'text-accent', soon: 'text-ink-2', later: 'text-ink-3' } as const;
 
 export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = false, onToggle, hideDue }: TaskRowProps) {
-  const { completeTask, snapshot } = useWorkspace();
+  const { completeTask, snapshot, index } = useWorkspace();
   const { openTask } = useUi();
   const now = useNow();
   const [checking, setChecking] = useState(false);
 
   const heading = isUncompletable(task.content);
+  // The task name without the dates written into its title; the dates get their own line below.
+  const dates = taskDates(task);
+  const routine = index ? isRoutineTask(task, index) : false;
   const priority = toUiPriority(task.priority);
   const style = PRIORITY_STYLE[priority];
   const due = hideDue ? null : describeDue(task.due, now);
@@ -115,8 +121,9 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
 
       <button type="button" onClick={() => openTask(task.id)} className="min-w-0 flex-1 text-left">
         <span className={`block break-words text-[14px] leading-5 ${checking ? 'text-ink-3 line-through' : heading ? 'font-semibold text-ink' : 'text-ink'}`}>
-          {plainText(task.content)}
+          {plainText(dates.title)}
         </span>
+        {!heading && <TaskDateLine dates={dates} routine={routine} />}
         {(meta.length > 0 || path) && (
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] leading-4 text-ink-3">
             {meta}

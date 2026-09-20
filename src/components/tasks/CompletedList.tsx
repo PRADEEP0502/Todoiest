@@ -3,7 +3,7 @@ import { usePaged } from '../../hooks/usePaged';
 import { useNow } from '../../hooks/useNow';
 import { formatShortDate, formatTime } from '../../lib/dates';
 import { taskPath, type WorkspaceIndex } from '../../lib/hierarchy';
-import { plainText } from '../../lib/text';
+import { taskTitle } from '../../lib/text';
 import type { TodoistTask } from '../../types/todoist';
 import { ShowMore } from '../common/ui';
 
@@ -21,7 +21,7 @@ export function CompletedList({ tasks, index, listKey }: { tasks: TodoistTask[];
             <li key={`${task.id}-${task.completed_at}`} className="flex items-start gap-3 px-2 py-2.5">
               <CircleCheckBig size={17} className="mt-0.5 shrink-0 text-accent" aria-hidden />
               <span className="min-w-0 flex-1">
-                <span className="block break-words text-[14px] text-ink-2 line-through decoration-black/20">{plainText(task.content)}</span>
+                <span className="block break-words text-[14px] text-ink-2 line-through decoration-black/20">{taskTitle(task.content)}</span>
                 <span className="block truncate text-[12px] text-ink-3">{taskPath(index, task).join(' › ')}</span>
               </span>
               {at && (

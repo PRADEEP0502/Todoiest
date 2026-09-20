@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseTitle } from './cd';
 import { createDemoSnapshot } from '../services/todoist/demoData';
 import type { TodoistProject, TodoistSection, TodoistTask, WorkspaceSnapshot } from '../types/todoist';
 import { buildIndex, containerKey, countContainer, descendantsOf, groupByProjectAndSection, taskPath } from './hierarchy';
@@ -72,7 +73,7 @@ describe('buildIndex with the demo workspace', () => {
   });
 
   it('nests subtasks under their parent and counts them', () => {
-    const lms = [...index.taskById.values()].find((t) => t.content === 'Develop LMS-style Onboarding System')!;
+    const lms = [...index.taskById.values()].find((t) => parseTitle(t.content).title === 'Develop LMS-style Onboarding System')!;
     expect(index.subtasks.get(lms.id)!.map((t) => t.content)).toEqual(['Define module list with HR', 'Record welcome video from MD', 'Choose LMS platform']);
     expect(descendantsOf(index, lms.id)).toHaveLength(3);
     const onboarding = index.sectionsByProject.get('p-projects')![0];
@@ -110,7 +111,7 @@ describe('dynamic data: the index reflects whatever Todoist returns', () => {
     const snap = base();
     const renamed = snap.sections.find((s) => s.name === 'WEBSITE')!;
     renamed.name = 'Website 2.0';
-    const moved = snap.tasks.find((t) => t.content === 'Finalise homepage copy')!;
+    const moved = snap.tasks.find((t) => parseTitle(t.content).title === 'Finalise homepage copy')!;
     const target = snap.sections.find((s) => s.name === 'Site Visits')!;
     moved.project_id = target.project_id;
     moved.section_id = target.id;
@@ -160,8 +161,8 @@ describe('groupByProjectAndSection', () => {
   it('groups a subset as Project → Section in sidebar order, nesting subtasks present in the subset', () => {
     const snap = createDemoSnapshot(NOW);
     const index = buildIndex(snap);
-    const lms = snap.tasks.find((t) => t.content === 'Develop LMS-style Onboarding System')!;
-    const subset = [...snap.tasks.filter((t) => t.parent_id === lms.id), lms, snap.tasks.find((t) => t.content === 'Inspect RV plant safety compliance')!];
+    const lms = snap.tasks.find((t) => parseTitle(t.content).title === 'Develop LMS-style Onboarding System')!;
+    const subset = [...snap.tasks.filter((t) => t.parent_id === lms.id), lms, snap.tasks.find((t) => parseTitle(t.content).title === 'Inspect RV plant safety compliance')!];
 
     const { groups, childrenOf } = groupByProjectAndSection(index, subset);
     expect(groups.map((g) => g.project.name)).toEqual(['RV', 'PROJECTS 🎯🎯']);

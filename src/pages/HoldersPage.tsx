@@ -1,5 +1,5 @@
-import { AlarmClock, ArrowLeft, CalendarCheck, CalendarOff, CircleCheckBig, FolderKanban, ListChecks, ListTree, MessageSquare, Users, X } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { AlarmClock, ArrowLeft, CalendarCheck, CalendarClock, CalendarOff, CalendarPlus, ChevronDown, CircleCheckBig, FolderKanban, ListChecks, ListTree, LockKeyhole, MessageSquare, Search, Users, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
 import { Avatar, EmptyState, MetricStrip, Notice, PageHeader, Panel, ProjectDot, ShowMore } from '../components/common/ui';
@@ -10,6 +10,8 @@ import { usePaged } from '../hooks/usePaged';
 import { href, navigate, type HolderView } from '../hooks/useRoute';
 import { formatShortDate, formatTime, startOfMonth, toDateKey } from '../lib/dates';
 import { taskPath, type WorkspaceIndex } from '../lib/hierarchy';
+import { isRoutineTask } from '../lib/routine';
+import { taskDates } from '../lib/taskDates';
 import { plainText } from '../lib/text';
 import { useUi } from '../store/ui';
 import { hasHolderData, holderCounts, UNASSIGNED } from '../lib/metrics';
@@ -44,15 +46,8 @@ export function HoldersPage() {
             <PageHeader title="Holder Wise" subtitle={`${people.length} people hold active tasks`} />
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor="holder-select" className="text-[13px] text-ink-2">Select a person</label>
-                <select id="holder-select" className="field w-auto min-w-56" value="" onChange={(e) => e.target.value && navigate(href.holder(e.target.value))}>
-                  <option value="">Choose…</option>
-                  {rows.map(([id, c]) => (
-                    <option key={id} value={id}>
-                      {holderName(snapshot, id)} — {c.active} active
-                    </option>
-                  ))}
-                </select>
+                <label className="text-[13px] text-ink-2">Select a person</label>
+                <SearchableHolderSelect rows={rows} snapshot={snapshot} />
               </div>
 
               <Panel title="Holder-wise Active Tasks" icon={<Users />} iconTone="info">
@@ -140,6 +135,108 @@ export function HoldersPage() {
   );
 }
 
+/** Searchable dropdown for picking a person from the holder list. */
+function SearchableHolderSelect({ rows, snapshot }: { rows: [string, ReturnType<typeof holderCounts> extends Map<string, infer V> ? V : never][]; snapshot: WorkspaceSnapshot }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close on click outside
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Auto-focus search input when opened
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  const filtered = rows.filter(([id]) => {
+    if (!search.trim()) return true;
+    return holderName(snapshot, id).toLowerCase().includes(search.toLowerCase());
+  });
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        className="field flex w-auto min-w-56 items-center justify-between gap-2 text-left"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="text-ink-3">Choose…</span>
+        <ChevronDown size={14} className={`text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border border-line bg-surface shadow-lg">
+          {/* Search input */}
+          <div className="border-b border-line p-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
+              <input
+                ref={inputRef}
+                type="text"
+                className="field w-full pl-8"
+                placeholder="Search people…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setOpen(false);
+                    setSearch('');
+                  }
+                  // Enter selects the first filtered result
+                  if (e.key === 'Enter' && filtered.length > 0) {
+                    navigate(href.holder(filtered[0][0]));
+                    setOpen(false);
+                    setSearch('');
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Options list */}
+          <ul className="max-h-60 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2.5 text-center text-[13px] text-ink-3">No results found</li>
+            ) : (
+              filtered.map(([id, c]) => (
+                <li key={id}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] text-ink transition-colors hover:bg-canvas/60"
+                    onClick={() => {
+                      navigate(href.holder(id));
+                      setOpen(false);
+                      setSearch('');
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Avatar id={id} name={holderName(snapshot, id)} size={20} />
+                      <span>{holderName(snapshot, id)}</span>
+                    </span>
+                    <span className="text-[12px] text-ink-3">{c.active} active</span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** A figure in the holders table that opens that person's page already filtered to it. */
 function Num({ v, danger, to }: { v: number; danger?: boolean; to: string }) {
   return (
@@ -163,6 +260,12 @@ const VIEW_TITLE: Record<HolderView, string> = {
   'no-due': 'Tasks with no due date',
   completed: 'Completed this month',
   comments: 'Comments written',
+  cd: 'Tasks with a Creation Date (CD)',
+  idd: 'Tasks with an Issue Date (IDD)',
+  dd: 'Tasks with a Due Date (DD)',
+  'no-cd': 'Tasks without a Creation Date (CD)',
+  'no-idd': 'Tasks without an Issue Date (IDD)',
+  'no-dd': 'Tasks without a Due Date (DD)',
 };
 
 interface HolderPageProps {
@@ -221,6 +324,13 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
           overdue: tasks.filter((t) => isOverdue(t, todayKey)),
           today: tasks.filter((t) => isDueToday(t, todayKey)),
           'no-due': tasks.filter((t) => !t.due),
+          // Exactly what is written in Todoist: CD and IDD from the title, DD from the due date.
+          cd: tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).cdFrom === 'title'),
+          idd: tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).idd !== null),
+          dd: tasks.filter((t) => !!t.due),
+          'no-cd': tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).cdFrom !== 'title'),
+          'no-idd': tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).idd === null),
+          'no-dd': tasks.filter((t) => !t.due),
         };
 
         // Bars: the person's projects, and the sections of the chosen project (or of all of them).
@@ -239,6 +349,11 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
           href.holder(holderId, { show, projectId: scopeProjectId, sectionId, ...filter });
         const card = (view: HolderView) => ({ href: link({ show: view }), selected: show === view });
         const scoped = !!scopeProjectId || !!sectionId;
+        // CD / IDD / DD for this holder's tasks only (repeating tasks have no single CD or IDD).
+        const dated = tasks.filter((t) => !isRoutineTask(t, index)).map((t) => taskDates(t));
+        const withCd = dated.filter((d) => d.cdFrom === 'title').length;
+        const withIdd = dated.filter((d) => d.idd).length;
+        const withDd = tasks.filter((t) => t.due).length;
         const count = show === 'completed' ? completed.length : show === 'comments' ? comments.length : lists[show].length;
 
         return (
@@ -279,6 +394,32 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                     : [{ label: 'Comments', icon: <MessageSquare />, iconTone: 'info' as const, value: comments.length, note: 'written', ...card('comments') }]),
                 ]}
               />
+
+              {tasks.length > 0 && (
+                <MetricStrip
+                  label={`${name}: CD, IDD and DD`}
+                  size="md"
+                  columns="grid-cols-1 sm:grid-cols-3"
+                  items={[
+                    { label: 'CD · Creation Date', icon: <CalendarPlus />, iconTone: 'info', value: withCd, ...card('cd'), note: `of ${dated.length} tasks · ${dated.length - withCd} without` },
+                    { label: 'IDD · Issue Date', icon: <LockKeyhole />, iconTone: 'warn', value: withIdd, ...card('idd'), note: `of ${dated.length} tasks · ${dated.length - withIdd} without` },
+                    { label: 'DD · Due Date', icon: <CalendarClock />, iconTone: 'good', value: withDd, ...card('dd'), note: `of ${tasks.length} tasks · ${tasks.length - withDd} without` },
+                  ]}
+                />
+              )}
+
+              {tasks.length > 0 && (
+                <MetricStrip
+                  label={`${name}: tasks missing CD, IDD or DD`}
+                  size="md"
+                  columns="grid-cols-1 sm:grid-cols-3"
+                  items={[
+                    { label: 'No CD', icon: <CalendarPlus />, iconTone: 'info', value: lists['no-cd'].length, note: 'no Creation Date', ...card('no-cd') },
+                    { label: 'No IDD', icon: <LockKeyhole />, iconTone: 'warn', value: lists['no-idd'].length, note: 'no Issue Date', ...card('no-idd') },
+                    { label: 'No DD', icon: <CalendarClock />, iconTone: 'good', value: lists['no-dd'].length, note: 'no Due Date', ...card('no-dd') },
+                  ]}
+                />
+              )}
 
               {allTasks.length > 0 && (
                 <div className="grid gap-4 lg:grid-cols-2">

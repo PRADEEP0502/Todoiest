@@ -1,3 +1,5 @@
+import { parseTitle } from './cd';
+
 /**
  * Todoist marks a task as non-completable (a heading-style row) by starting its name with "* ".
  * Such tasks have no checkbox in Todoist, so the dashboard doesn't offer one either.
@@ -13,3 +15,6 @@ export function plainText(text: string): string {
     .replace(/(^|[^*])\*([^*]+)\*/g, '$1$2')
     .trim();
 }
+
+/** A task's name as people read it: no CD/IDD written into the title, no Markdown, no "* " marker. */
+export const taskTitle = (content: string) => plainText(parseTitle(content).title);

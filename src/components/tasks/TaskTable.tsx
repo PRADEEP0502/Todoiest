@@ -3,11 +3,14 @@ import { usePaged } from '../../hooks/usePaged';
 import { useNow } from '../../hooks/useNow';
 import { describeDue } from '../../lib/dates';
 import { PRIORITY_STYLE, toUiPriority } from '../../lib/priority';
-import { plainText } from '../../lib/search';
+import { plainText, taskTitle } from '../../lib/text';
 import { useUi } from '../../store/ui';
 import { useWorkspace } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { ProjectDot, ShowMore } from '../common/ui';
+import { isRoutineTask } from '../../lib/routine';
+import { taskDates } from '../../lib/taskDates';
+import { TaskDateLine } from './TaskDates';
 import { href } from '../../hooks/useRoute';
 
 interface TaskTableProps {
@@ -46,13 +49,17 @@ export function TaskTable({ tasks, listKey, extra }: TaskTableProps) {
           const section = task.section_id ? index.sectionById.get(task.section_id) : undefined;
           const parent = task.parent_id ? index.taskById.get(task.parent_id) : undefined;
           const due = describeDue(task.due, now);
+          const dates = taskDates(task);
+          const routine = isRoutineTask(task, index);
           const priority = toUiPriority(task.priority);
           const holder = task.responsible_uid ? snapshot.people[task.responsible_uid]?.name : undefined;
           return (
             <li key={task.id} className={`grid items-start gap-x-3 gap-y-0.5 px-4 py-3 hover:bg-black/[0.02] ${cols}`}>
               <button type="button" onClick={() => openTask(task.id)} className="min-w-0 text-left">
-                <span className="block break-words text-[13.5px] text-ink hover:underline">{plainText(task.content)}</span>
-                {parent && <span className="block truncate text-[12px] text-ink-3">↳ {plainText(parent.content)}</span>}
+                <span className="block break-words text-[13.5px] text-ink hover:underline">{plainText(dates.title)}</span>
+                {/* The Due date column already shows DD; CD and IDD are locked and shown here. */}
+                <TaskDateLine dates={dates} only={['cd', 'idd']} routine={routine} />
+                {parent && <span className="block truncate text-[12px] text-ink-3">↳ {taskTitle(parent.content)}</span>}
                 <span className="mt-0.5 block break-words text-[12px] text-ink-3 md:hidden">
                   {[project?.name, section?.name].filter(Boolean).join(' › ')}
                   {due ? ` · ${due.label}` : ''}

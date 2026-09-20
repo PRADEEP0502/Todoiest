@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Toasts } from './components/common/Toasts';
+import { AgingPage } from './pages/AgingPage';
 import { ConnectBanner } from './components/layout/ConnectBanner';
 import { MobileNav, TopBar } from './components/layout/TopBar';
 import { Sidebar } from './components/layout/Sidebar';
@@ -35,6 +36,8 @@ function Page({ route, visit }: { route: Route; visit: number }) {
       return <ProjectDetailPage projectId={route.projectId} sectionId={route.sectionId} taskId={route.taskId} visit={visit} />;
     case 'overdue':
       return <OverduePage category={route.category} />;
+    case 'aging':
+      return <AgingPage />;
     case 'holders':
       return <HoldersPage />;
     case 'holder':

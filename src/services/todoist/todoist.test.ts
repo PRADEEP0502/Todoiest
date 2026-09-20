@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { parseTitle } from '../../lib/cd';
 import { buildIndex } from '../../lib/hierarchy';
 import { searchWorkspace } from '../../lib/search';
 import { TodoistApiError } from './client';
@@ -243,7 +244,7 @@ describe('demo source', () => {
   it('completes a parent together with its subtasks, logs it, and can reopen it', async () => {
     const source = createDemoSource();
     const before = await source.sync(() => {});
-    const parent = before.tasks.find((t) => t.content === 'Develop LMS-style Onboarding System')!;
+    const parent = before.tasks.find((t) => parseTitle(t.content).title === 'Develop LMS-style Onboarding System')!;
 
     await source.completeTask(parent.id);
     const after = await source.sync(() => {});

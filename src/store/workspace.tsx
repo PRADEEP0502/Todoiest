@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { titleForNewTask, titleForSavedTask } from '../lib/cd';
+import { lockedDatesIntact, titleForNewTask, titleForSavedTask } from '../lib/cd';
 import { isRoutineSection, isRoutineTask } from '../lib/routine';
 import { dueDateKey } from '../lib/dates';
 import { buildIndex, descendantsOf, type WorkspaceIndex } from '../lib/hierarchy';
@@ -64,8 +64,13 @@ export interface TaskForm {
   description: string;
   projectId: string;
   sectionId: string | null;
-  /** `YYYY-MM-DD` or null for no date. */
+  /** `YYYY-MM-DD` or null for no date. Editable at any time. */
   dueDate: string | null;
+  /**
+   * Issue date (IDD), `YYYY-MM-DD`. A person enters it once; it counts only while the task has none
+   * yet — once a task has an IDD this field is ignored, so it can never overwrite the stored one.
+   */
+  idd: string | null;
   priority: UiPriority;
 }
 
@@ -305,8 +310,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       try {
         const task = await write('create', () =>
           source.createTask({
-            // The title reaching Todoist already carries both dates: "16.09.26, Task, 20.09.26".
-            content: titleForNewTask(form.content, new Date(), form.dueDate, isRoutineForm(form)),
+            // The title reaching Todoist already carries the dates: "15.08.26, Task, 18.08.26".
+            content: titleForNewTask(form.content, new Date(), form.idd, isRoutineForm(form)),
             description: form.description.trim() || undefined,
             project_id: form.projectId,
             section_id: form.sectionId,
@@ -328,9 +333,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const saveTask = useCallback(
     async (task: TodoistTask, form: TaskForm) => {
       const changes: UpdateTaskInput = {};
-      // Both dates in the title stay exactly as they are, whatever the title or the due date becomes.
+      // CD and IDD in the title stay exactly as they are, whatever the name or the due date becomes.
       const routine = (index ? isRoutineTask(task, index) : false) || isRoutineForm(form);
-      const nextContent = titleForSavedTask({ content: task.content, addedAt: task.added_at, hasDueDate: !!task.due, routine }, form.content, form.dueDate);
+      const nextContent = titleForSavedTask({ content: task.content, addedAt: task.added_at, routine }, form.content, form.idd);
+      // Last line of defence: never send Todoist a title that changes or drops a stored CD/IDD.
+      if (!lockedDatesIntact(task.content, nextContent)) {
+        reportWriteFailure(new Error('locked dates would change'));
+        return false;
+      }
       if (nextContent !== task.content) changes.content = nextContent;
       if (form.description.trim() !== task.description.trim()) changes.description = form.description.trim();
       if (toApiPriority(form.priority) !== task.priority) changes.priority = toApiPriority(form.priority);

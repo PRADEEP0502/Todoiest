@@ -1,6 +1,6 @@
 import type { Person, TodoistProject, TodoistSection, TodoistTask } from '../types/todoist';
 import { type WorkspaceIndex, taskPath } from './hierarchy';
-import { plainText } from './text';
+import { plainText, taskTitle } from './text';
 
 /** `path` always ends with the matched item's own name, e.g. Project → Section → Parent → Task. */
 export type SearchResult =
@@ -71,7 +71,7 @@ export function searchWorkspace(index: WorkspaceIndex, query: string, extras: Se
   const tasks = taskMatches
     .sort((a, b) => b.s - a.s)
     .slice(0, LIMITS.tasks)
-    .map(({ task }) => ({ kind: 'task' as const, id: task.id, task, path: [...taskPath(index, task), plainText(task.content)] }));
+    .map(({ task }) => ({ kind: 'task' as const, id: task.id, task, path: [...taskPath(index, task), taskTitle(task.content)] }));
 
   const labels = rank(
     [...(extras.labels ?? new Map<string, number>())].map(([name, count]) => ({

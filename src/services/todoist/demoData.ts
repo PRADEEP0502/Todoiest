@@ -18,6 +18,11 @@ type Who = 'u-pradeep' | 'u-md' | 'u-kavya' | 'u-arun' | 'u-meena';
 
 interface TaskSpec {
   content: string;
+  /**
+   * Dates written into the title the way the workspace does it ("15.08.26, Task, 18.8.26"):
+   * [days ago it was created, days ago it was issued]. Left out for tasks with no dates yet.
+   */
+  dates?: [cdDaysAgo: number, iddDaysAgo: number];
   /** Days from today; omit for no due date. */
   due?: number;
   time?: string;
@@ -131,7 +136,7 @@ const PROJECTS: ProjectSpec[] = [
       [
         'Weekly Review',
         [
-          { content: 'Prepare weekly status summary', due: 0, time: '17:00', p: 1, who: 'u-pradeep', comments: [['u-md', 'Include overdue count by department.', 5]] },
+          { content: 'Prepare weekly status summary', dates: [8, 7], due: 0, time: '17:00', p: 1, who: 'u-pradeep', comments: [['u-md', 'Include overdue count by department.', 5]] },
           { content: 'Review pending approvals list', due: 0, p: 2, who: 'u-md' },
         ],
       ],
@@ -139,7 +144,7 @@ const PROJECTS: ProjectSpec[] = [
         'Decisions Pending',
         [
           {
-            content: 'Decide on second shift for RV plant',
+            content: 'Decide on second shift for RV plant', dates: [30, 26],
             due: 2,
             p: 1,
             who: 'u-md',
@@ -156,7 +161,7 @@ const PROJECTS: ProjectSpec[] = [
       [
         'Follow-ups',
         [
-          { content: 'Bank loan renewal paperwork', due: -4, p: 2, labels: ['waiting'], who: 'u-meena' },
+          { content: 'Bank loan renewal paperwork', dates: [70, 60], due: -4, p: 2, labels: ['waiting'], who: 'u-meena' },
           { content: 'Check status of insurance claim', due: 5, who: 'u-meena' },
         ],
       ],
@@ -177,16 +182,16 @@ const PROJECTS: ProjectSpec[] = [
       [
         'Site Visits',
         [
-          { content: 'Inspect RV plant safety compliance', due: 0, time: '10:30', p: 1, labels: ['urgent'], who: 'u-arun', comments: [['u-arun', 'Fire extinguishers due for refill.', 2]] },
-          { content: 'Prepare checklist for Coimbatore unit visit', due: 1, p: 2, who: 'u-arun' },
+          { content: 'Inspect RV plant safety compliance', dates: [20, 17], due: 0, time: '10:30', p: 1, labels: ['urgent'], who: 'u-arun', comments: [['u-arun', 'Fire extinguishers due for refill.', 2]] },
+          { content: 'Prepare checklist for Coimbatore unit visit', dates: [11, 9], due: 1, p: 2, who: 'u-arun' },
           { content: 'Review last quarter visit reports', due: -8, who: 'u-arun' },
         ],
       ],
       [
         'Client Follow-ups',
         [
-          { content: 'Send revised quotation to Sri Lakshmi Traders', due: -2, p: 1, who: 'u-pradeep', comments: [['u-md', 'Please close this by today.', 4]] },
-          { content: 'Follow up on pending PO from Apex Motors', due: 0, p: 2, labels: ['call'], who: 'u-kavya' },
+          { content: 'Send revised quotation to Sri Lakshmi Traders', dates: [52, 44], due: -2, p: 1, who: 'u-pradeep', comments: [['u-md', 'Please close this by today.', 4]] },
+          { content: 'Follow up on pending PO from Apex Motors', dates: [15, 14], due: 0, p: 2, labels: ['call'], who: 'u-kavya' },
           { content: 'Schedule review call with dealer network', due: 3, p: 3 },
         ],
       ],
@@ -208,9 +213,9 @@ const PROJECTS: ProjectSpec[] = [
       [
         'Hiring Pipeline',
         [
-          { content: 'Manpower requirements sources', due: 1, p: 1, who: 'u-kavya', comments: [['u-kavya', 'Two agencies shortlisted.', 22], ['u-md', 'Also check campus hiring.', 9]] },
-          { content: 'Shortlist candidates for Plant Supervisor', due: 0, p: 2, labels: ['review'], who: 'u-kavya' },
-          { content: 'Approve job description for Sales Executive', due: -1, p: 2, who: 'u-md' },
+          { content: 'Manpower requirements sources', dates: [41, 38], due: 1, p: 1, who: 'u-kavya', comments: [['u-kavya', 'Two agencies shortlisted.', 22], ['u-md', 'Also check campus hiring.', 9]] },
+          { content: 'Shortlist candidates for Plant Supervisor', dates: [27, 22], due: 0, p: 2, labels: ['review'], who: 'u-kavya' },
+          { content: 'Approve job description for Sales Executive', dates: [33, 30], due: -1, p: 2, who: 'u-md' },
           { content: 'Coordinate with placement agencies', due: -13, who: 'u-kavya' },
         ],
       ],
@@ -234,7 +239,7 @@ const PROJECTS: ProjectSpec[] = [
         'ON BOARD PROCESS',
         [
           {
-            content: 'Develop LMS-style Onboarding System',
+            content: 'Develop LMS-style Onboarding System', dates: [36, 33],
             due: 1,
             p: 1,
             who: 'u-pradeep',
@@ -247,8 +252,8 @@ const PROJECTS: ProjectSpec[] = [
               { content: 'Choose LMS platform', due: 2, p: 2, labels: ['review'], who: 'u-pradeep' },
             ],
           },
-          { content: 'Create employee handbook v2', due: 5, p: 2, who: 'u-kavya' },
-          { content: 'Set up day-one IT access checklist', due: 0, p: 3, who: 'u-arun' },
+          { content: 'Create employee handbook v2', dates: [18, 12], due: 5, p: 2, who: 'u-kavya' },
+          { content: 'Set up day-one IT access checklist', dates: [9, 7], due: 0, p: 3, who: 'u-arun' },
           { content: 'Buddy programme guidelines', due: 8 },
           { content: 'Onboarding feedback survey', due: 14, p: 4 },
         ],
@@ -256,13 +261,13 @@ const PROJECTS: ProjectSpec[] = [
       [
         'WEBSITE',
         [
-          { content: 'Finalise homepage copy', due: -3, p: 1, labels: ['urgent'], who: 'u-pradeep' },
-          { content: 'Approve new product photography', due: 2, p: 2, who: 'u-md' },
-          { content: 'Add careers page with open roles', due: 6, p: 3, who: 'u-meena' },
+          { content: 'Finalise homepage copy', dates: [60, 51], due: -3, p: 1, labels: ['urgent'], who: 'u-pradeep' },
+          { content: 'Approve new product photography', dates: [24, 21], due: 2, p: 2, who: 'u-md' },
+          { content: 'Add careers page with open roles', dates: [14, 10], due: 6, p: 3, who: 'u-meena' },
           { content: 'Set up contact form email routing', due: 10 },
         ],
       ],
-      ['MANPOWER', [{ content: 'Estimate project staffing for Q4', due: 4, p: 2, who: 'u-kavya' }, { content: 'Identify contract engineers for ERP rollout', due: 12 }]],
+      ['MANPOWER', [{ content: 'Estimate project staffing for Q4', dates: [22, 19], due: 4, p: 2, who: 'u-kavya' }, { content: 'Identify contract engineers for ERP rollout', due: 12 }]],
       ['ERP Rollout', []],
     ],
     done: [
@@ -278,7 +283,7 @@ const PROJECTS: ProjectSpec[] = [
     workspace: 'ws-jpm',
     shared: true,
     sections: [
-      ['Monthly Close', [{ content: 'Review cash flow statement', due: 0, p: 1, labels: ['finance'], who: 'u-meena' }, { content: 'Reconcile vendor ledgers', due: -6, p: 3, labels: ['finance'], who: 'u-meena' }]],
+      ['Monthly Close', [{ content: 'Review cash flow statement', dates: [12, 11], due: 0, p: 1, labels: ['finance'], who: 'u-meena' }, { content: 'Reconcile vendor ledgers', dates: [45, 40], due: -6, p: 3, labels: ['finance'], who: 'u-meena' }]],
       ['Audits', [{ content: 'Share documents with internal auditor', due: 13, p: 2, who: 'u-meena' }]],
     ],
     done: [['Approve September salaries', 0, 0, 'u-md']],
@@ -306,7 +311,7 @@ const PROJECTS: ProjectSpec[] = [
   light('p-it', 'IT Infrastructure', 'teal', 1, {
     Hardware: [{ content: 'Replace plant floor Wi-Fi access points', due: 4, p: 2 }, { content: 'Laptop allocation for new joinees', due: 2 }],
     Software: [{ content: 'Tally upgrade to latest version', due: -26 }, { content: 'Evaluate ERP vendors shortlist', due: 5, p: 2 }, { content: 'Renew Microsoft 365 licences', due: 18 }],
-    Security: [{ content: 'Enable two-factor login for all staff', due: 7, p: 1 }, { content: 'Quarterly data backup test' }],
+    Security: [{ content: 'Enable two-factor login for all staff', dates: [16, 13], due: 7, p: 1 }, { content: 'Quarterly data backup test' }],
   }),
   light('p-procurement', 'Procurement', 'olive_green', 3, {
     Vendors: [{ content: 'Compare quotes for packaging material', due: 2, p: 2 }, { content: 'Onboard new logistics partner', due: 10 }, { content: 'Vendor rating review' }],
@@ -365,6 +370,18 @@ function localDate(base: Date, offsetDays: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** "15.08.26" — as the dashboard writes a creation date. */
+function titleDate(base: Date, daysAgo: number): string {
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() - daysAgo);
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${pad(d.getFullYear() % 100)}`;
+}
+
+/** "18.8.26" — the same day written the looser way people type it (no zero padding). */
+function looseTitleDate(base: Date, daysAgo: number): string {
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() - daysAgo);
+  return `${d.getDate()}.${d.getMonth() + 1}.${pad(d.getFullYear() % 100)}`;
+}
+
 const toApiPriority = (p: 1 | 2 | 3 | 4 = 4) => (5 - p) as ApiPriority;
 
 export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
@@ -392,7 +409,9 @@ export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
       project_id: projectId,
       section_id: sectionId,
       parent_id: parentId,
-      content: spec.content,
+      content: spec.dates
+        ? `${titleDate(now, spec.dates[0])}, ${spec.content}, ${taskSeq % 2 ? looseTitleDate(now, spec.dates[1]) : titleDate(now, spec.dates[1])}`
+        : spec.content,
       description: spec.description ?? '',
       priority: toApiPriority(spec.p),
       due:

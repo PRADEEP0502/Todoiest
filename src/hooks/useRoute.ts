@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 /** What a holder's page lists: their tasks by state, what they completed, or what they wrote. */
-export const HOLDER_VIEWS = ['active', 'overdue', 'today', 'no-due', 'completed', 'comments'] as const;
+export const HOLDER_VIEWS = ['active', 'overdue', 'today', 'no-due', 'completed', 'comments', 'cd', 'idd', 'dd', 'no-cd', 'no-idd', 'no-dd'] as const;
 export type HolderView = (typeof HOLDER_VIEWS)[number];
 
 /** A holder's page, optionally narrowed to one of their projects and/or sections. */
@@ -20,6 +20,7 @@ export type Route =
   | { name: 'overdue'; category: string | null }
   | { name: 'holders' }
   | { name: 'holder'; holderId: string; show: HolderView; projectId: string | null; sectionId: string | null }
+  | { name: 'aging' }
   | { name: 'labels' }
   | { name: 'label'; label: string }
   | { name: 'metric'; metric: string }
@@ -41,6 +42,7 @@ export function parseHash(hash: string): Route {
     case 'activity':
     case 'comments':
     case 'notifications':
+    case 'aging':
       return { name: parts[0] };
     case 'projects':
       return parts[1]
@@ -91,6 +93,7 @@ export const href = {
     const qs = query.toString();
     return `#/holders/${enc(id)}${qs ? `?${qs}` : ''}`;
   },
+  aging: () => '#/aging',
   labels: () => '#/labels',
   label: (name: string) => `#/labels/${enc(name)}`,
   metric: (metric: string) => `#/tasks/${enc(metric)}`,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseTitle } from './cd';
 import { createDemoSnapshot } from '../services/todoist/demoData';
 import type { TodoistProject, TodoistSection, TodoistTask, WorkspaceSnapshot } from '../types/todoist';
 import { disclosureKey } from './disclosure';
@@ -131,7 +132,7 @@ describe('revealKeys', () => {
 
   it('opens only the section and parent tasks above a nested subtask', () => {
     const sub = snap.tasks.find((t) => t.content === 'Choose LMS platform')!;
-    const parent = snap.tasks.find((t) => t.content === 'Develop LMS-style Onboarding System')!;
+    const parent = snap.tasks.find((t) => parseTitle(t.content).title === 'Develop LMS-style Onboarding System')!;
     expect(revealKeys(index, { taskId: sub.id })).toEqual([disclosureKey.subtasks(parent.id), disclosureKey.section(parent.section_id!)]);
   });
 

@@ -1,4 +1,4 @@
-import { AlarmClock, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, FolderKanban, History, Inbox, Layers, LayoutDashboard, ListChecks, MessageSquare, PanelLeftClose, PanelLeftOpen, Settings, Sun, Tag, Users } from 'lucide-react';
+import { AlarmClock, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, FolderKanban, History, Hourglass, Inbox, Layers, LayoutDashboard, ListChecks, MessageSquare, PanelLeftClose, PanelLeftOpen, Settings, Sun, Tag, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useDisclosure } from '../../hooks/useDisclosure';
 import { useNow } from '../../hooks/useNow';
@@ -46,6 +46,7 @@ export function useNavLinks(route: Route): { main: NavLink[]; secondary: NavLink
     { to: href.activity(), label: 'Activity Logs', icon: <History size={ICON} />, active: route.name === 'activity' },
     { to: href.comments(), label: 'Comments', icon: <MessageSquare size={ICON} />, active: route.name === 'comments', count: snapshot?.comments.length, badge: 'grey' },
     { to: href.notifications(), label: 'Notifications', icon: <Bell size={ICON} />, active: route.name === 'notifications', count: unreadCount, badge: 'orange' },
+    { to: href.aging(), label: 'Holder Aging', icon: <Hourglass size={ICON} />, active: route.name === 'aging' },
   ];
   const secondary: NavLink[] = [
     { to: href.upcoming(), label: 'Upcoming', icon: <CalendarDays size={ICON} />, active: route.name === 'upcoming' },
@@ -206,7 +207,7 @@ export function Sidebar({ route }: { route: Route }) {
   const { index } = useWorkspace();
   // Opening and closing the sidebar is remembered on this device.
   const [open, toggleSidebar] = useDisclosure('sidebar:expanded', true);
-  const [dashboard, projects, today, overdue, holders, labels, activity, comments, notifications] = main;
+  const [dashboard, projects, today, overdue, holders, labels, activity, comments, notifications, aging] = main;
   const [upcoming, completed] = secondary;
 
   // Top-level Todoist projects as tree items; the full list lives on the Projects page.
@@ -257,6 +258,7 @@ export function Sidebar({ route }: { route: Route }) {
         <TreeGroup id="projects" label="Projects" icon={projects.icon} to={href.projects()} items={projectItems} collapsed={!open} />
         <TreeGroup id="tasks" label="Tasks" icon={<ListChecks size={ICON} />} to={href.today()} items={[today, overdue, upcoming, completed]} collapsed={!open} />
         <NavItem link={holders} collapsed={!open} />
+        <NavItem link={aging} collapsed={!open} />
         <NavItem link={labels} collapsed={!open} />
         <TreeGroup id="updates" label="Updates" icon={activity.icon} to={href.activity()} items={[activity, comments, notifications]} collapsed={!open} />
       </nav>

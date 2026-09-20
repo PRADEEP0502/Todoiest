@@ -1,7 +1,8 @@
 import { FolderKanban, Hash, Search, SquareCheck, Tag, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { href, navigate } from '../../hooks/useRoute';
-import { searchWorkspace, plainText, type SearchResult } from '../../lib/search';
+import { searchWorkspace, type SearchResult } from '../../lib/search';
+import { taskTitle } from '../../lib/text';
 import { useWorkspace } from '../../store/workspace';
 import { Avatar, ProjectDot } from '../common/ui';
 
@@ -195,7 +196,7 @@ function ResultGroup({
           name = result.section.name;
         } else if (result.kind === 'task') {
           icon = <SquareCheck size={13} className="text-ink-3" />;
-          name = plainText(result.task.content);
+          name = taskTitle(result.task.content);
         } else if (result.kind === 'label') {
           icon = <Tag size={13} className="text-ink-3" />;
           name = `${result.name} · ${result.count} active`;

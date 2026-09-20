@@ -1,4 +1,4 @@
-import { History } from 'lucide-react';
+import { FolderKanban, History, User } from 'lucide-react';
 import { useState } from 'react';
 import { Gate } from '../components/common/Gate';
 import { ActivityIcon } from '../components/common/ActivityIcon';
@@ -14,6 +14,7 @@ import { useWorkspace } from '../store/workspace';
 
 type Range = '24h' | 'week';
 type KindFilter = 'all' | 'completed' | 'added' | 'updated' | 'comment';
+const ALL = 'all';
 
 const KIND_MATCH: Record<KindFilter, (k: ActivityKind) => boolean> = {
   all: () => true,
@@ -33,6 +34,8 @@ export function ActivityPage() {
   const now = useNow(60_000);
   const [range, setRange] = useState<Range>('24h');
   const [kind, setKind] = useState<KindFilter>('all');
+  const [person, setPerson] = useState(ALL);
+  const [project, setProject] = useState(ALL);
   const { openTask } = useUi();
   const { index } = useWorkspace();
 
@@ -41,7 +44,28 @@ export function ActivityPage() {
       {({ snapshot, index: idx }) => {
         const since = now.getTime() - (range === '24h' ? 1 : ACTIVITY_WINDOW_DAYS) * 24 * 60 * 60 * 1000;
         const all = snapshot.activity.filter((e) => Date.parse(e.event_date) >= since).map((e) => describeActivity(e, snapshot, idx));
-        const rows = all.filter((r) => KIND_MATCH[kind](r.kind));
+
+        // Tally unique people and projects for filter dropdowns
+        const peopleTally = new Map<string, { name: string; count: number }>();
+        const projectTally = new Map<string, { name: string; count: number }>();
+        for (const r of all) {
+          const uid = r.userId ?? 'unknown';
+          const prev = peopleTally.get(uid);
+          peopleTally.set(uid, { name: r.user || 'Unknown person', count: (prev?.count ?? 0) + 1 });
+          if (r.projectId) {
+            const pp = projectTally.get(r.projectId);
+            projectTally.set(r.projectId, { name: r.projectName ?? 'Unknown project', count: (pp?.count ?? 0) + 1 });
+          }
+        }
+        const people = [...peopleTally].sort((a, b) => b[1].count - a[1].count).map(([id, v]) => ({ id, name: v.name, count: v.count }));
+        const projects = [...projectTally].sort((a, b) => b[1].count - a[1].count).map(([id, v]) => ({ id, name: v.name, count: v.count }));
+
+        const rows = all.filter((r) => {
+          if (!KIND_MATCH[kind](r.kind)) return false;
+          if (person !== ALL && (r.userId ?? 'unknown') !== person) return false;
+          if (project !== ALL && r.projectId !== project) return false;
+          return true;
+        });
         const countOf = (k: KindFilter) => all.filter((r) => KIND_MATCH[k](r.kind)).length;
 
         return (
@@ -67,11 +91,20 @@ export function ActivityPage() {
                     ]}
                   />
                 </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <ActivityFilterSelect id="activity-person" icon={<User size={14} />} label="Filter by person" value={person} onChange={setPerson} all={`Everyone (${all.length})`} options={people} />
+                  <ActivityFilterSelect id="activity-project" icon={<FolderKanban size={14} />} label="Filter by project" value={project} onChange={setProject} all={`All projects (${all.length})`} options={projects} />
+                  {(person !== ALL || project !== ALL) && (
+                    <button type="button" className="btn-ghost h-8 text-[12.5px]" onClick={() => { setPerson(ALL); setProject(ALL); }}>
+                      Clear filters
+                    </button>
+                  )}
+                </div>
                 <div className="panel overflow-hidden">
                   {rows.length === 0 ? (
                     <EmptyState icon={<History size={26} />} title="No activity in this period" />
                   ) : (
-                    <ActivityTable rows={rows} listKey={`${range}:${kind}`} now={now} onTask={(id) => index?.taskById.has(id) && openTask(id)} />
+                    <ActivityTable rows={rows} listKey={`${range}:${kind}:${person}:${project}`} now={now} onTask={(id) => index?.taskById.has(id) && openTask(id)} />
                   )}
                 </div>
                 <p className="text-2xs text-ink-3">
@@ -111,7 +144,7 @@ function ActivityTable({ rows, listKey, now, onTask }: { rows: ActivityRow[]; li
               </span>
               <span className="min-w-0 md:contents">
                 <span className="block truncate text-[13px] text-ink-2">
-                  {row.user}
+                  {row.userId ? <a href={href.holder(row.userId)} className="hover:underline">{row.user}</a> : row.user}
                   <span className="md:hidden"> · <span className={`font-medium ${ACTION_TONE[row.kind] ?? 'text-ink'}`}>{row.action}</span></span>
                 </span>
                 <span className={`hidden items-center gap-2 text-[13px] font-medium md:flex ${ACTION_TONE[row.kind] ?? 'text-ink'}`}>
@@ -139,5 +172,28 @@ function ActivityTable({ rows, listKey, now, onTask }: { rows: ActivityRow[]; li
       })}
       <ShowMore shown={shown} total={total} onMore={more} />
     </>
+  );
+}
+
+/** A labelled dropdown for narrowing the log to one person or one project. */
+function ActivityFilterSelect({ id, icon, label, value, onChange, all, options }: {
+  id: string;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  all: string;
+  options: { id: string; name: string; count: number }[];
+}) {
+  return (
+    <label htmlFor={id} className="flex items-center gap-1.5 text-ink-3">
+      {icon}
+      <select id={id} aria-label={label} className="field w-auto max-w-[16rem]" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value={ALL}>{all}</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>{o.name} ({o.count})</option>
+        ))}
+      </select>
+    </label>
   );
 }

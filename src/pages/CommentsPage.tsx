@@ -1,5 +1,5 @@
-import { CalendarDays, Clock, FolderKanban, MessageSquare, MessagesSquare, Search, User, X } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { CalendarDays, ChevronDown, Clock, FolderKanban, MessageSquare, MessagesSquare, Search, User, X } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Gate } from '../components/common/Gate';
 import { Avatar, EmptyState, MetricStrip, PageHeader, ProjectDot, ShowMore, Tabs } from '../components/common/ui';
 import { usePaged } from '../hooks/usePaged';
@@ -145,7 +145,7 @@ export function CommentsPage() {
   );
 }
 
-/** One dropdown of the people or projects that have comments, each with how many it holds. */
+/** One dropdown of the people or projects that have comments, each with how many it holds — now searchable. */
 function FilterSelect({
   id,
   icon,
@@ -163,20 +163,113 @@ function FilterSelect({
   all: string;
   options: { id: string; name: string; count: number }[];
 }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close on click outside
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Auto-focus search input when opened
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  const selectedLabel = value === ALL ? all : (options.find((o) => o.id === value)?.name ?? all);
+  const filtered = options.filter((o) => {
+    if (!search.trim()) return true;
+    return o.name.toLowerCase().includes(search.toLowerCase());
+  });
+
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5">
+    <div ref={ref} className="relative inline-flex min-w-0 items-center gap-1.5">
       <span aria-hidden className="shrink-0 text-ink-3">
         {icon}
       </span>
-      <select id={id} aria-label={label} className="field h-8 w-auto max-w-[14rem] py-0 text-[13px]" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value={ALL}>{all}</option>
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.name} ({o.count})
-          </option>
-        ))}
-      </select>
-    </span>
+      <button
+        type="button"
+        id={id}
+        aria-label={label}
+        className="field flex h-8 w-auto max-w-[14rem] items-center gap-1.5 py-0 text-[13px]"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="min-w-0 truncate">{selectedLabel}</span>
+        <ChevronDown size={12} className={`shrink-0 text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-lg border border-line bg-surface shadow-lg">
+          {/* Search input */}
+          <div className="border-b border-line p-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
+              <input
+                ref={inputRef}
+                type="text"
+                className="field w-full pl-8 text-[13px]"
+                placeholder={`Search…`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setOpen(false);
+                    setSearch('');
+                  }
+                  if (e.key === 'Enter') {
+                    if (filtered.length > 0) {
+                      onChange(filtered[0].id);
+                    }
+                    setOpen(false);
+                    setSearch('');
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Options list */}
+          <ul className="max-h-56 overflow-y-auto py-1">
+            {/* "All" option */}
+            <li>
+              <button
+                type="button"
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-canvas/60 ${value === ALL ? 'font-medium text-accent' : 'text-ink'}`}
+                onClick={() => { onChange(ALL); setOpen(false); setSearch(''); }}
+              >
+                {all}
+              </button>
+            </li>
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-center text-[13px] text-ink-3">No results found</li>
+            ) : (
+              filtered.map((o) => (
+                <li key={o.id}>
+                  <button
+                    type="button"
+                    className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-canvas/60 ${value === o.id ? 'font-medium text-accent' : 'text-ink'}`}
+                    onClick={() => { onChange(o.id); setOpen(false); setSearch(''); }}
+                  >
+                    <span className="min-w-0 truncate">{o.name}</span>
+                    <span className="ml-2 shrink-0 text-[12px] text-ink-3">{o.count}</span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
