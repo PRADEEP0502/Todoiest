@@ -17,24 +17,27 @@ import {
   Timer,
   TriangleAlert,
   Users,
+  UserX,
   Zap,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { ActivityIcon } from '../components/common/ActivityIcon';
 import { Gate } from '../components/common/Gate';
-import { Avatar, Chip, Count, EmptyState, Headline, MetricStrip, Panel, ProjectDot, type Metric } from '../components/common/ui';
+import { Avatar, Chip, Count, EmptyState, MetricStrip, Panel, ProjectDot, type Metric } from '../components/common/ui';
 import { TaskRow } from '../components/tasks/TaskRow';
 import { useNow } from '../hooks/useNow';
 import { href } from '../hooks/useRoute';
 import { describeActivity } from '../lib/activity';
-import { formatLongDate, formatTime, greeting, toDateKey } from '../lib/dates';
+import { quoteForDay } from '../lib/quotes';
+import { hasIdd } from '../lib/cd';
+import { formatLongDate, formatTime, toDateKey } from '../lib/dates';
 import { taskPath } from '../lib/hierarchy';
 import {
   CATEGORIES,
   DATE_CHECKS,
   completedToday,
-  describeCategory,
+  shortCategoryNote,
   describeDateCheck,
   hasHolderData,
   holderCounts,
@@ -59,7 +62,6 @@ export function DashboardPage() {
       {({ snapshot, index }) => {
         const rules = settings.rules;
         const todayKey = toDateKey(now);
-        const name = settings.displayName.trim() || snapshot.user.full_name.split(' ')[0] || 'there';
         const count = (metric: Parameters<typeof metricTasks>[0]) => metricTasks(metric, snapshot, index, rules, now).length;
 
         const dueToday = snapshot.tasks.filter((t) => isDueToday(t, todayKey)).length;
@@ -75,6 +77,12 @@ export function DashboardPage() {
               .slice(0, 5)
           : [];
 
+        // Holder-wise and project-wise totals; each card opens the overall list to drill into.
+        const activeProjects = index.orderedProjects.filter((n) => (index.openByProject.get(n.project.id) ?? 0) > 0).length;
+        const holderCount = [...holderStats].filter(([id, c]) => id !== UNASSIGNED && c.active > 0).length;
+        const assigned = snapshot.tasks.length - unassigned;
+        const withIdd = snapshot.tasks.filter((t) => hasIdd(t.content)).length;
+
         const important = snapshot.tasks
           .filter((t) => isDueToday(t, todayKey) || isOverdue(t, todayKey))
           .sort((a, b) => Number(isOverdue(b, todayKey)) - Number(isOverdue(a, todayKey)) || byPriorityThenTime(a, b));
@@ -85,7 +93,11 @@ export function DashboardPage() {
         return (
           <div className="space-y-5">
             <div>
-              <Headline fade={name}>{`${greeting(now)},`}</Headline>
+              {/* The quote marks sit in the text itself, so they stay beside the words on every line
+                  length, and balanced wrapping keeps a two-line quote from leaving one stray word. */}
+              <h1 className="max-w-4xl text-[19px] font-semibold uppercase leading-[27px] tracking-[0.01em] text-ink [text-wrap:balance] sm:text-[26px] sm:leading-[34px]">
+                {`“${quoteForDay(now)}”`}
+              </h1>
               <p className="mt-1 text-[14px] text-ink-2">{formatLongDate(now)}</p>
             </div>
 
@@ -160,6 +172,21 @@ export function DashboardPage() {
                   }))}
                 />
               </div>
+            </div>
+
+            <div>
+              <SubHeading icon={<Users />} title="Holder-wise & Project-wise" hint="click a card to drill down" link={{ to: href.holders(), label: 'Open Holder Wise' }} />
+              <MetricStrip
+                label="Holder-wise and project-wise totals"
+                size="md"
+                columns="grid-cols-2 lg:grid-cols-4"
+                items={[
+                  { label: 'Holders', icon: <Users />, iconTone: 'info', value: holderCount, href: href.holders(), note: `${assigned} tasks assigned` },
+                  { label: 'Projects', icon: <FolderKanban />, iconTone: 'good', value: activeProjects, href: href.projects(), note: 'with active tasks' },
+                  { label: 'No Holder', icon: <UserX />, iconTone: 'warn', value: unassigned, href: href.holder(UNASSIGNED), note: 'tasks nobody holds' },
+                  { label: 'Holder Aging', icon: <Hourglass />, value: withIdd, href: href.aging(), note: 'tasks with an IDD' },
+                ]}
+              />
             </div>
 
             <div className={`grid gap-4 ${holders.length ? 'lg:grid-cols-2' : ''}`}>
@@ -318,12 +345,6 @@ function shortDateCheckNote(rule: Parameters<typeof describeDateCheck>[0]): stri
     case 'unset':
       return 'waiting for a rule';
   }
-}
-
-/** Short note under a category number — the full rule is on the metric's own page. */
-function shortCategoryNote(id: (typeof CATEGORIES)[number]['id'], rules: Parameters<typeof describeCategory>[1]): string {
-  if (rules.categoryBasis !== 'days-overdue') return describeCategory(id, rules);
-  return { a5: '1–5 days late', a10: '6–10 days late', a30: '11–30 days late', a30plus: 'over a month late' }[id];
 }
 
 function SubHeading({ title, icon, hint, link }: { title: string; icon: ReactNode; hint?: string; link: { to: string; label: string } }) {

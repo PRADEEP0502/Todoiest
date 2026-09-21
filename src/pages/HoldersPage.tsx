@@ -1,7 +1,9 @@
-import { AlarmClock, ArrowLeft, CalendarCheck, CalendarClock, CalendarOff, CalendarPlus, ChevronDown, CircleCheckBig, FolderKanban, ListChecks, ListTree, LockKeyhole, MessageSquare, Search, Users, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { AlarmClock, CalendarCheck, CalendarClock, CalendarOff, CalendarPlus, CircleCheckBig, Clock, FolderKanban, Hourglass, ListChecks, ListTree, LockKeyhole, MessageSquare, Search, Siren, Timer, TriangleAlert, Users, X } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
+import { SearchField } from '../components/common/SearchField';
+import { SearchSelect } from '../components/common/SearchSelect';
 import { Avatar, EmptyState, MetricStrip, Notice, PageHeader, Panel, ProjectDot, ShowMore } from '../components/common/ui';
 import { CompletedList } from '../components/tasks/CompletedList';
 import { GroupedTasks } from '../components/tasks/GroupedTasks';
@@ -12,9 +14,11 @@ import { formatShortDate, formatTime, startOfMonth, toDateKey } from '../lib/dat
 import { taskPath, type WorkspaceIndex } from '../lib/hierarchy';
 import { isRoutineTask } from '../lib/routine';
 import { taskDates } from '../lib/taskDates';
+import { filterTasks } from '../lib/search';
 import { plainText } from '../lib/text';
 import { useUi } from '../store/ui';
-import { hasHolderData, holderCounts, UNASSIGNED } from '../lib/metrics';
+import { CATEGORIES, categoryOf, hasHolderData, holderCounts, shortCategoryNote, UNASSIGNED, type CategoryId } from '../lib/metrics';
+import { useWorkspace } from '../store/workspace';
 import { byPriorityThenTime, completedSince, isDueToday, isOverdue } from '../lib/stats';
 import type { TodoistComment, TodoistTask, WorkspaceSnapshot } from '../types/todoist';
 
@@ -23,6 +27,7 @@ const holderName = (snapshot: WorkspaceSnapshot, id: string) => (id === UNASSIGN
 /** Holder = the person Todoist lists as responsible for the task (task assignee in shared projects). */
 export function HoldersPage() {
   const now = useNow(60_000);
+  const [query, setQuery] = useState('');
   return (
     <Gate>
       {({ snapshot }) => {
@@ -40,14 +45,34 @@ export function HoldersPage() {
         }
         const rows = [...holderCounts(snapshot, now)].sort((a, b) => (a[0] === UNASSIGNED ? 1 : b[0] === UNASSIGNED ? -1 : b[1].active - a[1].active));
         const people = rows.filter(([id]) => id !== UNASSIGNED);
+        // The search box narrows the table and the phone cards to matching people.
+        const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const listed = rows.filter(([id]) => {
+          const text = `${holderName(snapshot, id)} ${snapshot.people[id]?.email ?? ''}`.toLowerCase();
+          return words.every((w) => text.includes(w));
+        });
 
         return (
           <>
             <PageHeader title="Holder Wise" subtitle={`${people.length} people hold active tasks`} />
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <label className="text-[13px] text-ink-2">Select a person</label>
-                <SearchableHolderSelect rows={rows} snapshot={snapshot} />
+                <SearchField className="w-full sm:w-72" value={query} onChange={setQuery} label="Search holders" placeholder="Search holders by name or email…" />
+                <label className="text-[13px] text-ink-2 sm:ml-2" htmlFor="holder-pick">or open a person</label>
+                <SearchSelect
+                  id="holder-pick"
+                  className="w-auto min-w-60"
+                  placeholder="Choose…"
+                  searchPlaceholder="Search people…"
+                  value=""
+                  onChange={(id) => navigate(href.holder(id))}
+                  options={rows.map(([id, c]) => ({
+                    value: id,
+                    label: holderName(snapshot, id),
+                    hint: `${c.active} active`,
+                    icon: <Avatar id={id} name={holderName(snapshot, id)} size={18} />,
+                  }))}
+                />
               </div>
 
               <Panel title="Holder-wise Active Tasks" icon={<Users />} iconTone="info">
@@ -67,8 +92,16 @@ export function HoldersPage() {
               </Panel>
 
               {/* Phones: one card per person, so every figure is readable without scrolling sideways. */}
+              {listed.length === 0 && (
+                <div className="panel">
+                  <EmptyState icon={<Search size={24} />} title={`No holder matches “${query.trim()}”`}>
+                    <button type="button" className="text-accent hover:underline" onClick={() => setQuery('')}>Clear the search</button>
+                  </EmptyState>
+                </div>
+              )}
+
               <ul className="space-y-2.5 sm:hidden">
-                {rows.map(([id, c]) => (
+                {listed.map(([id, c]) => (
                   <li key={id}>
                     <a href={href.holder(id)} className="panel block px-4 py-3.5">
                       <span className="flex items-center gap-2.5">
@@ -97,7 +130,7 @@ export function HoldersPage() {
                 ))}
               </ul>
 
-              <div className="panel hidden overflow-x-auto sm:block">
+              <div className={`panel overflow-x-auto ${listed.length ? 'hidden sm:block' : 'hidden'}`}>
                 <table className="w-full min-w-[640px] text-[13px]">
                   <thead>
                     <tr className="border-b border-line bg-canvas text-left text-2xs font-semibold uppercase tracking-[0.06em] text-ink-3">
@@ -108,7 +141,7 @@ export function HoldersPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {rows.map(([id, c]) => (
+                    {listed.map(([id, c]) => (
                       <tr key={id} className="cursor-pointer hover:bg-canvas/60" onClick={() => navigate(href.holder(id))}>
                         <td className="px-4 py-2.5">
                           <a href={href.holder(id)} className="flex items-center gap-2 font-medium text-ink hover:underline">
@@ -135,108 +168,6 @@ export function HoldersPage() {
   );
 }
 
-/** Searchable dropdown for picking a person from the holder list. */
-function SearchableHolderSelect({ rows, snapshot }: { rows: [string, ReturnType<typeof holderCounts> extends Map<string, infer V> ? V : never][]; snapshot: WorkspaceSnapshot }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const ref = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Close on click outside
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch('');
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  // Auto-focus search input when opened
-  useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
-
-  const filtered = rows.filter(([id]) => {
-    if (!search.trim()) return true;
-    return holderName(snapshot, id).toLowerCase().includes(search.toLowerCase());
-  });
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        className="field flex w-auto min-w-56 items-center justify-between gap-2 text-left"
-        onClick={() => setOpen(!open)}
-      >
-        <span className="text-ink-3">Choose…</span>
-        <ChevronDown size={14} className={`text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border border-line bg-surface shadow-lg">
-          {/* Search input */}
-          <div className="border-b border-line p-2">
-            <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
-              <input
-                ref={inputRef}
-                type="text"
-                className="field w-full pl-8"
-                placeholder="Search people…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setOpen(false);
-                    setSearch('');
-                  }
-                  // Enter selects the first filtered result
-                  if (e.key === 'Enter' && filtered.length > 0) {
-                    navigate(href.holder(filtered[0][0]));
-                    setOpen(false);
-                    setSearch('');
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Options list */}
-          <ul className="max-h-60 overflow-y-auto py-1">
-            {filtered.length === 0 ? (
-              <li className="px-3 py-2.5 text-center text-[13px] text-ink-3">No results found</li>
-            ) : (
-              filtered.map(([id, c]) => (
-                <li key={id}>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] text-ink transition-colors hover:bg-canvas/60"
-                    onClick={() => {
-                      navigate(href.holder(id));
-                      setOpen(false);
-                      setSearch('');
-                    }}
-                  >
-                    <span className="flex items-center gap-2">
-                      <Avatar id={id} name={holderName(snapshot, id)} size={20} />
-                      <span>{holderName(snapshot, id)}</span>
-                    </span>
-                    <span className="text-[12px] text-ink-3">{c.active} active</span>
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** A figure in the holders table that opens that person's page already filtered to it. */
 function Num({ v, danger, to }: { v: number; danger?: boolean; to: string }) {
   return (
@@ -260,12 +191,21 @@ const VIEW_TITLE: Record<HolderView, string> = {
   'no-due': 'Tasks with no due date',
   completed: 'Completed this month',
   comments: 'Comments written',
-  cd: 'Tasks with a Creation Date (CD)',
-  idd: 'Tasks with an Issue Date (IDD)',
-  dd: 'Tasks with a Due Date (DD)',
   'no-cd': 'Tasks without a Creation Date (CD)',
   'no-idd': 'Tasks without an Issue Date (IDD)',
   'no-dd': 'Tasks without a Due Date (DD)',
+  a5: 'Overdue · A-5',
+  a10: 'Overdue · A-10',
+  a30: 'Overdue · A-30',
+  a30plus: 'Overdue · A30+',
+};
+
+/** Icons escalate with lateness, as on the dashboard: a clock, a timer, an hourglass, then a siren. */
+const CATEGORY_ICON: Record<CategoryId, ReactNode> = {
+  a5: <Clock />,
+  a10: <Timer />,
+  a30: <Hourglass />,
+  a30plus: <Siren />,
 };
 
 interface HolderPageProps {
@@ -282,6 +222,12 @@ interface HolderPageProps {
  */
 export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageProps) {
   const now = useNow(60_000);
+  const { settings } = useWorkspace();
+  const rules = settings.rules;
+  // The search belongs to one person: opening another starts with a clear box.
+  const [search, setSearch] = useState({ id: holderId, text: '' });
+  const query = search.id === holderId ? search.text : '';
+  const setQuery = (text: string) => setSearch({ id: holderId, text });
   const listRef = useRef<HTMLElement>(null);
   const firstRender = useRef(true);
 
@@ -324,13 +270,12 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
           overdue: tasks.filter((t) => isOverdue(t, todayKey)),
           today: tasks.filter((t) => isDueToday(t, todayKey)),
           'no-due': tasks.filter((t) => !t.due),
-          // Exactly what is written in Todoist: CD and IDD from the title, DD from the due date.
-          cd: tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).cdFrom === 'title'),
-          idd: tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).idd !== null),
-          dd: tasks.filter((t) => !!t.due),
+          // Nothing written in Todoist: no CD or IDD in the title, no due date.
           'no-cd': tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).cdFrom !== 'title'),
           'no-idd': tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).idd === null),
           'no-dd': tasks.filter((t) => !t.due),
+          // Overdue categories, for this person's tasks in the chosen project/section only.
+          ...(Object.fromEntries(CATEGORIES.map((c) => [c.id, tasks.filter((t) => categoryOf(t, rules, index, todayKey) === c.id)])) as Record<CategoryId, TodoistTask[]>),
         };
 
         // Bars: the person's projects, and the sections of the chosen project (or of all of them).
@@ -349,18 +294,18 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
           href.holder(holderId, { show, projectId: scopeProjectId, sectionId, ...filter });
         const card = (view: HolderView) => ({ href: link({ show: view }), selected: show === view });
         const scoped = !!scopeProjectId || !!sectionId;
-        // CD / IDD / DD for this holder's tasks only (repeating tasks have no single CD or IDD).
-        const dated = tasks.filter((t) => !isRoutineTask(t, index)).map((t) => taskDates(t));
-        const withCd = dated.filter((d) => d.cdFrom === 'title').length;
-        const withIdd = dated.filter((d) => d.idd).length;
-        const withDd = tasks.filter((t) => t.due).length;
         const count = show === 'completed' ? completed.length : show === 'comments' ? comments.length : lists[show].length;
+        // The search box narrows whichever list is showing, inside this holder only.
+        const found =
+          show === 'completed'
+            ? filterTasks(completed, query, index, snapshot.people).length
+            : show === 'comments'
+              ? comments.filter((c) => matchesComment(c, query, index)).length
+              : filterTasks(lists[show], query, index, snapshot.people).length;
 
         return (
           <>
-            <a href={href.holders()} className="mb-2 inline-flex items-center gap-1 text-[12.5px] text-ink-3 hover:text-ink">
-              <ArrowLeft size={13} /> Holder Wise
-            </a>
+            <Breadcrumb trail={[{ label: 'Overall', to: href.dashboard() }, { label: 'Holder Wise', to: href.holders() }, { label: name }]} />
             <PageHeader
               title={
                 <span className="flex items-center gap-2.5">
@@ -370,11 +315,19 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
               }
               subtitle={holderId === UNASSIGNED ? 'Active tasks without a holder in Todoist' : snapshot.people[holderId]?.email}
               actions={
-                <select className="field w-auto" value={holderId} onChange={(e) => navigate(href.holder(e.target.value))} aria-label="Switch person">
-                  {[...holderCounts(snapshot, now).keys()].map((id) => (
-                    <option key={id} value={id}>{holderName(snapshot, id)}</option>
-                  ))}
-                </select>
+                <SearchSelect
+                  aria-label="Switch person"
+                  className="w-auto min-w-56"
+                  searchPlaceholder="Search people…"
+                  value={holderId}
+                  onChange={(id) => navigate(href.holder(id))}
+                  options={[...holderCounts(snapshot, now)].map(([id, c]) => ({
+                    value: id,
+                    label: holderName(snapshot, id),
+                    hint: `${c.active} active`,
+                    icon: <Avatar id={id} name={holderName(snapshot, id)} size={18} />,
+                  }))}
+                />
               }
             />
 
@@ -397,19 +350,6 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
 
               {tasks.length > 0 && (
                 <MetricStrip
-                  label={`${name}: CD, IDD and DD`}
-                  size="md"
-                  columns="grid-cols-1 sm:grid-cols-3"
-                  items={[
-                    { label: 'CD · Creation Date', icon: <CalendarPlus />, iconTone: 'info', value: withCd, ...card('cd'), note: `of ${dated.length} tasks · ${dated.length - withCd} without` },
-                    { label: 'IDD · Issue Date', icon: <LockKeyhole />, iconTone: 'warn', value: withIdd, ...card('idd'), note: `of ${dated.length} tasks · ${dated.length - withIdd} without` },
-                    { label: 'DD · Due Date', icon: <CalendarClock />, iconTone: 'good', value: withDd, ...card('dd'), note: `of ${tasks.length} tasks · ${tasks.length - withDd} without` },
-                  ]}
-                />
-              )}
-
-              {tasks.length > 0 && (
-                <MetricStrip
                   label={`${name}: tasks missing CD, IDD or DD`}
                   size="md"
                   columns="grid-cols-1 sm:grid-cols-3"
@@ -419,6 +359,29 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                     { label: 'No DD', icon: <CalendarClock />, iconTone: 'good', value: lists['no-dd'].length, note: 'no Due Date', ...card('no-dd') },
                   ]}
                 />
+              )}
+
+              {tasks.length > 0 && (
+                <div>
+                  <h2 className="mb-2.5 flex items-center gap-2 text-[13.5px] font-semibold text-ink-2">
+                    <TriangleAlert size={15} className="text-ink-3" aria-hidden />
+                    Overdue categories
+                    <span className="font-normal text-ink-3">· {lists.overdue.length} late{project ? ` in ${project.name}` : ''}</span>
+                  </h2>
+                  <MetricStrip
+                    label={`${name}: overdue categories`}
+                    size="md"
+                    columns="grid-cols-2 lg:grid-cols-4"
+                    items={CATEGORIES.map((c) => ({
+                      label: c.label,
+                      icon: CATEGORY_ICON[c.id],
+                      value: lists[c.id].length,
+                      note: shortCategoryNote(c.id, rules),
+                      tone: 'danger' as const,
+                      ...card(c.id),
+                    }))}
+                  />
+                </div>
               )}
 
               {allTasks.length > 0 && (
@@ -461,9 +424,11 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
               )}
 
               <section ref={listRef} className="scroll-mt-4">
-                <div className="mb-2.5 flex flex-wrap items-center gap-2">
+                {/* Stays in view while scrolling a long list, so the search and filters are always at hand. */}
+                <div className="sticky top-0 z-10 -mx-2 mb-2.5 flex flex-wrap items-center gap-2 bg-canvas/95 px-2 py-2 backdrop-blur">
                   <h2 className="text-[15px] font-semibold text-ink">
-                    {VIEW_TITLE[show]} <span className="font-normal text-ink-3">· {count}</span>
+                    {VIEW_TITLE[show]}{' '}
+                    <span className="font-normal text-ink-3">· {query.trim() ? `${found} of ${count}` : count}</span>
                   </h2>
                   {project && (
                     <a href={link({ projectId: null, sectionId: null })} className="filter-chip" title="Remove this filter">
@@ -476,10 +441,17 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                     </a>
                   )}
                   {(scoped || show !== 'active') && (
-                    <a href={href.holder(holderId)} className="ml-auto text-[12.5px] font-medium text-ink-3 hover:text-ink">
+                    <a href={href.holder(holderId)} className="text-[12.5px] font-medium text-ink-3 hover:text-ink">
                       Clear filters
                     </a>
                   )}
+                  <SearchField
+                    className="w-full sm:ml-auto sm:w-72"
+                    value={query}
+                    onChange={setQuery}
+                    label={`Search tasks of ${name}`}
+                    placeholder={show === 'comments' ? 'Search comments…' : `Search ${name}’s tasks…`}
+                  />
                 </div>
                 {holderId === UNASSIGNED && show !== 'completed' && (
                   <div className="mb-2">
@@ -489,16 +461,21 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                 <div className="panel px-3 py-2">
                   {count === 0 ? (
                     <EmptyState title={`${VIEW_TITLE[show]}: none for ${name}${scoped ? ' here' : ''}`} />
+                  ) : found === 0 ? (
+                    <EmptyState icon={<Search size={24} />} title={`Nothing matches “${query.trim()}”`}>
+                      <button type="button" className="text-accent hover:underline" onClick={() => setQuery('')}>Clear the search</button>
+                    </EmptyState>
                   ) : show === 'completed' ? (
-                    <CompletedList tasks={completed} index={index} listKey={`${holderId}:${scopeProjectId}:${sectionId}`} />
+                    <CompletedList tasks={filterTasks(completed, query, index, snapshot.people)} index={index} listKey={`${holderId}:${scopeProjectId}:${sectionId}:${query}`} />
                   ) : show === 'comments' ? (
-                    <HolderComments comments={comments} index={index} now={now} />
+                    <HolderComments comments={comments.filter((c) => matchesComment(c, query, index))} index={index} now={now} />
                   ) : (
+                    // Open, so the whole list scrolls straight through without expanding each group.
                     <GroupedTasks
-                      tasks={lists[show]}
+                      tasks={filterTasks(lists[show], query, index, snapshot.people)}
                       viewKey={`holder:${holderId}:${show}`}
                       compare={byPriorityThenTime}
-                      defaultOpen={lists[show].length <= 30}
+                      defaultOpen
                     />
                   )}
                 </div>
@@ -508,6 +485,33 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
         );
       }}
     </Gate>
+  );
+}
+
+/** A comment matches when its text or its task's name has every word of the search. */
+function matchesComment(comment: TodoistComment, query: string, index: WorkspaceIndex): boolean {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const task = index.taskById.get(comment.task_id);
+  const text = `${plainText(comment.content)} ${task ? plainText(task.content) : ''}`.toLowerCase();
+  return words.every((w) => text.includes(w));
+}
+
+/** Overall › Holder Wise › Person — each step back is one click. */
+function Breadcrumb({ trail }: { trail: { label: string; to?: string }[] }) {
+  return (
+    <nav className="mb-2 flex flex-wrap items-center gap-1.5 text-[12.5px] text-ink-3" aria-label="Breadcrumb">
+      {trail.map((step, i) => (
+        <span key={step.label} className="flex items-center gap-1.5">
+          {i > 0 && <span aria-hidden>›</span>}
+          {step.to ? (
+            <a href={step.to} className="hover:text-ink hover:underline">{step.label}</a>
+          ) : (
+            <span className="font-medium text-ink-2" aria-current="page">{step.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
   );
 }
 

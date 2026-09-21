@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 /** What a holder's page lists: their tasks by state, what they completed, or what they wrote. */
-export const HOLDER_VIEWS = ['active', 'overdue', 'today', 'no-due', 'completed', 'comments', 'cd', 'idd', 'dd', 'no-cd', 'no-idd', 'no-dd'] as const;
+export const HOLDER_VIEWS = ['active', 'overdue', 'today', 'no-due', 'completed', 'comments', 'no-cd', 'no-idd', 'no-dd', 'a5', 'a10', 'a30', 'a30plus'] as const;
 export type HolderView = (typeof HOLDER_VIEWS)[number];
 
 /** A holder's page, optionally narrowed to one of their projects and/or sections. */

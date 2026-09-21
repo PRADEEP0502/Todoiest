@@ -146,11 +146,6 @@ export function formatDaysAgo(timestamp: number, now: Date): string {
   return `${Math.round(days / 30)} months ago`;
 }
 
-export function greeting(now: Date): string {
-  const h = now.getHours();
-  return h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
-}
-
 export function formatLongDate(now: Date): string {
   return `${WEEKDAYS[now.getDay()]}, ${now.getDate()} ${MONTHS_LONG[now.getMonth()]} ${now.getFullYear()}`;
 }

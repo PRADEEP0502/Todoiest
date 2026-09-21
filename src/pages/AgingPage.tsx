@@ -2,10 +2,11 @@ import { Hourglass, Lock, Pencil, Users } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Avatar, Chevron, EmptyState, Notice, PageHeader, ShowMore } from '../components/common/ui';
 import { Gate } from '../components/common/Gate';
+import { SearchSelect } from '../components/common/SearchSelect';
 import { useDisclosure } from '../hooks/useDisclosure';
 import { usePaged } from '../hooks/usePaged';
 import { useNow } from '../hooks/useNow';
-import { agingOf, formatDays, holderAging, NO_HOLDER, type AgingRow, type HolderAging } from '../lib/aging';
+import { formatDays, holderAging, NO_HOLDER, type AgingRow, type HolderAging } from '../lib/aging';
 import { taskPath, type WorkspaceIndex } from '../lib/hierarchy';
 import { dueDateKey } from '../lib/dates';
 import { toUiPriority } from '../lib/priority';
@@ -31,10 +32,10 @@ function formFromTask(task: TodoistTask, index: WorkspaceIndex): TaskForm {
   };
 }
 
-const COLS = 'md:grid-cols-[minmax(0,1.5fr)_6.6rem_6.6rem_8.6rem_5.4rem_5.4rem_5.4rem]';
+const COLS = 'md:grid-cols-[minmax(0,1.6fr)_6.6rem_6.6rem_8.6rem_5.8rem_5.8rem]';
 
 /** How many days, with red for a negative span (a date entered out of order). */
-function Age({ days, kind }: { days: number | null; kind?: 'cd-idd' | 'idd-dd' | 'cd-dd' }) {
+function Age({ days, kind }: { days: number | null; kind?: 'cd' | 'idd' }) {
   return <span data-age={kind} data-days={days ?? ''} className={`tabular-nums ${days === null ? 'text-ink-3' : days < 0 ? 'font-semibold text-p1' : 'text-ink'}`}>{formatDays(days)}</span>;
 }
 
@@ -48,7 +49,7 @@ function HeaderCell({ children, marker }: { children: ReactNode; marker?: 'lock'
   );
 }
 
-/** Due date cell: editable right here. Changing it recalculates IDD → DD and CD → DD only. */
+/** Due date cell: editable right here. It has no part in CD Age or IDD Age. */
 function DueDateInput({ row, onChange, id }: { row: AgingRow; onChange: (task: TodoistTask, dueDate: string | null) => void; id: string }) {
   return (
     <input
@@ -76,14 +77,13 @@ function GroupTable({ group, index, onDueChange }: { group: HolderAging; index: 
         <HeaderCell marker="lock">CD</HeaderCell>
         <HeaderCell marker="lock">IDD</HeaderCell>
         <HeaderCell marker="edit">DD</HeaderCell>
-        <span>CD → IDD</span>
-        <span>IDD → DD</span>
-        <span>CD → DD</span>
+        <span>CD Age</span>
+        <span>IDD Age</span>
       </div>
       <ul className="divide-y divide-black/[0.05]">
         {visible.map((row) => {
           const path = taskPath(index, row.task).slice(0, 2).join(' › ');
-          const ages = agingOf(row.dates);
+          const ages = row.aging;
           return (
             <li key={row.task.id} className={`grid items-center gap-x-3 gap-y-2 px-4 py-3 md:py-2.5 ${COLS}`}>
               <button type="button" onClick={() => openTask(row.task.id)} className="min-w-0 text-left">
@@ -95,9 +95,8 @@ function GroupTable({ group, index, onDueChange }: { group: HolderAging; index: 
               <span className="hidden text-[12.5px] md:block"><Locked value={row.dates.cd} /></span>
               <span className="hidden text-[12.5px] md:block"><Locked value={row.dates.idd} /></span>
               <span className="hidden md:block"><DueDateInput row={row} onChange={onDueChange} id={`dd-${row.task.id}`} /></span>
-              <span className="hidden text-[12.5px] md:block"><Age kind="cd-idd" days={ages.cdToIdd} /></span>
-              <span className="hidden text-[12.5px] md:block"><Age kind="idd-dd" days={ages.iddToDd} /></span>
-              <span className="hidden text-[12.5px] md:block"><Age kind="cd-dd" days={ages.cdToDd} /></span>
+              <span className="hidden text-[12.5px] md:block"><Age kind="cd" days={ages.cdAge} /></span>
+              <span className="hidden text-[12.5px] md:block"><Age kind="idd" days={ages.iddAge} /></span>
 
               {/* Phones: a compact block under the name. */}
               <div className="grid grid-cols-3 gap-x-2 gap-y-2 text-[12px] md:hidden">
@@ -114,16 +113,12 @@ function GroupTable({ group, index, onDueChange }: { group: HolderAging; index: 
                   <DueDateInput row={row} onChange={onDueChange} id={`dd-m-${row.task.id}`} />
                 </div>
                 <div>
-                  <span className="mb-0.5 block text-2xs font-semibold text-ink-3">CD → IDD</span>
-                  <Age kind="cd-idd" days={ages.cdToIdd} />
+                  <span className="mb-0.5 block text-2xs font-semibold text-ink-3">CD Age</span>
+                  <Age kind="cd" days={ages.cdAge} />
                 </div>
                 <div>
-                  <span className="mb-0.5 block text-2xs font-semibold text-ink-3">IDD → DD</span>
-                  <Age kind="idd-dd" days={ages.iddToDd} />
-                </div>
-                <div>
-                  <span className="mb-0.5 block text-2xs font-semibold text-ink-3">CD → DD</span>
-                  <Age kind="cd-dd" days={ages.cdToDd} />
+                  <span className="mb-0.5 block text-2xs font-semibold text-ink-3">IDD Age</span>
+                  <Age kind="idd" days={ages.iddAge} />
                 </div>
               </div>
             </li>
@@ -152,12 +147,11 @@ function HolderBlock({ group, name, index, open: defaultOpen, onDueChange }: { g
             </span>
           </span>
         </span>
-        <span className="grid w-full grid-cols-3 gap-3 text-[12px] sm:w-auto sm:gap-5">
+        <span className="grid w-full grid-cols-2 gap-3 text-[12px] sm:w-auto sm:gap-5">
           {(
             [
-              ['CD → IDD', avg.cdToIdd],
-              ['IDD → DD', avg.iddToDd],
-              ['CD → DD', avg.cdToDd],
+              ['CD Age', avg.cdAge],
+              ['IDD Age', avg.iddAge],
             ] as const
           ).map(([label, value]) => (
             <span key={label} className="block sm:text-right">
@@ -181,24 +175,22 @@ export function AgingPage() {
   return (
     <Gate>
       {({ snapshot, index }) => {
-        // `now` keeps the page current across midnight; aging itself is between stored dates.
-        void now;
-        const groups = holderAging(snapshot.tasks, index, { onlyWithIdd });
-        const everyone = holderAging(snapshot.tasks, index, { onlyWithIdd: false });
+        // Ages count up to today; `now` ticks, so they roll over at midnight on an open page.
+        const groups = holderAging(snapshot.tasks, index, { onlyWithIdd }, now);
+        const everyone = holderAging(snapshot.tasks, index, { onlyWithIdd: false }, now);
         const shown = holder === 'all' ? groups : groups.filter((g) => g.id === holder);
         const hidden = everyone.reduce((n, g) => n + g.withoutIdd, 0);
         const onDueChange = (task: TodoistTask, dueDate: string | null) => void saveTask(task, { ...formFromTask(task, index), dueDate });
 
         return (
           <>
-            <PageHeader title="Holder Aging" subtitle="Days between each task’s Creation Date, Issue Date and Due Date, for every holder" />
+            <PageHeader title="Holder Aging" subtitle="How many days ago each task was created and issued, for every holder" />
 
             <div className="space-y-4">
-              <div className="grid gap-2.5 sm:grid-cols-3" role="list" aria-label="How aging is calculated">
+              <div className="grid gap-2.5 sm:grid-cols-2" role="list" aria-label="How aging is calculated">
                 {[
-                  ['CD → IDD Age', 'IDD − CD', 'Fixed once the issue date is entered.'],
-                  ['IDD → DD Age', 'DD − IDD', 'Recalculated whenever the due date changes.'],
-                  ['CD → DD Total Age', 'DD − CD', 'Recalculated whenever the due date changes.'],
+                  ['CD Age', 'Today − CD', 'Goes up by one every day. Changing DD never affects it.'],
+                  ['IDD Age', 'Today − IDD', 'Goes up by one every day. Changing DD never affects it.'],
                 ].map(([title, formula, note]) => (
                   <div key={title} role="listitem" className="rounded-2xl border border-black/[0.05] bg-black/[0.02] px-4 py-3">
                     <span className="block text-[12.5px] font-semibold text-ink">{title}</span>
@@ -209,18 +201,25 @@ export function AgingPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <label className="inline-flex items-center gap-2 text-[13px] text-ink-2">
+                <div className="inline-flex items-center gap-2 text-[13px] text-ink-2">
                   <Users size={15} aria-hidden />
-                  <span className="sr-only">Holder</span>
-                  <select className="field w-auto min-w-52" value={holder} onChange={(e) => setHolder(e.target.value)} aria-label="Holder">
-                    <option value="all">All holders ({groups.length})</option>
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {holderName(snapshot, g.id)} — {g.rows.length}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <SearchSelect
+                    aria-label="Holder"
+                    className="w-auto min-w-60"
+                    searchPlaceholder="Search people…"
+                    value={holder}
+                    onChange={setHolder}
+                    options={[
+                      { value: 'all', label: 'All holders', hint: String(groups.length) },
+                      ...groups.map((g) => ({
+                        value: g.id,
+                        label: holderName(snapshot, g.id),
+                        hint: String(g.rows.length),
+                        icon: <Avatar id={g.id} name={holderName(snapshot, g.id)} size={18} />,
+                      })),
+                    ]}
+                  />
+                </div>
                 <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-ink-2">
                   <input type="checkbox" checked={onlyWithIdd} onChange={(e) => setOnlyWithIdd(e.target.checked)} className="h-4 w-4 accent-[#1a7f53]" />
                   Only tasks that have an Issue Date
@@ -233,7 +232,7 @@ export function AgingPage() {
                   <EmptyState icon={<Hourglass size={26} />} title={onlyWithIdd ? 'No task has an Issue Date yet' : 'No tasks to age'}>
                     {onlyWithIdd
                       ? 'Open a task and enter its Issue Date (IDD) once — it locks as soon as you save. Or untick the filter above to see every task.'
-                      : 'Aging needs a Creation Date and a Due Date on the task.'}
+                      : 'Aging needs a Creation Date or an Issue Date in the task title.'}
                   </EmptyState>
                 </div>
               ) : (
@@ -245,7 +244,7 @@ export function AgingPage() {
               )}
 
               <Notice>
-                CD and IDD are locked — they are written into the Todoist task title once and never change. Only DD is editable here; a new due date updates IDD → DD and CD → DD, and never CD → IDD.
+                CD and IDD are locked — they are written into the Todoist task title once and never change. DD is editable here, and changing it never touches CD Age or IDD Age.
                 Routine (repeating) tasks are left out, because they have no single creation or issue date.
               </Notice>
             </div>

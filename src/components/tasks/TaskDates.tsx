@@ -36,22 +36,33 @@ const EMPTY: Record<DateKind, string> = {
  * One line, for task rows and tables: `CD 16-09-2026 🔒 · IDD 20-09-2026 🔒 · DD 25-09-2026 ✏️`.
  * `only` limits it to some of the dates (tables have a Due date column of their own).
  */
-export function TaskDateLine({ dates, only = ['cd', 'idd', 'dd'], routine = false }: { dates: TaskDates; only?: DateKind[]; routine?: boolean }) {
+export function TaskDateLine({
+  dates,
+  only = ['cd', 'idd', 'dd'],
+  routine = false,
+  now = new Date(),
+}: {
+  dates: TaskDates;
+  only?: DateKind[];
+  routine?: boolean;
+  /** Today, for the ages; pass a ticking clock so they roll over at midnight. */
+  now?: Date;
+}) {
   const shown = only.filter((k) => !(routine && k !== 'dd'));
-  const values: Values = { cd: dates.cd, idd: dates.idd, dd: dates.dd };
+  // A creation date Todoist only knows from its own record (not written in the title) is not shown here,
+  // so a task listed as "No CD" never displays one.
+  const cdInTitle = dates.cdFrom === 'title';
+  const values: Values = { cd: cdInTitle ? dates.cd : null, idd: dates.idd, dd: dates.dd };
   // Nothing to say for a task with no dates at all.
   if (!shown.some((k) => values[k])) return null;
-  // Days between the dates shown, e.g. CD → IDD, so the gaps read at a glance.
-  const age = agingOf(dates);
+  // How many days ago CD and IDD were — they grow daily and never depend on DD.
+  const age = agingOf({ cdKey: cdInTitle ? dates.cdKey : null, iddKey: dates.iddKey }, now);
   const spans = (
     [
-      ['CD→IDD', age.cdToIdd, 'Days from Creation Date to Issue Date', ['cd', 'idd']],
-      ['IDD→DD', age.iddToDd, 'Days from Issue Date to Due Date', ['idd', 'dd']],
-      ['CD→DD', age.cdToDd, 'Days from Creation Date to Due Date', ['cd', 'dd']],
+      ['CD Age', age.cdAge, 'Days since the Creation Date (today − CD)', 'cd'],
+      ['IDD Age', age.iddAge, 'Days since the Issue Date (today − IDD)', 'idd'],
     ] as const
-  )
-    .filter(([, , , ends]) => ends.every((e) => shown.includes(e)))
-    .map(([label, days, title]) => [label, days, title] as const);
+  ).filter(([, , , kind]) => shown.includes(kind));
   return (
     <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11.5px] leading-4 text-ink-3">
       {shown.map((k) => {

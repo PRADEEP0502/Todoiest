@@ -185,6 +185,8 @@ export interface SectionGroup {
   section: TodoistSection | null;
   /** Tasks whose parent is not part of this group. */
   roots: TodoistTask[];
+  /** Everything listed under the section, subtasks included. */
+  count: number;
 }
 
 export interface ProjectTaskGroup {
@@ -222,6 +224,10 @@ export function groupByProjectAndSection(
   }
   for (const list of children.values()) list.sort(compare);
 
+  // What the section header counts: the tasks under it, plus any of their subtasks in this list.
+  const withSubtasks = (roots: TodoistTask[]): number =>
+    roots.reduce((total, task) => total + 1 + withSubtasks(children.get(task.id) ?? []), 0);
+
   const sectionRank = (key: string) => (key ? (index.sectionById.get(key)?.section_order ?? 0) : -Infinity);
   const groups = [...byProject.entries()]
     .sort(([a], [b]) => (index.projectRank.get(a) ?? 0) - (index.projectRank.get(b) ?? 0))
@@ -230,7 +236,10 @@ export function groupByProjectAndSection(
       count: counts.get(projectId) ?? 0,
       sections: [...sections.entries()]
         .sort(([a], [b]) => sectionRank(a) - sectionRank(b))
-        .map(([key, roots]) => ({ section: key ? index.sectionById.get(key)! : null, roots: roots.sort(compare) })),
+        .map(([key, roots]) => {
+          const sorted = roots.sort(compare);
+          return { section: key ? index.sectionById.get(key)! : null, roots: sorted, count: withSubtasks(sorted) };
+        }),
     }));
 
   return { groups, childrenOf: (taskId) => children.get(taskId) ?? [] };

@@ -12,13 +12,33 @@
  * kept exactly as written, so a stored date is never reformatted or "corrected".
  */
 
-const DATE = String.raw`\d{1,2}\.\d{1,2}\.(?:\d{4}|\d{2})`;
-/** A leading "DD.MM.YY," (with or without a space after the comma). */
-const CD_PREFIX = new RegExp(`^(${DATE}),[ \\t]*`);
+/**
+ * A day written with dots, dashes or slashes — 15.08.26, 18.8.26, 19-09-26, 18/08/2026 — or with
+ * commas, 13,08,26. Commas only with two-digit day and month, so a list like "3,4,5" is not a date.
+ */
+const DATE = String.raw`(?:\d{1,2}[./-]\d{1,2}[./-]|\d{2},\d{2},)(?:\d{4}|\d{2})`;
+/** Todoist's "* " heading marker, which sits in front of everything else. */
+const HEADING = /^\*\s+/;
+/** Bold or italic wrapping the whole name, as in "* **24.07.26,6T mechine**". */
+const EMPHASIS = /^(\*\*|__|\*|_)([\s\S]+)\1$/;
+/** A leading date: "DD.MM.YY," — also written "DD.MM.YY." or with only a space after it. */
+const CD_PREFIX = new RegExp(`^(${DATE})(?:\\s*[,.]\\s*|\\s+)`);
 /** A trailing ", DD.MM.YY". The comma is what separates it from a date inside the sentence. */
-const IDD_SUFFIX = new RegExp(`,[ \\t]*(${DATE})[ \\t]*$`);
+const IDD_SUFFIX = new RegExp(`\\s*,\\s*(${DATE})\\s*$`);
 
 const pad = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * A title's markup taken off the front and back — the heading marker and any emphasis wrapping
+ * the whole name — so the dates can be read, and put back exactly as they were when it is saved.
+ */
+function peel(content: string): { mark: string; fence: string; body: string } {
+  const trimmed = content.trim();
+  const mark = HEADING.exec(trimmed)?.[0] ?? '';
+  const rest = trimmed.slice(mark.length);
+  const wrapped = EMPHASIS.exec(rest);
+  return { mark, fence: wrapped?.[1] ?? '', body: (wrapped?.[2] ?? rest).trim() };
+}
 
 export interface TitleDates {
   /** Creation date as written in the title, or null when the title carries none. */
@@ -56,11 +76,12 @@ export function cdFromTimestamp(value: string | null | undefined): string | null
  * is not a real calendar day. Two-digit years mean 20xx.
  */
 export function titleDateToKey(written: string | null | undefined): string | null {
-  const m = new RegExp(`^(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4}|\\d{2})$`).exec((written ?? '').trim());
+  // The same separator has to be used twice, so "1.2-26" is not read as a date.
+  const m = /^(\d{1,2})([./,-])(\d{1,2})\2(\d{4}|\d{2})$/.exec((written ?? '').trim());
   if (!m) return null;
   const day = Number(m[1]);
-  const month = Number(m[2]);
-  const year = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  const month = Number(m[3]);
+  const year = m[4].length === 2 ? 2000 + Number(m[4]) : Number(m[4]);
   const check = new Date(year, month - 1, day);
   if (check.getFullYear() !== year || check.getMonth() !== month - 1 || check.getDate() !== day) return null;
   return `${year}-${pad(month)}-${pad(day)}`;
@@ -68,20 +89,22 @@ export function titleDateToKey(written: string | null | undefined): string | nul
 
 /** Splits "15.08.26, Develop LMS Portal, 18.8.26" into its two dates and the title between them. */
 export function parseTitle(content: string): TitleDates {
-  let rest = content.trim();
+  // A heading marker and bold markers sit outside the dates; they stay part of the title.
+  const { mark, fence, body } = peel(content);
+  let rest = body;
   const front = CD_PREFIX.exec(rest);
   const cd = front && titleDateToKey(front[1]) ? front[1] : null;
   if (front && cd) rest = rest.slice(front[0].length);
   const back = IDD_SUFFIX.exec(rest);
   const idd = back && titleDateToKey(back[1]) ? back[1] : null;
   if (back && idd) rest = rest.slice(0, back.index);
-  return { cd, title: rest.trim(), idd };
+  return { cd, title: `${mark}${fence}${rest.trim()}${fence}`, idd };
 }
 
 /** Puts a title back together with its dates, without ever doubling one that is already there. */
 export function buildTitle({ cd, title, idd }: TitleDates): string {
-  const bare = parseTitle(title).title;
-  return `${cd ? `${cd}, ` : ''}${bare}${idd ? `, ${idd}` : ''}`;
+  const { mark, fence, body } = peel(parseTitle(title).title);
+  return `${mark}${fence}${cd ? `${cd}, ` : ''}${body}${idd ? `, ${idd}` : ''}${fence}`;
 }
 
 export const hasCd = (content: string) => parseTitle(content).cd !== null;

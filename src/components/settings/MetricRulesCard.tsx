@@ -12,6 +12,7 @@ import {
 } from '../../lib/metrics';
 import { useWorkspace } from '../../store/workspace';
 import { IconBadge } from '../common/ui';
+import { SearchSelect } from '../common/SearchSelect';
 
 const BASES: { value: CategoryBasis; label: string; hint: string }[] = [
   { value: 'days-overdue', label: 'Days overdue (from due dates)', hint: 'A-5 = 1–5 days late, A-10 = 6–10, A-30 = 11–30, A30+ = over 30.' },
@@ -77,11 +78,13 @@ export function MetricRulesCard() {
       <div className="space-y-3">
         <div>
           <label className="label" htmlFor="category-basis">A-5 / A-10 / A-30 / A30+ are based on</label>
-          <select id="category-basis" className="field max-w-sm" value={rules.categoryBasis} onChange={(e) => update({ categoryBasis: e.target.value as CategoryBasis })}>
-            {BASES.map((b) => (
-              <option key={b.value} value={b.value}>{b.label}</option>
-            ))}
-          </select>
+          <SearchSelect
+            id="category-basis"
+            className="w-full max-w-sm"
+            value={rules.categoryBasis}
+            onChange={(v) => update({ categoryBasis: v as CategoryBasis })}
+            options={BASES.map((b) => ({ value: b.value, label: b.label }))}
+          />
           <p className="mt-1 text-[12px] text-ink-3">{BASES.find((b) => b.value === rules.categoryBasis)!.hint}</p>
         </div>
 
@@ -112,11 +115,12 @@ export function MetricRulesCard() {
             return (
               <div key={id}>
                 <label className="label" htmlFor={`check-${id}`}>“{label}” counts</label>
-                <select id={`check-${id}`} className="field" value={rule.kind} onChange={(e) => setCheck(id, e.target.value as DateCheckRule['kind'])}>
-                  {CHECK_KINDS.map((k) => (
-                    <option key={k.value} value={k.value}>{k.label}</option>
-                  ))}
-                </select>
+                <SearchSelect
+                  id={`check-${id}`}
+                  value={rule.kind}
+                  onChange={(v) => setCheck(id, v as DateCheckRule['kind'])}
+                  options={CHECK_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                />
                 {kind.needsValue && (
                   <input
                     className="field mt-1.5"

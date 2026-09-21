@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Loader2, PlugZap, RefreshCw, Smile } from 'lucide-react';
+import { Eye, EyeOff, Loader2, PlugZap, RefreshCw } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { IconBadge, PageHeader } from '../components/common/ui';
 import { ConnectionBadge, ModeBadge, SyncButton } from '../components/layout/SyncStatus';
@@ -6,7 +6,7 @@ import { MetricRulesCard } from '../components/settings/MetricRulesCard';
 import { useWorkspace } from '../store/workspace';
 
 export function SettingsPage() {
-  const { mode, settings, snapshot, connectLive, switchToDemo, forgetToken, setDisplayName } = useWorkspace();
+  const { mode, settings, snapshot, connectLive, switchToDemo, forgetToken } = useWorkspace();
   const [token, setToken] = useState('');
   const [reveal, setReveal] = useState(false);
   const [status, setStatus] = useState<{ tone: 'error' | 'ok'; text: string } | null>(null);
@@ -103,17 +103,6 @@ export function SettingsPage() {
 
         <MetricRulesCard />
 
-        <Card title="Greeting" icon={<Smile />}>
-          <label className="label" htmlFor="display-name">Name shown on the dashboard</label>
-          <input
-            id="display-name"
-            className="field max-w-xs"
-            placeholder={snapshot?.user.full_name.split(' ')[0] ?? 'Your name'}
-            value={settings.displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-          />
-          <p className="mt-1.5 text-[12px] text-ink-3">Leave empty to use the Todoist account name.</p>
-        </Card>
 
         <Card title="How syncing works" icon={<RefreshCw />}>
           <ul className="list-disc space-y-1 pl-5 text-[13px] text-ink-2">

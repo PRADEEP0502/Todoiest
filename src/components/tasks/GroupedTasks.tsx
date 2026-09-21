@@ -101,6 +101,7 @@ function SectionBlock({
       <button type="button" onClick={toggle} aria-expanded={!collapsed} className="flex items-center gap-1.5 rounded px-1 py-1 text-left hover:bg-canvas">
         <Chevron collapsed={collapsed} className="!h-3.5 !w-3.5" />
         <span className="text-[12.5px] font-semibold text-ink-2">{group.section.name}</span>
+        <Count>{group.count}</Count>
       </button>
       {!collapsed && <TaskTree tasks={group.roots} childrenOf={childrenOf} hideDue={hideDue} subtasksOpen />}
     </div>

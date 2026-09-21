@@ -8,8 +8,6 @@ export interface Settings {
   /** The token in use: one pasted in Settings, else VITE_TODOIST_API_TOKEN from .env.local. */
   token: string;
   tokenSource: TokenSource;
-  /** Overrides the Todoist account name in the greeting. */
-  displayName: string;
   /** How A-5/A-10/A-30/A30+ and No CD/No IDD are worked out from Todoist data. */
   rules: MetricRules;
   /** Show notifications for changes made by the connected account itself. */
@@ -21,7 +19,6 @@ interface StoredSettings {
   savedToken: string;
   /** True only after the user clicks "Switch to Demo Mode". */
   demoChosen: boolean;
-  displayName: string;
   rules: Partial<MetricRules>;
   notifyOwnActions: boolean;
 }
@@ -54,7 +51,6 @@ function readStored(): Partial<StoredSettings> {
     return {
       savedToken: legacy.token && legacy.token !== envToken() ? legacy.token : '',
       demoChosen: false,
-      displayName: legacy.displayName,
       rules: legacy.rules,
       notifyOwnActions: legacy.notifyOwnActions,
     };
@@ -71,7 +67,6 @@ export function resolveSettings(stored: Partial<StoredSettings>, env: string): S
     token,
     tokenSource,
     mode: token && !stored.demoChosen ? 'live' : 'demo',
-    displayName: stored.displayName ?? '',
     rules: {
       ...DEFAULT_RULES,
       ...stored.rules,
@@ -92,7 +87,6 @@ export function saveSettings(settings: Settings): void {
   const stored: StoredSettings = {
     savedToken: settings.tokenSource === 'saved' ? settings.token : '',
     demoChosen: settings.mode === 'demo' && settings.tokenSource !== 'none',
-    displayName: settings.displayName,
     rules: settings.rules,
     notifyOwnActions: settings.notifyOwnActions,
   };

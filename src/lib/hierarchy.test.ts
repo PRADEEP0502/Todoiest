@@ -170,6 +170,9 @@ describe('groupByProjectAndSection', () => {
     expect(groups[1].sections[0].roots.map((t) => t.id)).toEqual([lms.id]);
     expect(childrenOf(lms.id)).toHaveLength(3);
     expect(groups[1].count).toBe(4);
+    // The section counts what is listed under it: the task plus its three subtasks.
+    expect(groups[1].sections[0].count).toBe(4);
+    expect(groups[0].sections[0].count).toBe(1);
   });
 });
 

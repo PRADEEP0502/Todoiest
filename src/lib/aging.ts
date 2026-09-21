@@ -1,33 +1,28 @@
 import type { TodoistTask } from '../types/todoist';
-import { daysBetween } from './dates';
+import { daysBetween, toDateKey } from './dates';
 import { isRoutineTask } from './routine';
 import type { WorkspaceIndex } from './hierarchy';
 import { taskDates, type TaskDates } from './taskDates';
 
 /**
- * Aging, in whole calendar days, between the three dates of a task:
+ * Aging, in whole calendar days, up to today:
  *
- *   CD → IDD   =  IDD − CD   how long the task waited from creation until it was issued
- *   IDD → DD   =  DD − IDD   the time planned from issue until it is due
- *   CD → DD    =  DD − CD    the total time from creation to due
+ *   CD Age   =  today − CD    how long ago the task was created
+ *   IDD Age  =  today − IDD   how long ago it was issued
  *
- * CD and IDD never change, so CD → IDD is fixed for good. Rescheduling changes only DD, so
- * IDD → DD and CD → DD are recalculated from the current due date every time.
- * A value is null whenever one of its two dates is missing — nothing is estimated.
+ * Both grow by one every day on their own. CD and IDD never change, and DD takes no part, so
+ * rescheduling a task never moves either age. A value is null when its date is missing.
  */
 export interface Aging {
-  cdToIdd: number | null;
-  iddToDd: number | null;
-  cdToDd: number | null;
+  cdAge: number | null;
+  iddAge: number | null;
 }
 
-const span = (from: string | null, to: string | null) => (from && to ? daysBetween(from, to) : null);
-
-export function agingOf(dates: Pick<TaskDates, 'cdKey' | 'iddKey' | 'ddKey'>): Aging {
+export function agingOf(dates: Pick<TaskDates, 'cdKey' | 'iddKey'>, today: Date): Aging {
+  const todayKey = toDateKey(today);
   return {
-    cdToIdd: span(dates.cdKey, dates.iddKey),
-    iddToDd: span(dates.iddKey, dates.ddKey),
-    cdToDd: span(dates.cdKey, dates.ddKey),
+    cdAge: dates.cdKey ? daysBetween(dates.cdKey, todayKey) : null,
+    iddAge: dates.iddKey ? daysBetween(dates.iddKey, todayKey) : null,
   };
 }
 
@@ -48,7 +43,7 @@ export interface HolderAging {
   /** Tasks in `rows` that have an issue date; averages are over the tasks that have each value. */
   withIdd: number;
   withoutIdd: number;
-  average: { cdToIdd: number | null; iddToDd: number | null; cdToDd: number | null };
+  average: Aging;
 }
 
 const mean = (values: (number | null)[]): number | null => {
@@ -57,10 +52,10 @@ const mean = (values: (number | null)[]): number | null => {
 };
 
 /**
- * Active tasks grouped by their current holder, each with its aging. Longest total aging first
- * inside a holder; holders with the most tasks first, "no holder" last.
+ * Active tasks grouped by their current holder, each with its aging as of `today`. Oldest task
+ * first inside a holder; holders with the most tasks first, "no holder" last.
  */
-export function holderAging(tasks: TodoistTask[], index: WorkspaceIndex, { onlyWithIdd }: { onlyWithIdd: boolean }): HolderAging[] {
+export function holderAging(tasks: TodoistTask[], index: WorkspaceIndex, { onlyWithIdd }: { onlyWithIdd: boolean }, today: Date): HolderAging[] {
   const byHolder = new Map<string, AgingRow[]>();
   for (const task of tasks) {
     const routine = isRoutineTask(task, index);
@@ -68,7 +63,7 @@ export function holderAging(tasks: TodoistTask[], index: WorkspaceIndex, { onlyW
     // Tasks that repeat have no single creation or issue date, so they take no part in aging.
     if (routine) continue;
     const id = task.responsible_uid ?? NO_HOLDER;
-    const row: AgingRow = { task, dates, aging: agingOf(dates), routine };
+    const row: AgingRow = { task, dates, aging: agingOf(dates, today), routine };
     const list = byHolder.get(id);
     if (list) list.push(row);
     else byHolder.set(id, [row]);
@@ -78,7 +73,7 @@ export function holderAging(tasks: TodoistTask[], index: WorkspaceIndex, { onlyW
   for (const [id, all] of byHolder) {
     const withIdd = all.filter((r) => r.dates.iddKey).length;
     const rows = (onlyWithIdd ? all.filter((r) => r.dates.iddKey) : all).sort(
-      (a, b) => (b.aging.cdToDd ?? -Infinity) - (a.aging.cdToDd ?? -Infinity) || a.task.child_order - b.task.child_order,
+      (a, b) => (b.aging.cdAge ?? -Infinity) - (a.aging.cdAge ?? -Infinity) || a.task.child_order - b.task.child_order,
     );
     groups.push({
       id,
@@ -86,9 +81,8 @@ export function holderAging(tasks: TodoistTask[], index: WorkspaceIndex, { onlyW
       withIdd,
       withoutIdd: all.length - withIdd,
       average: {
-        cdToIdd: mean(rows.map((r) => r.aging.cdToIdd)),
-        iddToDd: mean(rows.map((r) => r.aging.iddToDd)),
-        cdToDd: mean(rows.map((r) => r.aging.cdToDd)),
+        cdAge: mean(rows.map((r) => r.aging.cdAge)),
+        iddAge: mean(rows.map((r) => r.aging.iddAge)),
       },
     });
   }

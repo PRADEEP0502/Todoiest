@@ -98,7 +98,6 @@ interface WorkspaceContextValue {
   connectLive: (token: string) => Promise<{ name: string }>;
   switchToDemo: () => void;
   forgetToken: () => void;
-  setDisplayName: (name: string) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -568,7 +567,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       void cacheClear();
       setSettings((s) => withoutSavedToken(s));
     },
-    setDisplayName: (displayName) => setSettings((s) => ({ ...s, displayName })),
     setRules: (rules) => setSettings((s) => ({ ...s, rules })),
     setNotifyOwnActions: (notifyOwnActions) => setSettings((s) => ({ ...s, notifyOwnActions })),
   };

@@ -91,3 +91,18 @@ export function searchWorkspace(index: WorkspaceIndex, query: string, extras: Se
 
   return { projects, sections, tasks, labels, people, total: projects.length + sections.length + taskMatches.length + labels.length + people.length };
 }
+
+/**
+ * Narrows a list of tasks to those matching every word of `query`, looking at the task name
+ * (dates included, as written), its description, where it lives and who holds it. An empty
+ * query keeps every task.
+ */
+export function filterTasks(tasks: TodoistTask[], query: string, index: WorkspaceIndex, people: Record<string, Person> = {}): TodoistTask[] {
+  const words = normalize(query.trim()).split(/\s+/).filter(Boolean);
+  if (!words.length) return tasks;
+  return tasks.filter((task) => {
+    const holder = task.responsible_uid ? (people[task.responsible_uid]?.name ?? '') : '';
+    const text = normalize([task.content, task.description, taskPath(index, task).join(' '), holder, task.labels.join(' ')].join(' '));
+    return words.every((w) => text.includes(w));
+  });
+}

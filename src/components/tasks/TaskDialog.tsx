@@ -13,7 +13,8 @@ import { useWorkspace, type TaskForm } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { Modal } from '../common/Modal';
 import { TaskDateCards } from './TaskDates';
-import { Avatar } from '../common/ui';
+import { Avatar, ProjectDot } from '../common/ui';
+import { SearchSelect } from '../common/SearchSelect';
 
 export function TaskDialog() {
   const { dialog, closeDialog } = useUi();
@@ -217,40 +218,37 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="task-project">Project</label>
-            <select
+            <SearchSelect
               id="task-project"
-              className="field"
+              searchPlaceholder="Search projects…"
               value={form.projectId}
-              onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value, sectionId: null }))}
-            >
-              {index.groups.map((group) => (
-                <optgroup key={group.id} label={group.name}>
-                  {index.orderedProjects
-                    .filter((node) => (node.project.workspace_id ? String(node.project.workspace_id) : PERSONAL_GROUP_ID) === group.id)
-                    .map((node) => (
-                      <option key={node.project.id} value={node.project.id}>
-                        {'   '.repeat(node.depth)}
-                        {node.project.name}
-                      </option>
-                    ))}
-                </optgroup>
-              ))}
-            </select>
+              onChange={(projectId) => setForm((f) => ({ ...f, projectId, sectionId: null }))}
+              options={index.groups.flatMap((group) =>
+                index.orderedProjects
+                  .filter((node) => (node.project.workspace_id ? String(node.project.workspace_id) : PERSONAL_GROUP_ID) === group.id)
+                  .map((node) => ({
+                    value: node.project.id,
+                    label: node.project.name,
+                    group: group.name,
+                    depth: node.depth,
+                    icon: <ProjectDot color={node.project.color} />,
+                  })),
+              )}
+            />
           </div>
           <div>
             <label className="label" htmlFor="task-section">Section</label>
-            <select
+            <SearchSelect
               id="task-section"
-              className="field"
+              searchPlaceholder="Search sections…"
               value={form.sectionId ?? ''}
-              onChange={(e) => set('sectionId', e.target.value || null)}
+              onChange={(id) => set('sectionId', id || null)}
               disabled={sections.length === 0}
-            >
-              <option value="">{sections.length ? 'No section' : 'No sections in this project'}</option>
-              {sections.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: sections.length ? 'No section' : 'No sections in this project' },
+                ...sections.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
           </div>
         </div>
 

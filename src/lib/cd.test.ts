@@ -17,6 +17,65 @@ describe('dates in the task title (CD and IDD)', () => {
     expect(cdFromApiDate(null)).toBe(null);
   });
 
+  it('reads the shapes this workspace actually uses in Todoist', () => {
+    // Heading marker and bold wrap the whole name, dates included.
+    expect(parseTitle('* **24.07.26,6T mechine**')).toEqual({ cd: '24.07.26', title: '* **6T mechine**', idd: null });
+    expect(parseTitle('* **17.02.26,QAD ASSISTANT - 1 No, 23.02.26**')).toEqual({
+      cd: '17.02.26',
+      title: '* **QAD ASSISTANT - 1 No**',
+      idd: '23.02.26',
+    });
+    // Only a space after the date, and a space before the comma.
+    expect(parseTitle('15.08.26 Panel Board Ac Not Working').cd).toBe('15.08.26');
+    expect(parseTitle('21.08.26 , To develop the company website')).toEqual({
+      cd: '21.08.26',
+      title: 'To develop the company website',
+      idd: null,
+    });
+    // Saving keeps the marker, the bold and both dates exactly where they were.
+    expect(buildTitle(parseTitle('* **17.02.26,QAD ASSISTANT - 1 No, 23.02.26**'))).toBe('* **17.02.26, QAD ASSISTANT - 1 No, 23.02.26**');
+  });
+
+  it('reads a heading task, whose "* " marker sits in front of the dates', () => {
+    // Todoist headings look like "* 24.07.26,6T mechine" — the marker belongs to the title.
+    expect(parseTitle('* 24.07.26,6T mechine')).toEqual({ cd: '24.07.26', title: '* 6T mechine', idd: null });
+    expect(parseTitle('* 15.08.26, LMS, 18.8.26')).toEqual({ cd: '15.08.26', title: '* LMS', idd: '18.8.26' });
+    // Todoist writes the marker with a non-breaking space as well as a plain one.
+    expect(parseTitle('* 24.07.26,6T mechine').cd).toBe('24.07.26');
+    // Saving one keeps it a heading, and keeps both dates where they were.
+    expect(buildTitle(parseTitle('* 15.08.26, LMS, 18.8.26'))).toBe('* 15.08.26, LMS, 18.8.26');
+    expect(titleForSavedTask({ content: '* 24.07.26,6T mechine', addedAt: '2026-07-24T06:00:00Z' }, '* 6T mechine', null)).toBe('* 24.07.26, 6T mechine');
+  });
+
+  it('reads a date written with commas, as this workspace sometimes does', () => {
+    expect(parseTitle('13,08,26,Flow meter,A flow meter needs to be installed on the slit-open machine.')).toEqual({
+      cd: '13,08,26',
+      title: 'Flow meter,A flow meter needs to be installed on the slit-open machine.',
+      idd: null,
+    });
+    expect(titleDateToKey('13,08,26')).toBe('2026-08-13');
+    // A plain list of numbers is not a date.
+    expect(parseTitle('3,4,5 rolls to be checked').cd).toBeNull();
+    expect(titleDateToKey('13,08.26')).toBeNull();
+  });
+
+  it('reads dates written with dashes or slashes as well as dots', () => {
+    expect(parseTitle('19-09-26. P1 machine dyes are dosing automatically.').cd).toBe('19-09-26');
+    expect(titleDateToKey('19-09-26')).toBe('2026-09-19');
+    expect(titleDateToKey('18/08/2026')).toBe('2026-08-18');
+    // Not dates: a plain range, and one that mixes its separators.
+    expect(parseTitle('A 5-10 range task').cd).toBeNull();
+    expect(titleDateToKey('1.2-26')).toBeNull();
+  });
+
+  it('accepts the full stop this workspace also writes after CD', () => {
+    expect(parseTitle('11.09.26.Sensor, magnet sensor is not working.')).toEqual({
+      cd: '11.09.26',
+      title: 'Sensor, magnet sensor is not working.',
+      idd: null,
+    });
+  });
+
   it('reads the title exactly as it is written in the real workspace', () => {
     // From a live Todoist task: zero-padded CD, unpadded IDD.
     expect(parseTitle('15.08.26, Develop an LMS-style Onboarding System for New Employees, 18.8.26')).toEqual({
@@ -38,7 +97,8 @@ describe('dates in the task title (CD and IDD)', () => {
     expect(titleDateToKey('08.09.2026')).toBe('2026-09-08');
     expect(titleDateToKey('31.02.26')).toBeNull();
     expect(titleDateToKey('00.01.26')).toBeNull();
-    expect(titleDateToKey('15-08-26')).toBeNull();
+    expect(titleDateToKey('15-08-26')).toBe('2026-08-15'); // dashes are written here too
+    expect(titleDateToKey('15.08-26')).toBeNull();
     expect(parseTitle('31.02.26, Not a date, 99.99.26')).toEqual({ cd: null, title: '31.02.26, Not a date, 99.99.26', idd: null });
   });
 

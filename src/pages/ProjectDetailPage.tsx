@@ -1,6 +1,8 @@
-import { ChevronsDownUp, ChevronsUpDown, FolderX, ListPlus, Plus } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, FolderX, ListPlus, Plus, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Gate } from '../components/common/Gate';
+import { SearchField } from '../components/common/SearchField';
+import { GroupedTasks } from '../components/tasks/GroupedTasks';
 import { Count, EmptyState, ProjectDot } from '../components/common/ui';
 import { NewSectionDialog } from '../components/projects/CreateDialogs';
 import { ProjectSections, projectBlockKeys } from '../components/projects/ProjectSections';
@@ -8,8 +10,9 @@ import { disclosureKey, isOpen, setOpen, useDisclosureState } from '../hooks/use
 import { href } from '../hooks/useRoute';
 import { PERSONAL_GROUP_ID, type WorkspaceIndex } from '../lib/hierarchy';
 import { revealKeys } from '../lib/projects';
+import { filterTasks } from '../lib/search';
 import { useUi } from '../store/ui';
-import type { TodoistProject, TodoistWorkspace } from '../types/todoist';
+import type { Person, TodoistProject, TodoistWorkspace } from '../types/todoist';
 
 interface Props {
   projectId: string;
@@ -20,13 +23,25 @@ interface Props {
 }
 
 export function ProjectDetailPage(props: Props) {
-  return <Gate>{({ index, snapshot }) => <ProjectDetail {...props} index={index} workspaces={snapshot.workspaces} />}</Gate>;
+  return <Gate>{({ index, snapshot }) => <ProjectDetail {...props} index={index} workspaces={snapshot.workspaces} people={snapshot.people} />}</Gate>;
 }
 
-function ProjectDetail({ index, workspaces, projectId, sectionId, taskId, visit }: Props & { index: WorkspaceIndex; workspaces: TodoistWorkspace[] }) {
+function ProjectDetail({
+  index,
+  workspaces,
+  people,
+  projectId,
+  sectionId,
+  taskId,
+  visit,
+}: Props & { index: WorkspaceIndex; workspaces: TodoistWorkspace[]; people: Record<string, Person> }) {
   const { openNewTask } = useUi();
   const openState = useDisclosureState();
   const [addingSection, setAddingSection] = useState(false);
+  // The search belongs to one project: opening another starts with a clear box.
+  const [search, setSearch] = useState({ id: projectId, text: '' });
+  const query = search.id === projectId ? search.text : '';
+  const setQuery = (text: string) => setSearch({ id: projectId, text });
   const project = index.projectById.get(projectId);
   useReveal(index, projectId, sectionId, taskId, visit);
 
@@ -43,6 +58,10 @@ function ProjectDetail({ index, workspaces, projectId, sectionId, taskId, visit 
   const openCount = index.openByProject.get(project.id) ?? 0;
   const childProjects = index.orderedProjects.filter((n) => n.project.parent_id === project.id).map((n) => n.project);
   const blockKeys = projectBlockKeys(index, project.id);
+  // Searching lists this project's matching tasks (subtasks included), already opened.
+  const searching = query.trim().length > 0;
+  const projectTasks = searching ? [...index.taskById.values()].filter((t) => t.project_id === project.id) : [];
+  const matches = searching ? filterTasks(projectTasks, query, index, people) : [];
   const allOpen = blockKeys.length > 0 && blockKeys.every((k) => isOpen(openState, k, false));
 
   // Breadcrumb: workspace › parent projects.
@@ -59,6 +78,8 @@ function ProjectDetail({ index, workspaces, projectId, sectionId, taskId, visit 
   return (
     <div>
       <nav className="mb-2 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-3" aria-label="Breadcrumb">
+        <a href={href.dashboard()} className="hover:text-ink hover:underline">Overall</a>
+        <span>›</span>
         <a href={href.projects()} className="hover:text-ink hover:underline">Projects</a>
         {crumbs.map((c, i) => (
           <span key={i} className="flex items-center gap-1.5">
@@ -118,9 +139,31 @@ function ProjectDetail({ index, workspaces, projectId, sectionId, taskId, visit 
         </div>
       )}
 
-      <div className="panel overflow-hidden">
-        <ProjectSections index={index} projectId={project.id} />
+      {/* Stays in view while scrolling a long project, so the search is always at hand. */}
+      <div className="sticky top-0 z-10 -mx-2 mb-2.5 flex flex-wrap items-center gap-2 bg-canvas/95 px-2 py-2 backdrop-blur">
+        <SearchField className="min-w-0 flex-1 sm:max-w-sm" value={query} onChange={setQuery} label={`Search tasks in ${project.name}`} placeholder={`Search tasks in ${project.name}…`} />
+        {searching && (
+          <span className="text-[12.5px] text-ink-3">
+            {matches.length} of {projectTasks.length} task{projectTasks.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
+
+      {searching ? (
+        <div className="panel px-3 py-2">
+          {matches.length === 0 ? (
+            <EmptyState icon={<Search size={24} />} title={`Nothing in ${project.name} matches “${query.trim()}”`}>
+              <button type="button" className="text-accent hover:underline" onClick={() => setQuery('')}>Clear the search</button>
+            </EmptyState>
+          ) : (
+            <GroupedTasks tasks={matches} viewKey={`project-search:${project.id}`} defaultOpen />
+          )}
+        </div>
+      ) : (
+        <div className="panel overflow-hidden">
+          <ProjectSections index={index} projectId={project.id} />
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { PROJECT_COLORS } from '../../lib/priority';
 import { useWorkspace } from '../../store/workspace';
 import type { TodoistProject, TodoistSection } from '../../types/todoist';
 import { Modal } from '../common/Modal';
+import { SearchSelect } from '../common/SearchSelect';
+import { ProjectDot } from '../common/ui';
 
 const COLOR_LABEL = (name: string) => name.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
@@ -61,32 +63,38 @@ export function NewProjectDialog({ onClose, onCreated }: { onClose: () => void; 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="project-location">Where</label>
-            <select
+            <SearchSelect
               id="project-location"
-              className="field"
+              searchPlaceholder="Search workspaces…"
               value={location}
-              onChange={(e) => {
-                setLocation(e.target.value);
+              onChange={(v) => {
+                setLocation(v);
                 setParentId('');
               }}
-            >
-              <option value={PERSONAL_GROUP_ID}>Personal</option>
-              {snapshot.workspaces.map((w) => (
-                <option key={w.id} value={String(w.id)}>{w.name} (team)</option>
-              ))}
-            </select>
+              options={[
+                { value: PERSONAL_GROUP_ID, label: 'Personal' },
+                ...snapshot.workspaces.map((w) => ({ value: String(w.id), label: `${w.name} (team)` })),
+              ]}
+            />
           </div>
           <div>
             <label className="label" htmlFor="project-parent">Inside project (optional)</label>
-            <select id="project-parent" className="field" value={parentId} onChange={(e) => setParentId(e.target.value)} disabled={!parents.length}>
-              <option value="">{parents.length ? 'None — top level' : 'No projects here yet'}</option>
-              {parents.map((node) => (
-                <option key={node.project.id} value={node.project.id}>
-                  {'   '.repeat(node.depth)}
-                  {node.project.name}
-                </option>
-              ))}
-            </select>
+            <SearchSelect
+              id="project-parent"
+              searchPlaceholder="Search projects…"
+              value={parentId}
+              onChange={setParentId}
+              disabled={!parents.length}
+              options={[
+                { value: '', label: parents.length ? 'None — top level' : 'No projects here yet' },
+                ...parents.map((node) => ({
+                  value: node.project.id,
+                  label: node.project.name,
+                  depth: node.depth,
+                  icon: <ProjectDot color={node.project.color} />,
+                })),
+              ]}
+            />
           </div>
         </div>
         <div>

@@ -123,7 +123,8 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
         <span className={`block break-words text-[14px] leading-5 ${checking ? 'text-ink-3 line-through' : heading ? 'font-semibold text-ink' : 'text-ink'}`}>
           {plainText(dates.title)}
         </span>
-        {!heading && <TaskDateLine dates={dates} routine={routine} />}
+        {/* Headings carry CD and IDD in their titles too, so they get the same date line. */}
+        <TaskDateLine dates={dates} routine={routine} now={now} />
         {(meta.length > 0 || path) && (
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] leading-4 text-ink-3">
             {meta}

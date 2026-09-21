@@ -84,6 +84,12 @@ export function categoryOf(task: TodoistTask, rules: MetricRules, index: Workspa
   }
 }
 
+/** Short note under a category number — the full rule is on the metric's own page. */
+export function shortCategoryNote(id: CategoryId, rules: MetricRules): string {
+  if (rules.categoryBasis !== 'days-overdue') return describeCategory(id, rules);
+  return { a5: '1–5 days late', a10: '6–10 days late', a30: '11–30 days late', a30plus: 'over a month late' }[id];
+}
+
 export function describeCategory(id: CategoryId, rules: MetricRules): string {
   if (rules.categoryBasis === 'labels') return `Tasks with the label “${rules.categoryNames[id]}”`;
   if (rules.categoryBasis === 'sections') return `Tasks in sections named “${rules.categoryNames[id]}”`;

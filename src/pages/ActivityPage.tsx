@@ -1,6 +1,7 @@
 import { FolderKanban, History, User } from 'lucide-react';
 import { useState } from 'react';
 import { Gate } from '../components/common/Gate';
+import { SearchSelect } from '../components/common/SearchSelect';
 import { ActivityIcon } from '../components/common/ActivityIcon';
 import { EmptyState, Notice, PageHeader, ShowMore, Tabs } from '../components/common/ui';
 import { usePaged } from '../hooks/usePaged';
@@ -186,14 +187,16 @@ function ActivityFilterSelect({ id, icon, label, value, onChange, all, options }
   options: { id: string; name: string; count: number }[];
 }) {
   return (
-    <label htmlFor={id} className="flex items-center gap-1.5 text-ink-3">
+    <div className="flex items-center gap-1.5 text-ink-3">
       {icon}
-      <select id={id} aria-label={label} className="field w-auto max-w-[16rem]" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value={ALL}>{all}</option>
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>{o.name} ({o.count})</option>
-        ))}
-      </select>
-    </label>
+      <SearchSelect
+        id={id}
+        aria-label={label}
+        className="w-auto min-w-52 max-w-[18rem]"
+        value={value}
+        onChange={onChange}
+        options={[{ value: ALL, label: all }, ...options.map((o) => ({ value: o.id, label: o.name, hint: String(o.count) }))]}
+      />
+    </div>
   );
 }
