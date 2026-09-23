@@ -52,6 +52,27 @@ export interface MetricRules {
   noIdd: DateCheckRule;
 }
 
+export type DateKind = 'cd' | 'idd' | 'dd';
+
+/**
+ * Whether a task has no CD, no IDD or no DD. This is the one rule behind every No CD / No IDD /
+ * No DD count and the list its card opens, so the two can never disagree.
+ *  - CD and IDD are the dates written in the Todoist title, read in every way this workspace
+ *    writes them; a task that has one is never counted as missing it.
+ *  - DD is Todoist's own due date.
+ * Routine (repeating) tasks carry no single CD or IDD, so they never count as missing one.
+ */
+export function isMissingDate(kind: DateKind, task: TodoistTask, index: WorkspaceIndex): boolean {
+  switch (kind) {
+    case 'cd':
+      return !isRoutineTask(task, index) && !hasCd(task.content);
+    case 'idd':
+      return !isRoutineTask(task, index) && !hasIdd(task.content);
+    case 'dd':
+      return !dueDateKey(task.due);
+  }
+}
+
 export const DEFAULT_RULES: MetricRules = {
   categoryBasis: 'days-overdue',
   categoryNames: { a5: 'A-5', a10: 'A-10', a30: 'A-30', a30plus: 'A30+' },
@@ -105,11 +126,10 @@ export function matchesDateCheck(task: TodoistTask, rule: DateCheckRule, index: 
   switch (rule.kind) {
     case 'unset':
       return false;
-    // Routine work repeats, so it has no one creation date or first due date to carry.
     case 'no-cd':
-      return !isRoutineTask(task, index) && !hasCd(task.content);
+      return isMissingDate('cd', task, index);
     case 'no-idd':
-      return !isRoutineTask(task, index) && !hasIdd(task.content);
+      return isMissingDate('idd', task, index);
     case 'without-label':
       return !task.labels.some((l) => same(l, rule.value));
     case 'with-label':
@@ -130,9 +150,9 @@ export function describeDateCheck(rule: DateCheckRule): string {
     case 'unset':
       return 'Not set up yet';
     case 'no-cd':
-      return 'Active tasks with no creation date in the title — routine tasks excluded';
+      return 'Active tasks with no Creation Date (CD) in the title — routine tasks excluded';
     case 'no-idd':
-      return 'Active tasks with no first due date in the title — routine tasks excluded';
+      return 'Active tasks with no Issue Date (IDD) in the title — routine tasks excluded';
     case 'without-label':
       return `Active tasks without the label “${rule.value}”`;
     case 'with-label':
@@ -155,7 +175,7 @@ export function metricTasks(metric: MetricId, snapshot: WorkspaceSnapshot, index
     case 'active':
       return snapshot.tasks;
     case 'no-due':
-      return snapshot.tasks.filter((t) => !t.due);
+      return snapshot.tasks.filter((t) => isMissingDate('dd', t, index));
     case 'noCd':
     case 'noIdd':
       return isDateCheckConfigured(rules[metric]) ? snapshot.tasks.filter((t) => matchesDateCheck(t, rules[metric], index)) : [];
@@ -194,7 +214,7 @@ export function holderCounts(snapshot: WorkspaceSnapshot, now: Date): Map<string
     c.active++;
     if (isOverdue(t, todayKey)) c.overdue++;
     if (isDueToday(t, todayKey)) c.today++;
-    if (!t.due) c.noDue++;
+    if (!dueDateKey(t.due)) c.noDue++;
   }
   for (const t of completedSince(snapshot.completed, startOfMonth(now))) get(t.responsible_uid ?? UNASSIGNED).completed++;
   // Only comments on tasks that are still open, the same set the holder page and Comments list show.
@@ -232,7 +252,7 @@ export function labelRows(snapshot: WorkspaceSnapshot, now: Date): LabelRow[] {
       row.active++;
       if (isOverdue(t, todayKey)) row.overdue++;
       if (isDueToday(t, todayKey)) row.today++;
-      if (!t.due) row.noDue++;
+      if (!dueDateKey(t.due)) row.noDue++;
     }
   }
   for (const t of completedSince(snapshot.completed, startOfMonth(now))) for (const name of t.labels) get(name).completed++;

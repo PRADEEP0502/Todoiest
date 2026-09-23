@@ -47,6 +47,23 @@ describe('dates in the task title (CD and IDD)', () => {
     expect(titleForSavedTask({ content: '* 24.07.26,6T mechine', addedAt: '2026-07-24T06:00:00Z' }, '* 6T mechine', null)).toBe('* 24.07.26, 6T mechine');
   });
 
+  it('after a CD, reads the closing date as IDD however it is set off', () => {
+    expect(parseTitle('24.07.26, Water leakage,6T cooling line water leakage.15.8.26')).toEqual({
+      cd: '24.07.26',
+      title: 'Water leakage,6T cooling line water leakage',
+      idd: '15.8.26',
+    });
+    expect(parseTitle('31.07.26, Manpower sources, updates need in comment box 17.08.26').idd).toBe('17.08.26');
+    expect(parseTitle('08.08.26, tank stirror,we need additional tank stirror.15/9/26').idd).toBe('15/9/26');
+    // Bold that starts after the CD.
+    expect(parseTitle('* 12.06.26,**Despatch ASST- 1 No’s,25.06.26**')).toEqual({ cd: '12.06.26', title: '* **Despatch ASST- 1 No’s**', idd: '25.06.26' });
+    // Without a CD, only a comma marks the IDD, so a date inside a sentence is left alone.
+    expect(parseTitle('Check the reading taken on 17.08.26').idd).toBeNull();
+    // Saving keeps both dates.
+    const saved = buildTitle(parseTitle('24.07.26, Water leakage.15.8.26'));
+    expect(parseTitle(saved)).toMatchObject({ cd: '24.07.26', idd: '15.8.26' });
+  });
+
   it('reads a date written with commas, as this workspace sometimes does', () => {
     expect(parseTitle('13,08,26,Flow meter,A flow meter needs to be installed on the slit-open machine.')).toEqual({
       cd: '13,08,26',

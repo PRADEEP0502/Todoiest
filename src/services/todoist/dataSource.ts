@@ -48,7 +48,10 @@ export interface DataSource {
   createSection(input: CreateSectionInput): Promise<TodoistSection>;
 }
 
-export const ACTIVITY_WINDOW_DAYS = 7;
+/** How far back the activity log is kept, so "7+ days" has something older to show. */
+export const ACTIVITY_WINDOW_DAYS = 30;
+/** The recent slice of that log: the "Last 7 days" tab, and what "7+ days" starts after. */
+export const ACTIVITY_RECENT_DAYS = 7;
 
 /** Start of the completed-task window loaded on every sync: this month, or this week if it began last month. */
 export function completedWindowStart(now: Date): Date {

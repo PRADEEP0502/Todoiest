@@ -12,12 +12,10 @@ import { usePaged } from '../hooks/usePaged';
 import { href, navigate, type HolderView } from '../hooks/useRoute';
 import { formatShortDate, formatTime, startOfMonth, toDateKey } from '../lib/dates';
 import { taskPath, type WorkspaceIndex } from '../lib/hierarchy';
-import { isRoutineTask } from '../lib/routine';
-import { taskDates } from '../lib/taskDates';
 import { filterTasks } from '../lib/search';
 import { plainText } from '../lib/text';
 import { useUi } from '../store/ui';
-import { CATEGORIES, categoryOf, hasHolderData, holderCounts, shortCategoryNote, UNASSIGNED, type CategoryId } from '../lib/metrics';
+import { CATEGORIES, categoryOf, hasHolderData, holderCounts, isMissingDate, shortCategoryNote, UNASSIGNED, type CategoryId } from '../lib/metrics';
 import { useWorkspace } from '../store/workspace';
 import { byPriorityThenTime, completedSince, isDueToday, isOverdue } from '../lib/stats';
 import type { TodoistComment, TodoistTask, WorkspaceSnapshot } from '../types/todoist';
@@ -269,11 +267,11 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
           active: tasks,
           overdue: tasks.filter((t) => isOverdue(t, todayKey)),
           today: tasks.filter((t) => isDueToday(t, todayKey)),
-          'no-due': tasks.filter((t) => !t.due),
+          'no-due': tasks.filter((t) => isMissingDate('dd', t, index)),
           // Nothing written in Todoist: no CD or IDD in the title, no due date.
-          'no-cd': tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).cdFrom !== 'title'),
-          'no-idd': tasks.filter((t) => !isRoutineTask(t, index) && taskDates(t).idd === null),
-          'no-dd': tasks.filter((t) => !t.due),
+          'no-cd': tasks.filter((t) => isMissingDate('cd', t, index)),
+          'no-idd': tasks.filter((t) => isMissingDate('idd', t, index)),
+          'no-dd': tasks.filter((t) => isMissingDate('dd', t, index)),
           // Overdue categories, for this person's tasks in the chosen project/section only.
           ...(Object.fromEntries(CATEGORIES.map((c) => [c.id, tasks.filter((t) => categoryOf(t, rules, index, todayKey) === c.id)])) as Record<CategoryId, TodoistTask[]>),
         };

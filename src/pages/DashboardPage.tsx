@@ -329,9 +329,9 @@ const DATE_CHECK_ICON: Record<(typeof DATE_CHECKS)[number]['id'], ReactNode> = {
 function shortDateCheckNote(rule: Parameters<typeof describeDateCheck>[0]): string {
   switch (rule.kind) {
     case 'no-cd':
-      return 'missing DD.MM.YY';
+      return 'no CD in the title';
     case 'no-idd':
-      return 'no first due date';
+      return 'no IDD in the title';
     case 'without-label':
       return `without the “${rule.value}” label`;
     case 'with-label':

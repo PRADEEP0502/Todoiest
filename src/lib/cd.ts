@@ -25,6 +25,11 @@ const EMPHASIS = /^(\*\*|__|\*|_)([\s\S]+)\1$/;
 const CD_PREFIX = new RegExp(`^(${DATE})(?:\\s*[,.]\\s*|\\s+)`);
 /** A trailing ", DD.MM.YY". The comma is what separates it from a date inside the sentence. */
 const IDD_SUFFIX = new RegExp(`\\s*,\\s*(${DATE})\\s*$`);
+/**
+ * Once a title has opened with its CD, the date that closes it is the IDD, however it was set off:
+ * "…, 17.09.26", "…leakage.15.8.26" or "…comment box 17.08.26".
+ */
+const IDD_SUFFIX_AFTER_CD = new RegExp(`(?:\\s*[,.]\\s*|\\s+)(${DATE})\\s*$`);
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -95,10 +100,15 @@ export function parseTitle(content: string): TitleDates {
   const front = CD_PREFIX.exec(rest);
   const cd = front && titleDateToKey(front[1]) ? front[1] : null;
   if (front && cd) rest = rest.slice(front[0].length);
-  const back = IDD_SUFFIX.exec(rest);
+  // Bold can also start after the CD: "* 12.06.26,**Despatch ASST, 25.06.26**".
+  const inner = fence ? null : EMPHASIS.exec(rest);
+  const innerFence = inner?.[1] ?? '';
+  if (inner) rest = inner[2].trim();
+  const back = (cd ? IDD_SUFFIX_AFTER_CD : IDD_SUFFIX).exec(rest);
   const idd = back && titleDateToKey(back[1]) ? back[1] : null;
   if (back && idd) rest = rest.slice(0, back.index);
-  return { cd, title: `${mark}${fence}${rest.trim()}${fence}`, idd };
+  const wrap = fence || innerFence;
+  return { cd, title: `${mark}${wrap}${rest.trim()}${wrap}`, idd };
 }
 
 /** Puts a title back together with its dates, without ever doubling one that is already there. */

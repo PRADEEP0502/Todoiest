@@ -9,11 +9,11 @@ import { useNow } from '../hooks/useNow';
 import { href } from '../hooks/useRoute';
 import { describeActivity, type ActivityKind, type ActivityRow } from '../lib/activity';
 import { formatDayHeading, formatTime, toDateKey } from '../lib/dates';
-import { ACTIVITY_WINDOW_DAYS } from '../services/todoist';
+import { ACTIVITY_RECENT_DAYS, ACTIVITY_WINDOW_DAYS } from '../services/todoist';
 import { useUi } from '../store/ui';
 import { useWorkspace } from '../store/workspace';
 
-type Range = '24h' | 'week';
+type Range = '24h' | 'week' | 'older';
 type KindFilter = 'all' | 'completed' | 'added' | 'updated' | 'comment';
 const ALL = 'all';
 
@@ -43,8 +43,16 @@ export function ActivityPage() {
   return (
     <Gate>
       {({ snapshot, index: idx }) => {
-        const since = now.getTime() - (range === '24h' ? 1 : ACTIVITY_WINDOW_DAYS) * 24 * 60 * 60 * 1000;
-        const all = snapshot.activity.filter((e) => Date.parse(e.event_date) >= since).map((e) => describeActivity(e, snapshot, idx));
+        // Each tab is a slice of the log Todoist gave us: the last day, the last week, or what is older than that.
+        const day = 24 * 60 * 60 * 1000;
+        const from = now.getTime() - (range === '24h' ? 1 : ACTIVITY_WINDOW_DAYS) * day;
+        const to = range === 'older' ? now.getTime() - ACTIVITY_RECENT_DAYS * day : Infinity;
+        const inRange = (e: { event_date: string }) => {
+          const at = Date.parse(e.event_date);
+          return at >= from && at < to;
+        };
+        const all = snapshot.activity.filter(inRange).map((e) => describeActivity(e, snapshot, idx));
+        const olderCount = snapshot.activity.filter((e) => Date.parse(e.event_date) < now.getTime() - ACTIVITY_RECENT_DAYS * day).length;
 
         // Tally unique people and projects for filter dropdowns
         const peopleTally = new Map<string, { name: string; count: number }>();
@@ -78,7 +86,16 @@ export function ActivityPage() {
             ) : (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Tabs label="Time range" value={range} onChange={setRange} options={[{ value: '24h', label: 'Last 24 hours' }, { value: 'week', label: `Last ${ACTIVITY_WINDOW_DAYS} days` }]} />
+                  <Tabs
+                    label="Time range"
+                    value={range}
+                    onChange={setRange}
+                    options={[
+                      { value: '24h', label: 'Last 24 hours' },
+                      { value: 'week', label: `Last ${ACTIVITY_RECENT_DAYS} days` },
+                      { value: 'older', label: `${ACTIVITY_RECENT_DAYS}+ days`, count: olderCount },
+                    ]}
+                  />
                   <Tabs
                     label="Type"
                     value={kind}
@@ -103,7 +120,9 @@ export function ActivityPage() {
                 </div>
                 <div className="panel overflow-hidden">
                   {rows.length === 0 ? (
-                    <EmptyState icon={<History size={26} />} title="No activity in this period" />
+                    <EmptyState icon={<History size={26} />} title="No activity in this period">
+                      {range === 'older' ? `Todoist's log is kept here for ${ACTIVITY_WINDOW_DAYS} days, so this shows days 7 to ${ACTIVITY_WINDOW_DAYS} back.` : undefined}
+                    </EmptyState>
                   ) : (
                     <ActivityTable rows={rows} listKey={`${range}:${kind}:${person}:${project}`} now={now} onTask={(id) => index?.taskById.has(id) && openTask(id)} />
                   )}

@@ -28,7 +28,7 @@ interface Values {
 /** Why a date might be empty, in words, rather than a bare dash. */
 const EMPTY: Record<DateKind, string> = {
   cd: 'Not recorded',
-  idd: 'Set with the first due date',
+  idd: 'Entered once, then locked',
   dd: 'No due date',
 };
 

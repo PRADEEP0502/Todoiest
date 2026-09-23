@@ -114,7 +114,11 @@ export function createLiveSource(token: string): DataSource {
       onStep('activity');
       const windowStart = new Date(now.getTime() - ACTIVITY_WINDOW_DAYS * DAY);
       const newest = activity[0] ? new Date(activity[0].event_date) : null;
-      const since = newest && newest > windowStart ? newest : windowStart;
+      const oldest = activity.at(-1) ? new Date(activity.at(-1)!.event_date) : null;
+      // Only what is new — unless the window now reaches further back than what we hold, in which
+      // case the missing older days are fetched once.
+      const covered = oldest !== null && oldest <= new Date(windowStart.getTime() + DAY);
+      const since = newest && covered ? newest : windowStart;
       try {
         const fresh = await getActivity(client, since, signal);
         const byId = new Map(activity.map((e) => [e.id, e]));
