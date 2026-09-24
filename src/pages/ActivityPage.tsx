@@ -52,7 +52,6 @@ export function ActivityPage() {
           return at >= from && at < to;
         };
         const all = snapshot.activity.filter(inRange).map((e) => describeActivity(e, snapshot, idx));
-        const olderCount = snapshot.activity.filter((e) => Date.parse(e.event_date) < now.getTime() - ACTIVITY_RECENT_DAYS * day).length;
 
         // Tally unique people and projects for filter dropdowns
         const peopleTally = new Map<string, { name: string; count: number }>();
@@ -93,7 +92,7 @@ export function ActivityPage() {
                     options={[
                       { value: '24h', label: 'Last 24 hours' },
                       { value: 'week', label: `Last ${ACTIVITY_RECENT_DAYS} days` },
-                      { value: 'older', label: `${ACTIVITY_RECENT_DAYS}+ days`, count: olderCount },
+                      { value: 'older', label: `${ACTIVITY_RECENT_DAYS}+ days` },
                     ]}
                   />
                   <Tabs
