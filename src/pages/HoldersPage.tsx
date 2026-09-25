@@ -1,23 +1,24 @@
-import { AlarmClock, CalendarCheck, CalendarClock, CalendarOff, CalendarPlus, CircleCheckBig, Clock, FolderKanban, Hourglass, ListChecks, ListTree, LockKeyhole, MessageSquare, Search, Siren, Timer, TriangleAlert, Users, X } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { FolderKanban, ListTree, MessageSquare, Search, Users, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
 import { SearchField } from '../components/common/SearchField';
 import { SearchSelect } from '../components/common/SearchSelect';
-import { Avatar, EmptyState, MetricStrip, Notice, PageHeader, Panel, ProjectDot, ShowMore } from '../components/common/ui';
+import { Avatar, EmptyState, Notice, PageHeader, Panel, ProjectDot, ShowMore } from '../components/common/ui';
 import { CompletedList } from '../components/tasks/CompletedList';
 import { GroupedTasks } from '../components/tasks/GroupedTasks';
+import { ScopeKpis, scopeLists, VIEW_TITLE } from '../components/tasks/ScopeKpis';
 import { useNow } from '../hooks/useNow';
 import { usePaged } from '../hooks/usePaged';
 import { href, navigate, type HolderView } from '../hooks/useRoute';
-import { formatShortDate, formatTime, startOfMonth, toDateKey } from '../lib/dates';
+import { formatShortDate, formatTime, startOfMonth } from '../lib/dates';
 import { taskPath, type WorkspaceIndex } from '../lib/hierarchy';
 import { filterTasks } from '../lib/search';
 import { plainText } from '../lib/text';
 import { useUi } from '../store/ui';
-import { CATEGORIES, categoryOf, hasHolderData, holderCounts, isMissingDate, shortCategoryNote, UNASSIGNED, type CategoryId } from '../lib/metrics';
+import { hasHolderData, holderCounts, UNASSIGNED } from '../lib/metrics';
 import { useWorkspace } from '../store/workspace';
-import { byPriorityThenTime, completedSince, isDueToday, isOverdue } from '../lib/stats';
+import { byPriorityThenTime, completedSince } from '../lib/stats';
 import type { TodoistComment, TodoistTask, WorkspaceSnapshot } from '../types/todoist';
 
 const holderName = (snapshot: WorkspaceSnapshot, id: string) => (id === UNASSIGNED ? 'No holder' : (snapshot.people[id]?.name ?? 'Unknown person'));
@@ -182,30 +183,6 @@ function Num({ v, danger, to }: { v: number; danger?: boolean; to: string }) {
   );
 }
 
-const VIEW_TITLE: Record<HolderView, string> = {
-  active: 'All active tasks',
-  overdue: 'Overdue tasks',
-  today: 'Due today',
-  'no-due': 'Tasks with no due date',
-  completed: 'Completed this month',
-  comments: 'Comments written',
-  'no-cd': 'Tasks without a Creation Date (CD)',
-  'no-idd': 'Tasks without an Issue Date (IDD)',
-  'no-dd': 'Tasks without a Due Date (DD)',
-  a5: 'Overdue · A-5',
-  a10: 'Overdue · A-10',
-  a30: 'Overdue · A-30',
-  a30plus: 'Overdue · A30+',
-};
-
-/** Icons escalate with lateness, as on the dashboard: a clock, a timer, an hourglass, then a siren. */
-const CATEGORY_ICON: Record<CategoryId, ReactNode> = {
-  a5: <Clock />,
-  a10: <Timer />,
-  a30: <Hourglass />,
-  a30plus: <Siren />,
-};
-
 interface HolderPageProps {
   holderId: string;
   show: HolderView;
@@ -242,7 +219,6 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
     <Gate>
       {({ snapshot, index }) => {
         const name = holderName(snapshot, holderId);
-        const todayKey = toDateKey(now);
         const isHolder = (t: TodoistTask) => (t.responsible_uid ?? UNASSIGNED) === holderId;
         const section = sectionId ? index.sectionById.get(sectionId) : undefined;
         // A section implies its project, so a section link alone is enough.
@@ -263,18 +239,8 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                 return !!task && inScope(task);
               });
 
-        const lists: Record<Exclude<HolderView, 'completed' | 'comments'>, TodoistTask[]> = {
-          active: tasks,
-          overdue: tasks.filter((t) => isOverdue(t, todayKey)),
-          today: tasks.filter((t) => isDueToday(t, todayKey)),
-          'no-due': tasks.filter((t) => isMissingDate('dd', t, index)),
-          // Nothing written in Todoist: no CD or IDD in the title, no due date.
-          'no-cd': tasks.filter((t) => isMissingDate('cd', t, index)),
-          'no-idd': tasks.filter((t) => isMissingDate('idd', t, index)),
-          'no-dd': tasks.filter((t) => isMissingDate('dd', t, index)),
-          // Overdue categories, for this person's tasks in the chosen project/section only.
-          ...(Object.fromEntries(CATEGORIES.map((c) => [c.id, tasks.filter((t) => categoryOf(t, rules, index, todayKey) === c.id)])) as Record<CategoryId, TodoistTask[]>),
-        };
+        // Every card and every list of this person, in the chosen project/section only.
+        const lists = scopeLists(tasks, index, rules, now);
 
         // Bars: the person's projects, and the sections of the chosen project (or of all of them).
         const byProject = new Map<string, number>();
@@ -330,57 +296,15 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
             />
 
             <div className="space-y-4">
-              <MetricStrip
-                label={`${name}: totals`}
-                size="md"
-                columns={holderId === UNASSIGNED ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'}
-                items={[
-                  { label: 'Active Tasks', icon: <ListChecks />, value: lists.active.length, ...card('active') },
-                  { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: completed.length, note: 'this month', ...card('completed') },
-                  { label: 'Overdue', icon: <AlarmClock />, value: lists.overdue.length, tone: 'danger', ...card('overdue') },
-                  { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: lists.today.length, ...card('today') },
-                  { label: 'No Due Date', icon: <CalendarOff />, iconTone: 'warn', value: lists['no-due'].length, ...card('no-due') },
-                  ...(holderId === UNASSIGNED
-                    ? []
-                    : [{ label: 'Comments', icon: <MessageSquare />, iconTone: 'info' as const, value: comments.length, note: 'written', ...card('comments') }]),
-                ]}
+              <ScopeKpis
+                name={name}
+                lists={lists}
+                completed={completed.length}
+                comments={holderId === UNASSIGNED ? null : comments.length}
+                rules={rules}
+                card={card}
+                scopeNote={project ? ` in ${project.name}` : undefined}
               />
-
-              {tasks.length > 0 && (
-                <MetricStrip
-                  label={`${name}: tasks missing CD, IDD or DD`}
-                  size="md"
-                  columns="grid-cols-1 sm:grid-cols-3"
-                  items={[
-                    { label: 'No CD', icon: <CalendarPlus />, iconTone: 'info', value: lists['no-cd'].length, note: 'no Creation Date', ...card('no-cd') },
-                    { label: 'No IDD', icon: <LockKeyhole />, iconTone: 'warn', value: lists['no-idd'].length, note: 'no Issue Date', ...card('no-idd') },
-                    { label: 'No DD', icon: <CalendarClock />, iconTone: 'good', value: lists['no-dd'].length, note: 'no Due Date', ...card('no-dd') },
-                  ]}
-                />
-              )}
-
-              {tasks.length > 0 && (
-                <div>
-                  <h2 className="mb-2.5 flex items-center gap-2 text-[13.5px] font-semibold text-ink-2">
-                    <TriangleAlert size={15} className="text-ink-3" aria-hidden />
-                    Overdue categories
-                    <span className="font-normal text-ink-3">· {lists.overdue.length} late{project ? ` in ${project.name}` : ''}</span>
-                  </h2>
-                  <MetricStrip
-                    label={`${name}: overdue categories`}
-                    size="md"
-                    columns="grid-cols-2 lg:grid-cols-4"
-                    items={CATEGORIES.map((c) => ({
-                      label: c.label,
-                      icon: CATEGORY_ICON[c.id],
-                      value: lists[c.id].length,
-                      note: shortCategoryNote(c.id, rules),
-                      tone: 'danger' as const,
-                      ...card(c.id),
-                    }))}
-                  />
-                </div>
-              )}
 
               {allTasks.length > 0 && (
                 <div className="grid gap-4 lg:grid-cols-2">

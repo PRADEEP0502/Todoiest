@@ -150,8 +150,8 @@ export function MetricStrip({ items, columns, size = 'lg', label }: { items: Met
           <>
             <span className="flex min-w-0 items-start gap-2 pr-4 sm:gap-2.5">
               {m.icon && <IconBadge icon={m.icon} tone={tone} size={lg ? 'md' : 'sm'} />}
-              {/* Wraps rather than clipping: no label is ever half-shown on a narrow screen. */}
-              <span className={`min-w-0 break-words font-semibold leading-tight text-ink [hyphens:none] ${lg ? 'text-[13.5px]' : 'text-[13px]'}`}>{m.label}</span>
+              {/* Wraps between words rather than clipping, so "Completed" never breaks in half. */}
+              <span className={`min-w-0 break-normal font-semibold leading-tight text-ink [hyphens:none] ${lg ? 'text-[13.5px]' : 'text-[13px]'}`}>{m.label}</span>
             </span>
             {/* Fixed-height value row, so a card that says "Set up" is exactly as tall as one with a number. */}
             <span className={`flex items-center ${lg ? 'mt-3 h-10' : 'mt-2.5 h-8'}`}>

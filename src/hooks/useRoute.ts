@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** What a holder's page lists: their tasks by state, what they completed, or what they wrote. */
+/** What a holder's or a project's page lists: tasks by state, what was completed, or what was written. */
 export const HOLDER_VIEWS = ['active', 'overdue', 'today', 'no-due', 'completed', 'comments', 'no-cd', 'no-idd', 'no-dd', 'a5', 'a10', 'a30', 'a30plus'] as const;
 export type HolderView = (typeof HOLDER_VIEWS)[number];
 
@@ -16,7 +16,7 @@ export type Route =
   | { name: 'today' }
   | { name: 'upcoming' }
   | { name: 'projects' }
-  | { name: 'project'; projectId: string; sectionId: string | null; taskId: string | null }
+  | { name: 'project'; projectId: string; sectionId: string | null; taskId: string | null; show: HolderView | null }
   | { name: 'overdue'; category: string | null }
   | { name: 'holders' }
   | { name: 'holder'; holderId: string; show: HolderView; projectId: string | null; sectionId: string | null }
@@ -46,7 +46,14 @@ export function parseHash(hash: string): Route {
       return { name: parts[0] };
     case 'projects':
       return parts[1]
-        ? { name: 'project', projectId: parts[1], sectionId: query.get('section'), taskId: query.get('task') }
+        ? {
+            name: 'project',
+            projectId: parts[1],
+            sectionId: query.get('section'),
+            taskId: query.get('task'),
+            // A KPI card was clicked: the page lists that slice of the project instead of its sections.
+            show: (HOLDER_VIEWS as readonly string[]).includes(query.get('show') ?? '') ? (query.get('show') as HolderView) : null,
+          }
         : { name: 'projects' };
     case 'overdue':
       return { name: 'overdue', category: query.get('category') };
@@ -75,11 +82,12 @@ export const href = {
   today: () => '#/today',
   upcoming: () => '#/upcoming',
   projects: () => '#/projects',
-  /** Optionally points at a section or task inside the project, which the page reveals. */
-  project: (projectId: string, focus: { sectionId?: string | null; taskId?: string | null } = {}) => {
+  /** Optionally points at a section or task inside the project, or at one of its KPI lists. */
+  project: (projectId: string, focus: { sectionId?: string | null; taskId?: string | null; show?: HolderView | null } = {}) => {
     const query = new URLSearchParams();
     if (focus.sectionId) query.set('section', focus.sectionId);
     if (focus.taskId) query.set('task', focus.taskId);
+    if (focus.show) query.set('show', focus.show);
     const qs = query.toString();
     return `#/projects/${enc(projectId)}${qs ? `?${qs}` : ''}`;
   },
