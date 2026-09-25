@@ -90,12 +90,31 @@ export interface TodoistLabel {
 }
 
 /** A task comment (called a "note" in the Sync API). */
+/** A file posted with a comment: a photo of a machine, a quotation, a drawing. */
+export interface TodoistAttachment {
+  name: string;
+  /** Media type Todoist recorded, e.g. "image/jpeg"; null when it did not say. */
+  type: string | null;
+  /** The file itself. Todoist's link, used as given — no token is ever added to it. */
+  url: string;
+  /** Full-size picture, for files Todoist knows are images. */
+  image: string | null;
+  /** Small picture Todoist prepared, cheap to load in a preview. */
+  thumbnail: string | null;
+  width: number | null;
+  height: number | null;
+  /** Size in bytes, when Todoist reported it. */
+  size: number | null;
+}
+
 export interface TodoistComment {
   id: string;
   task_id: string;
   posted_uid: string | null;
   content: string;
   posted_at: string | null;
+  /** The file posted with this comment, if any. */
+  attachment?: TodoistAttachment | null;
   is_deleted?: boolean;
 }
 

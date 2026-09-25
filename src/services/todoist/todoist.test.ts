@@ -85,8 +85,28 @@ describe('live Todoist source (API v1)', () => {
             sections: [{ id: 's1', project_id: 'p2', name: 'Hiring', section_order: 1 }],
             items: [apiTask('t1', { responsible_uid: 'u9' }), apiTask('t2', { project_id: 'p2', section_id: 's1', priority: 4 })],
             notes: [
-              { id: 'n1', item_id: 't2', posted_uid: 'u9', content: 'Two agencies shortlisted', posted_at: '2026-09-14T08:00:00Z' },
+              {
+                id: 'n1',
+                item_id: 't2',
+                posted_uid: 'u9',
+                content: 'Two agencies shortlisted',
+                posted_at: '2026-09-14T08:00:00Z',
+                file_attachment: {
+                  file_name: 'image.jpg',
+                  file_type: 'image/jpeg',
+                  file_url: 'https://files.todoist.com/user_upload/v2/1/file.jpg',
+                  file_size: 109_724,
+                  image: 'https://files.todoist.com/user_upload/v2/1/file.jpg',
+                  image_width: 599,
+                  image_height: 1280,
+                  tn_m: ['https://image-resize.todoist.com/m.jpg', 288, 288],
+                  upload_state: 'completed',
+                },
+              },
               { id: 'n2', item_id: 't2', posted_uid: 'u1', content: 'ok', posted_at: '2026-09-14T09:00:00Z' },
+              // Still uploading, and one with no link at all: neither becomes an attachment.
+              { id: 'n3', item_id: 't1', posted_uid: 'u1', content: 'uploading', posted_at: '2026-09-14T09:05:00Z', file_attachment: { file_name: 'wait.jpg', file_url: 'https://files.todoist.com/x.jpg', upload_state: 'pending' } },
+              { id: 'n4', item_id: 't1', posted_uid: 'u1', content: 'no link', posted_at: '2026-09-14T09:06:00Z', file_attachment: { file_name: 'gone.jpg', file_type: 'image/jpeg' } },
             ],
             labels: [{ id: 'l1', name: 'urgent', color: 'red', order: 1 }],
             collaborators: [{ id: 'u9', full_name: 'Kavya', email: 'k@example.com' }],
@@ -145,7 +165,25 @@ describe('live Todoist source (API v1)', () => {
     expect(syncCount).toBe(2);
     expect(next.projects.find((p) => p.id === 'p2')!.name).toBe('MANPOWER (renamed)');
     expect(next.tasks.map((t) => t.id).sort()).toEqual(['t2', 't3']);
-    expect(next.comments.map((c) => c.id)).toEqual(['n1']);
+    expect(next.comments.map((c) => c.id)).toEqual(['n1', 'n3', 'n4']);
+    // A comment's file becomes the task's attachment, with Todoist's own links kept as given.
+    const photo = snapshot.comments.find((c) => c.id === 'n1')!.attachment!;
+    expect(photo).toMatchObject({
+      name: 'image.jpg',
+      type: 'image/jpeg',
+      url: 'https://files.todoist.com/user_upload/v2/1/file.jpg',
+      thumbnail: 'https://image-resize.todoist.com/m.jpg',
+      width: 599,
+      height: 1280,
+      size: 109_724,
+    });
+    // No token is ever put into a file link.
+    expect(JSON.stringify(photo)).not.toContain('secret-token');
+    expect(snapshot.comments.find((c) => c.id === 'n2')!.attachment).toBeNull();
+    // A file still uploading, or one without a link, is left out.
+    expect(snapshot.comments.find((c) => c.id === 'n3')!.attachment).toBeNull();
+    expect(snapshot.comments.find((c) => c.id === 'n4')!.attachment).toBeNull();
+
     expect(next.tasks.find((t) => t.id === 't2')!.note_count).toBe(1);
     expect(next.sections).toHaveLength(1);
   });

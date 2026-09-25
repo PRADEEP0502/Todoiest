@@ -1,5 +1,6 @@
 import type {
   Person,
+  TodoistAttachment,
   TodoistComment,
   TodoistLabel,
   TodoistProject,
@@ -14,7 +15,44 @@ import type { TodoistClient } from './client';
 // sections, tasks, task comments, labels and collaborators. The first call is a full sync
 // (`sync_token=*`); later calls send the previous token and receive only what changed.
 
+/**
+ * A comment's file, as the app uses it. Anything still uploading, deleted or without a link is
+ * dropped, so the UI never has a half-file to render.
+ */
+function toAttachment(raw: RawFileAttachment | null | undefined): TodoistAttachment | null {
+  if (!raw) return null;
+  const url = raw.file_url ?? raw.image ?? null;
+  if (!url || (raw.upload_state && raw.upload_state !== 'completed')) return null;
+  return {
+    name: raw.file_name?.trim() || 'Attachment',
+    type: raw.file_type ?? null,
+    url,
+    image: raw.image ?? null,
+    // The medium thumbnail is the one shown; it keeps a long comment thread light.
+    thumbnail: raw.tn_m?.[0] ?? raw.tn_l?.[0] ?? raw.tn_s?.[0] ?? null,
+    width: raw.image_width ?? null,
+    height: raw.image_height ?? null,
+    size: raw.file_size ?? null,
+  };
+}
+
 export const SYNC_RESOURCES = ['user', 'workspaces', 'projects', 'sections', 'items', 'notes', 'labels', 'collaborators'] as const;
+
+/** Todoist's own shape for a file on a comment; every field is optional in practice. */
+interface RawFileAttachment {
+  file_name?: string | null;
+  file_type?: string | null;
+  file_url?: string | null;
+  file_size?: number | null;
+  image?: string | null;
+  image_width?: number | null;
+  image_height?: number | null;
+  /** Thumbnails: [url, width, height], small / medium / large. */
+  tn_s?: [string, number, number] | null;
+  tn_m?: [string, number, number] | null;
+  tn_l?: [string, number, number] | null;
+  upload_state?: string | null;
+}
 
 interface RawNote {
   id: string;
@@ -22,6 +60,7 @@ interface RawNote {
   posted_uid: string | number | null;
   content: string;
   posted_at: string | null;
+  file_attachment?: RawFileAttachment | null;
   is_deleted?: boolean;
 }
 
@@ -105,6 +144,7 @@ export function applySync(previous: SyncState | null, response: SyncResponse): S
       posted_uid: note.posted_uid == null ? null : String(note.posted_uid),
       content: note.content,
       posted_at: note.posted_at,
+      attachment: toAttachment(note.file_attachment),
       is_deleted: note.is_deleted,
     })),
     full,

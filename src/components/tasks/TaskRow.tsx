@@ -1,9 +1,10 @@
-import { Check, Flag, GitBranch, MessageSquare, Tag, User } from 'lucide-react';
+import { Check, Flag, GitBranch, MessageSquare, Paperclip, Tag, User } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useNow } from '../../hooks/useNow';
 import { describeDue, dueTime } from '../../lib/dates';
 import { PRIORITY_STYLE, toUiPriority } from '../../lib/priority';
 import { isRoutineTask } from '../../lib/routine';
+import { attachmentCount } from '../../lib/attachments';
 import { taskDates } from '../../lib/taskDates';
 import { isUncompletable, plainText } from '../../lib/text';
 import { useUi } from '../../store/ui';
@@ -49,6 +50,14 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
       <span key="p" className={`inline-flex items-center gap-0.5 font-medium ${style.text}`}>
         <Flag size={11} strokeWidth={2.5} />
         {style.label}
+      </span>,
+    );
+  const fileCount = snapshot ? attachmentCount(snapshot.comments, task.id) : 0;
+  if (fileCount > 0)
+    meta.push(
+      <span key="f" className="inline-flex items-center gap-1" title={`${fileCount} attachment${fileCount > 1 ? 's' : ''}`}>
+        <Paperclip size={11} />
+        {fileCount}
       </span>,
     );
   if (task.note_count > 0)

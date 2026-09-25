@@ -1,4 +1,5 @@
 import type {
+  TodoistAttachment,
   ActivityEvent,
   ApiPriority,
   Person,
@@ -32,8 +33,8 @@ interface TaskSpec {
   labels?: string[];
   who?: Who;
   description?: string;
-  /** Comments: [author, text, hours ago]. */
-  comments?: [Who, string, number][];
+  /** Comments: [author, text, hours ago, file attached with it]. */
+  comments?: [Who, string, number, DemoFile?][];
   sub?: TaskSpec[];
 }
 
@@ -61,6 +62,23 @@ const PEOPLE: Person[] = [
   { id: 'u-arun', name: 'Arun M', email: 'arun@example.com' },
   { id: 'u-meena', name: 'Meena R', email: 'meena@example.com' },
 ];
+
+/** Files for the demo: a drawn photo, a document, and a link that no longer works. */
+type DemoFile = 'photo' | 'photo2' | 'document' | 'expired';
+
+/** A small picture drawn here rather than fetched, so Demo Mode needs no network. */
+const drawing = (bg: string, fg: string, text: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320"><rect width="480" height="320" fill="${bg}"/><circle cx="360" cy="90" r="46" fill="${fg}" opacity="0.35"/><rect x="40" y="200" width="400" height="70" rx="12" fill="${fg}" opacity="0.2"/><text x="40" y="120" font-family="Segoe UI, sans-serif" font-size="34" fill="${fg}">${text}</text></svg>`,
+  )}`;
+
+const DEMO_FILES: Record<DemoFile, TodoistAttachment> = {
+  photo: { name: 'pump-leak.jpg', type: 'image/jpeg', url: drawing('#e8f1ec', '#1a7f53', 'Pump leak'), image: drawing('#e8f1ec', '#1a7f53', 'Pump leak'), thumbnail: null, width: 480, height: 320, size: 184_320 },
+  photo2: { name: 'panel-board.jpg', type: 'image/jpeg', url: drawing('#f3eee6', '#a2601f', 'Panel board'), image: drawing('#f3eee6', '#a2601f', 'Panel board'), thumbnail: null, width: 480, height: 320, size: 231_400 },
+  document: { name: 'quotation-2026.pdf', type: 'application/pdf', url: 'https://files.todoist.com/demo/quotation-2026.pdf', image: null, thumbnail: null, width: null, height: null, size: 412_000 },
+  // Points nowhere on purpose: the preview must say so instead of leaving a blank box.
+  expired: { name: 'old-photo.jpg', type: 'image/jpeg', url: 'https://files.todoist.com/demo/expired-attachment.jpg', image: 'https://files.todoist.com/demo/expired-attachment.jpg', thumbnail: null, width: null, height: null, size: 90_000 },
+};
 
 const PROJECTS: ProjectSpec[] = [
   {
@@ -182,7 +200,7 @@ const PROJECTS: ProjectSpec[] = [
       [
         'Site Visits',
         [
-          { content: 'Inspect RV plant safety compliance', dates: [20, 17], due: 0, time: '10:30', p: 1, labels: ['urgent'], who: 'u-arun', comments: [['u-arun', 'Fire extinguishers due for refill.', 2]] },
+          { content: 'Inspect RV plant safety compliance', dates: [20, 17], due: 0, time: '10:30', p: 1, labels: ['urgent'], who: 'u-arun', comments: [['u-arun', 'Fire extinguishers due for refill.', 2, 'photo'], ['u-arun', 'Panel board also needs a check.', 1, 'photo2']] },
           { content: 'Prepare checklist for Coimbatore unit visit', dates: [11, 9], due: 1, p: 2, who: 'u-arun' },
           { content: 'Review last quarter visit reports', due: -8, who: 'u-arun' },
         ],
@@ -190,7 +208,7 @@ const PROJECTS: ProjectSpec[] = [
       [
         'Client Follow-ups',
         [
-          { content: 'Send revised quotation to Sri Lakshmi Traders', dates: [52, 44], due: -2, p: 1, who: 'u-pradeep', comments: [['u-md', 'Please close this by today.', 4]] },
+          { content: 'Send revised quotation to Sri Lakshmi Traders', dates: [52, 44], due: -2, p: 1, who: 'u-pradeep', comments: [['u-md', 'Please close this by today.', 4, 'document']] },
           { content: 'Follow up on pending PO from Apex Motors', dates: [15, 14], due: 0, p: 2, labels: ['call'], who: 'u-kavya' },
           { content: 'Schedule review call with dealer network', due: 3, p: 3 },
         ],
@@ -213,7 +231,7 @@ const PROJECTS: ProjectSpec[] = [
       [
         'Hiring Pipeline',
         [
-          { content: 'Manpower requirements sources', dates: [41, 38], due: 1, p: 1, who: 'u-kavya', comments: [['u-kavya', 'Two agencies shortlisted.', 22], ['u-md', 'Also check campus hiring.', 9]] },
+          { content: 'Manpower requirements sources', dates: [41, 38], due: 1, p: 1, who: 'u-kavya', comments: [['u-kavya', 'Two agencies shortlisted.', 22, 'expired'], ['u-md', 'Also check campus hiring.', 9]] },
           { content: 'Shortlist candidates for Plant Supervisor', dates: [27, 22], due: 0, p: 2, labels: ['review'], who: 'u-kavya' },
           { content: 'Approve job description for Sales Executive', dates: [33, 30], due: -1, p: 2, who: 'u-md' },
           { content: 'Coordinate with placement agencies', due: -13, who: 'u-kavya' },
@@ -432,10 +450,10 @@ export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
     if (!parentId && order === 1) {
       log({ object_type: 'item', object_id: id, event_type: 'updated', event_date: updatedAt, parent_project_id: projectId, parent_item_id: null, initiator_id: spec.who ?? 'u-pradeep', extra_data: { content: spec.content } });
     }
-    for (const [author, text, hoursAgo] of spec.comments ?? []) {
+    for (const [author, text, hoursAgo, file] of spec.comments ?? []) {
       const postedAt = at(hoursAgo * HOUR);
       const commentId = `demo-comment-${++commentSeq}`;
-      comments.push({ id: commentId, task_id: id, posted_uid: author, content: text, posted_at: postedAt });
+      comments.push({ id: commentId, task_id: id, posted_uid: author, content: text, posted_at: postedAt, attachment: file ? DEMO_FILES[file] : null });
       log({ object_type: 'note', object_id: commentId, event_type: 'added', event_date: postedAt, parent_project_id: projectId, parent_item_id: id, initiator_id: author, extra_data: { content: text, parent_item_content: spec.content } });
     }
     spec.sub?.forEach((child, i) => makeTask(child, projectId, sectionId, id, i + 1, idle));

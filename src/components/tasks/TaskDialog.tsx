@@ -13,6 +13,8 @@ import { useWorkspace, type TaskForm } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { Modal } from '../common/Modal';
 import { TaskDateCards } from './TaskDates';
+import { TaskAttachments } from './TaskAttachments';
+import { taskAttachments } from '../../lib/attachments';
 import { Avatar, ProjectDot } from '../common/ui';
 import { SearchSelect } from '../common/SearchSelect';
 
@@ -346,6 +348,8 @@ function TaskComments({ taskId }: { taskId: string }) {
   const now = useMemo(() => new Date(), []);
   if (!snapshot) return null;
   const comments = snapshot.comments.filter((c) => c.task_id === taskId).sort((a, b) => (a.posted_at ?? '').localeCompare(b.posted_at ?? ''));
+  // Todoist keeps a task's files on its comments; a task with none shows no attachment area at all.
+  const files = taskAttachments(snapshot.comments, taskId);
 
   const send = async () => {
     if (!draft.trim() || sending) return;
@@ -356,7 +360,9 @@ function TaskComments({ taskId }: { taskId: string }) {
   };
 
   return (
-    <section className="mt-4 border-t border-line pt-3" aria-label="Comments">
+    <>
+      <TaskAttachments files={files} />
+      <section className="mt-4 border-t border-line pt-3" aria-label="Comments">
       <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
         <MessageSquare size={13} /> Comments <span className="font-normal text-ink-3">{comments.length}</span>
       </h3>
@@ -395,7 +401,8 @@ function TaskComments({ taskId }: { taskId: string }) {
         <button type="button" className="btn-secondary h-9" onClick={send} disabled={!draft.trim() || sending}>
           <Send size={14} /> {sending ? 'Posting…' : 'Post'}
         </button>
-      </div>
-    </section>
+        </div>
+      </section>
+    </>
   );
 }
