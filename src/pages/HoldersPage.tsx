@@ -56,8 +56,7 @@ export function HoldersPage() {
             <PageHeader title="Holder Wise" subtitle={`${people.length} people hold active tasks`} />
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <SearchField className="w-full sm:w-72" value={query} onChange={setQuery} label="Search holders" placeholder="Search holders by name or email…" />
-                <label className="text-[13px] text-ink-2 sm:ml-2" htmlFor="holder-pick">or open a person</label>
+                <label className="text-[13px] text-ink-2" htmlFor="holder-pick">Open a person</label>
                 <SearchSelect
                   id="holder-pick"
                   className="w-auto min-w-60"
@@ -72,6 +71,8 @@ export function HoldersPage() {
                     icon: <Avatar id={id} name={holderName(snapshot, id)} size={18} />,
                   }))}
                 />
+                <span className="text-[13px] text-ink-2 sm:ml-2">or narrow the list</span>
+                <SearchField className="w-full sm:w-72" value={query} onChange={setQuery} label="Search holders" placeholder="Search holders by name or email…" />
               </div>
 
               <Panel title="Holder-wise Active Tasks" icon={<Users />} iconTone="info">
