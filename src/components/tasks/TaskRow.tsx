@@ -1,4 +1,4 @@
-import { Check, Flag, GitBranch, MessageSquare, Paperclip, Tag, User } from 'lucide-react';
+import { Check, Flag, GitBranch, MessageSquare, Paperclip, Plus, Tag, User } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useNow } from '../../hooks/useNow';
 import { describeDue, dueTime } from '../../lib/dates';
@@ -29,7 +29,7 @@ const TONE_CLASS = { overdue: 'text-p1', today: 'text-accent', soon: 'text-ink-2
 
 export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = false, onToggle, hideDue }: TaskRowProps) {
   const { completeTask, snapshot, index } = useWorkspace();
-  const { openTask } = useUi();
+  const { openTask, openNewTask } = useUi();
   const now = useNow();
   const [checking, setChecking] = useState(false);
 
@@ -140,6 +140,17 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
             {path && path.length > 0 && <span className="truncate">{path.join(' › ')}</span>}
           </span>
         )}
+      </button>
+
+      {/* Adds a subtask under this task, from wherever the task is listed. */}
+      <button
+        type="button"
+        onClick={() => openNewTask({ parentId: task.id })}
+        aria-label={`Add subtask to ${plainText(dates.title)}`}
+        title="Add subtask"
+        className="icon-btn mt-[1px] h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-70 hover:!opacity-100 focus:opacity-100 max-sm:opacity-60"
+      >
+        <Plus size={15} />
       </button>
     </div>
   );

@@ -64,6 +64,13 @@ export interface TaskForm {
   description: string;
   projectId: string;
   sectionId: string | null;
+  /**
+   * The task this one sits under in Todoist, set when it is created as a subtask. Todoist keeps a
+   * subtask in its parent's project, so it is never sent together with a project or a section.
+   */
+  parentId?: string | null;
+  /** Who holds it: a collaborator's id, or null for nobody. A subtask may differ from its parent. */
+  assigneeId?: string | null;
   /** `YYYY-MM-DD` or null for no date. Editable at any time. */
   dueDate: string | null;
   /**
@@ -312,8 +319,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             // The title reaching Todoist already carries the dates: "15.08.26, Task, 18.08.26".
             content: titleForNewTask(form.content, new Date(), form.idd, isRoutineForm(form)),
             description: form.description.trim() || undefined,
-            project_id: form.projectId,
-            section_id: form.sectionId,
+            // A subtask belongs to its parent; Todoist places it in the parent's project itself.
+            project_id: form.parentId ? undefined : form.projectId,
+            section_id: form.parentId ? undefined : form.sectionId,
+            parent_id: form.parentId ?? undefined,
+            assignee_id: form.assigneeId ?? undefined,
             priority: toApiPriority(form.priority),
             due_date: form.dueDate ?? undefined,
           }),
@@ -348,6 +358,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (form.dueDate) changes.due_date = form.dueDate;
         else changes.due_string = 'no date';
       }
+      // Handing a task to someone else is an edit, never a move: it stays in its project.
+      if ((form.assigneeId ?? null) !== (task.responsible_uid ?? null)) changes.assignee_id = form.assigneeId ?? null;
       const moved = form.projectId !== task.project_id || form.sectionId !== (task.section_id ?? null);
 
       try {

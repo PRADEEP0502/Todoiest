@@ -11,6 +11,8 @@ export interface NewTaskDefaults {
   projectId?: string;
   sectionId?: string | null;
   dueDate?: string | null;
+  /** Todoist id of the task this one goes under, for "Add subtask". */
+  parentId?: string | null;
 }
 
 export type TaskDialogState = { kind: 'closed' } | { kind: 'edit'; taskId: string } | { kind: 'create'; defaults: NewTaskDefaults };

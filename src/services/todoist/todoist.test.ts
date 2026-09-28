@@ -213,7 +213,12 @@ describe('live Todoist source (API v1)', () => {
     const source = createLiveSource('tok');
 
     await source.createTask({ content: 'Call vendor', project_id: 'p1', section_id: 's1', priority: 4, due_date: '2026-09-15' });
+    // A subtask carries its parent instead of a project: Todoist keeps it where the parent is.
+    await source.createTask({ content: 'Order the seal', parent_id: 't1', assignee_id: 'u9', priority: 4 });
     await source.updateTask('t1', { content: 'Renamed', due_string: 'no date' });
+    // Handing a task to someone else, and then to nobody: Todoist takes assignee_id either way.
+    await source.updateTask('t1', { assignee_id: 'u9' });
+    await source.updateTask('t1', { assignee_id: null });
     await source.moveTask('t1', { project_id: 'p1', section_id: 's2' });
     await source.moveTask('t1', { project_id: 'p3', section_id: null });
     await source.completeTask('t1');
@@ -223,6 +228,9 @@ describe('live Todoist source (API v1)', () => {
 
     expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
       'POST /api/v1/tasks',
+      'POST /api/v1/tasks',
+      'POST /api/v1/tasks/t1',
+      'POST /api/v1/tasks/t1',
       'POST /api/v1/tasks/t1',
       'POST /api/v1/tasks/t1/move',
       'POST /api/v1/tasks/t1/move',
@@ -232,10 +240,13 @@ describe('live Todoist source (API v1)', () => {
       'POST /api/v1/comments',
     ]);
     expect(calls[0].body).toEqual({ content: 'Call vendor', project_id: 'p1', section_id: 's1', priority: 4, due_date: '2026-09-15' });
-    expect(calls[1].body).toEqual({ content: 'Renamed', due_string: 'no date' });
-    expect(calls[2].body).toEqual({ section_id: 's2' });
-    expect(calls[3].body).toEqual({ project_id: 'p3' });
-    expect(calls[7].body).toEqual({ task_id: 't1', content: 'Done by Friday' });
+    expect(calls[1].body).toEqual({ content: 'Order the seal', parent_id: 't1', assignee_id: 'u9', priority: 4 });
+    expect(calls[2].body).toEqual({ content: 'Renamed', due_string: 'no date' });
+    expect(calls[3].body).toEqual({ assignee_id: 'u9' });
+    expect(calls[4].body).toEqual({ assignee_id: null });
+    expect(calls[5].body).toEqual({ section_id: 's2' });
+    expect(calls[6].body).toEqual({ project_id: 'p3' });
+    expect(calls[10].body).toEqual({ task_id: 't1', content: 'Done by Friday' });
     expect(comment).toMatchObject({ id: 'c9', task_id: 't1', content: 'Done by Friday' });
   });
 

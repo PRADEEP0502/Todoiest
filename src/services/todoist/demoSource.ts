@@ -72,19 +72,21 @@ export function createDemoSource(): DataSource {
 
     async createTask(input) {
       await wait(120);
-      const projectId = input.project_id ?? state.user.inbox_project_id ?? state.projects[0].id;
+      // Todoist keeps a subtask wherever its parent is, whatever the request says.
+      const parent = input.parent_id ? state.tasks.find((t) => t.id === input.parent_id) : undefined;
+      const projectId = parent?.project_id ?? input.project_id ?? state.user.inbox_project_id ?? state.projects[0].id;
       const now = new Date().toISOString();
       const task: TodoistTask = {
         id: `demo-new-${++seq}`,
         project_id: projectId,
-        section_id: input.section_id ?? null,
+        section_id: parent ? parent.section_id : (input.section_id ?? null),
         parent_id: input.parent_id ?? null,
         content: input.content,
         description: input.description ?? '',
         priority: input.priority ?? 1,
         due: input.due_date ? { date: input.due_date, string: '', is_recurring: false } : null,
         labels: input.labels ?? [],
-        responsible_uid: null,
+        responsible_uid: input.assignee_id ?? null,
         note_count: 0,
         child_order: state.tasks.filter((t) => t.project_id === projectId).length + 1,
         checked: false,
@@ -106,6 +108,7 @@ export function createDemoSource(): DataSource {
         task.content = input.content;
       }
       if (input.description !== undefined) task.description = input.description;
+      if (input.assignee_id !== undefined) task.responsible_uid = input.assignee_id;
       if (input.priority !== undefined) task.priority = input.priority;
       if (input.labels !== undefined) task.labels = input.labels;
       if (input.due_string === 'no date' || input.due_date) {

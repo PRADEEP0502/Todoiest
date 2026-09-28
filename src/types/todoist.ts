@@ -152,6 +152,8 @@ export interface CreateTaskInput {
   project_id?: string;
   section_id?: string | null;
   parent_id?: string | null;
+  /** Who holds the task. Todoist takes it as `assignee_id` and reports it as `responsible_uid`. */
+  assignee_id?: string | null;
   priority?: ApiPriority;
   /** `YYYY-MM-DD` */
   due_date?: string;
@@ -162,6 +164,8 @@ export interface UpdateTaskInput {
   content?: string;
   description?: string;
   priority?: ApiPriority;
+  /** Who holds the task; null hands it back to nobody. Moving holders never moves the task. */
+  assignee_id?: string | null;
   /** `YYYY-MM-DD`. Use `due_string: "no date"` to clear. */
   due_date?: string;
   due_string?: string;

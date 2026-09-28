@@ -1,18 +1,18 @@
-import { Check, ExternalLink, Flag, MessageSquare, Pencil, Send, Tag, Trash2, User } from 'lucide-react';
+import { Check, ExternalLink, Flag, ListTree, MessageSquare, Pencil, Plus, Send, Tag, Trash2, User } from 'lucide-react';
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { formatCd, parseTitle, titleForNewTask } from '../../lib/cd';
 import { longFromDateKey, longFromTitleDate, taskDates, type TaskDates } from '../../lib/taskDates';
 import { isRoutineSection, isRoutineTask } from '../../lib/routine';
-import { addDays, dueDateKey, dueTime, formatShortDate, formatTime, startOfWeek, toDateKey } from '../../lib/dates';
+import { addDays, describeDue, dueDateKey, dueTime, formatShortDate, formatTime, startOfWeek, toDateKey } from '../../lib/dates';
 import { plainText } from '../../lib/search';
 import { descendantsOf, PERSONAL_GROUP_ID, taskPath } from '../../lib/hierarchy';
 import { PRIORITY_STYLE, toUiPriority, type UiPriority } from '../../lib/priority';
-import { isUncompletable } from '../../lib/text';
+import { isUncompletable, taskTitle } from '../../lib/text';
 import { useUi, type NewTaskDefaults } from '../../store/ui';
 import { useWorkspace, type TaskForm } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { Modal } from '../common/Modal';
-import { TaskDateCards } from './TaskDates';
+import { TaskDateCards, TaskDateLine } from './TaskDates';
 import { TaskAttachments } from './TaskAttachments';
 import { taskAttachments } from '../../lib/attachments';
 import { Avatar, ProjectDot } from '../common/ui';
@@ -38,6 +38,7 @@ function MissingTask({ onClose }: { onClose: () => void }) {
 
 function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?: NewTaskDefaults; onClose: () => void }) {
   const { index, snapshot, mode, createTask, saveTask, completeTask, deleteTask } = useWorkspace();
+  const { openTask, openNewTask } = useUi();
   const now = useMemo(() => new Date(), []);
 
   const initial = useMemo<TaskForm>(() => {
@@ -51,18 +52,24 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
         dueDate: dueDateKey(task.due),
         // Never pre-filled: a stored IDD is shown locked, and a missing one is entered here once.
         idd: null,
+        assigneeId: task.responsible_uid ?? null,
         priority: toUiPriority(task.priority),
       };
     }
     const fallbackProject = snapshot?.user.inbox_project_id ?? index?.orderedProjects[0]?.project.id ?? '';
     const projectId = defaults?.projectId && index?.projectById.has(defaults.projectId) ? defaults.projectId : fallbackProject;
+    // Created under a task: Todoist keeps it in the parent's project, whatever is shown here.
+    const parent = defaults?.parentId ? index?.taskById.get(defaults.parentId) : undefined;
     return {
       content: '',
       description: '',
-      projectId,
-      sectionId: defaults?.sectionId ?? null,
+      projectId: parent?.project_id ?? projectId,
+      sectionId: parent ? (parent.section_id ?? null) : (defaults?.sectionId ?? null),
+      parentId: parent?.id ?? null,
       dueDate: defaults?.dueDate ?? null,
       idd: null,
+      // A subtask starts unheld: each one is given to whoever will do it.
+      assigneeId: null,
       priority: 4,
     };
   }, [task, defaults, index, snapshot]);
@@ -82,9 +89,14 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const dirty = (Object.keys(initial) as (keyof TaskForm)[]).some((k) => form[k] !== initial[k]);
   const valid = form.content.trim().length > 0 && index.projectById.has(form.projectId);
   const subtasks = task ? descendantsOf(index, task.id) : [];
+  // Only the children directly under this task are drawn; each of those opens its own dialog.
+  const children = task ? (index.subtasks.get(task.id) ?? []) : [];
+  const parentTask = form.parentId ? index.taskById.get(form.parentId) : undefined;
   const sectionName = form.sectionId ? (index.sectionById.get(form.sectionId)?.name ?? '') : '';
   const routine = (task ? isRoutineTask(task, index) : false) || isRoutineSection(sectionName);
   const assignee = task?.responsible_uid ? snapshot?.people[task.responsible_uid] : undefined;
+  // Everyone Todoist knows in this workspace; a subtask can go to someone else than its parent.
+  const people = Object.values(snapshot?.people ?? {}).sort((a, b) => a.name.localeCompare(b.name));
 
   // The three dates as they stand, and what saving will newly record. CD and IDD, once written,
   // are only ever shown; nothing in this form can edit them. A task with no IDD yet gets a one-time
@@ -174,7 +186,17 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   return (
     <Modal
       onClose={onClose}
-      title={task ? <span className="truncate">{taskPath(index, task).join(' › ')}</span> : <span className="font-medium text-ink">New task</span>}
+      title={
+        task ? (
+          <span className="truncate">{taskPath(index, task).join(' › ')}</span>
+        ) : parentTask ? (
+          <span className="truncate">
+            <span className="font-medium text-ink">New subtask</span> of {taskTitle(parentTask.content)}
+          </span>
+        ) : (
+          <span className="font-medium text-ink">New task</span>
+        )
+      }
       footer={footer}
     >
       <form
@@ -222,6 +244,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
             <label className="label" htmlFor="task-project">Project</label>
             <SearchSelect
               id="task-project"
+              disabled={!!form.parentId}
               searchPlaceholder="Search projects…"
               value={form.projectId}
               onChange={(projectId) => setForm((f) => ({ ...f, projectId, sectionId: null }))}
@@ -245,13 +268,34 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
               searchPlaceholder="Search sections…"
               value={form.sectionId ?? ''}
               onChange={(id) => set('sectionId', id || null)}
-              disabled={sections.length === 0}
+              disabled={sections.length === 0 || !!form.parentId}
               options={[
                 { value: '', label: sections.length ? 'No section' : 'No sections in this project' },
                 ...sections.map((s) => ({ value: s.id, label: s.name })),
               ]}
             />
           </div>
+        </div>
+
+        <div>
+          <label className="label" htmlFor="task-assignee">Holder</label>
+          <SearchSelect
+            id="task-assignee"
+            className="w-full sm:max-w-xs"
+            searchPlaceholder="Search people…"
+            placeholder="No one"
+            value={form.assigneeId ?? ''}
+            onChange={(id) => set('assigneeId', id || null)}
+            options={[
+              { value: '', label: 'No one' },
+              ...people.map((person) => ({
+                value: person.id,
+                label: person.name,
+                icon: <Avatar id={person.id} name={person.name} size={18} />,
+              })),
+            ]}
+          />
+          {mode === 'demo' && <p className="mt-1 text-[12px] text-ink-3">Todoist only records a holder in a shared project.</p>}
         </div>
 
         <div>
@@ -333,6 +377,49 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
             )}
           </div>
         )}
+        {task && (
+          <section className="border-t border-line pt-3" aria-label="Subtasks">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+                <ListTree size={13} aria-hidden /> Subtasks <span className="font-normal text-ink-3">{children.length}</span>
+              </h3>
+              <button type="button" className="btn-secondary h-8 text-[12.5px]" onClick={() => openNewTask({ parentId: task.id })}>
+                <Plus size={14} /> Add subtask
+              </button>
+            </div>
+            {children.length > 0 && (
+              <ul className="text-[13px]">
+                {children.map((child, i) => {
+                  const last = i === children.length - 1;
+                  const dates = taskDates(child);
+                  return (
+                    <li key={child.id} className="flex items-start gap-2 py-1">
+                      <span aria-hidden className="select-none pt-0.5 font-mono text-[12px] leading-5 text-ink-3">{last ? '└─' : '├─'}</span>
+                      <button type="button" onClick={() => openTask(child.id)} className="min-w-0 flex-1 text-left">
+                        <span className="block break-words text-ink hover:underline">{taskTitle(child.content)}</span>
+                        <TaskDateLine dates={dates} />
+                        <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] text-ink-3">
+                          {(() => {
+                            const held = child.responsible_uid ? snapshot?.people[child.responsible_uid] : undefined;
+                            return (
+                              <span className="inline-flex items-center gap-1">
+                                <User size={11} aria-hidden /> {held?.name ?? 'No holder'}
+                              </span>
+                            );
+                          })()}
+                          {(() => {
+                            const state = describeDue(child.due, now);
+                            return state ? <span className={`font-medium ${DUE_TONE[state.tone]}`}>{state.label}</span> : <span>No due date</span>;
+                          })()}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        )}
         <button type="submit" hidden />
       </form>
       {task && <TaskComments taskId={task.id} />}
@@ -406,3 +493,6 @@ function TaskComments({ taskId }: { taskId: string }) {
     </>
   );
 }
+
+/** The colour a subtask's due state is written in, matching the task rows. */
+const DUE_TONE = { overdue: 'text-p1', today: 'text-accent', soon: 'text-ink-2', later: 'text-ink-3' } as const;
