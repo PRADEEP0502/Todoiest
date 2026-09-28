@@ -1,7 +1,8 @@
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Plus } from 'lucide-react';
 import { useDisclosure } from '../../hooks/useDisclosure';
 import { href } from '../../hooks/useRoute';
 import { groupByProjectAndSection, type ProjectTaskGroup, type SectionGroup } from '../../lib/hierarchy';
+import { useUi } from '../../store/ui';
 import { useWorkspace } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { Chevron, Count, ProjectDot } from '../common/ui';
@@ -15,19 +16,40 @@ interface GroupedTasksProps {
   hideDue?: boolean;
   /** Whether project and section groups start open. Large lists start collapsed. */
   defaultOpen?: boolean;
+  /**
+   * Carried into a task added from a group heading — a person's own list hands it to them, so the
+   * new task lands where the reader is already looking.
+   */
+  addDefaults?: { assigneeId?: string | null };
 }
 
 /** Any list of tasks, organised as Project → Section → Task (→ Subtask). */
-export function GroupedTasks({ tasks, viewKey, compare, hideDue, defaultOpen = true }: GroupedTasksProps) {
+export function GroupedTasks({ tasks, viewKey, compare, hideDue, defaultOpen = true, addDefaults }: GroupedTasksProps) {
   const { index } = useWorkspace();
   if (!index) return null;
   const { groups, childrenOf } = groupByProjectAndSection(index, tasks, compare);
   return (
     <div className="space-y-1">
       {groups.map((group) => (
-        <ProjectBlock key={group.project.id} group={group} viewKey={viewKey} childrenOf={childrenOf} hideDue={hideDue} defaultOpen={defaultOpen} />
+        <ProjectBlock key={group.project.id} group={group} viewKey={viewKey} childrenOf={childrenOf} hideDue={hideDue} defaultOpen={defaultOpen} addDefaults={addDefaults} />
       ))}
     </div>
+  );
+}
+
+/** Adds a task straight into this project or section, from the heading it sits on. */
+function AddHere({ projectId, sectionId, label, addDefaults }: { projectId: string; sectionId: string | null; label: string; addDefaults?: { assigneeId?: string | null } }) {
+  const { openNewTask } = useUi();
+  return (
+    <button
+      type="button"
+      className="icon-btn opacity-50 transition-opacity hover:opacity-100 group-hover:opacity-100 focus:opacity-100"
+      onClick={() => openNewTask({ projectId, sectionId, ...addDefaults })}
+      aria-label={`Add task to ${label}`}
+      title="Add task here"
+    >
+      <Plus size={15} />
+    </button>
   );
 }
 
@@ -37,12 +59,14 @@ function ProjectBlock({
   childrenOf,
   hideDue,
   defaultOpen,
+  addDefaults,
 }: {
   group: ProjectTaskGroup;
   viewKey: string;
   childrenOf: (id: string) => TodoistTask[];
   hideDue?: boolean;
   defaultOpen: boolean;
+  addDefaults?: { assigneeId?: string | null };
 }) {
   const [open, toggle] = useDisclosure(`${viewKey}:project:${group.project.id}`, defaultOpen);
   const collapsed = !open;
@@ -55,6 +79,7 @@ function ProjectBlock({
           <span className="truncate text-[14px] font-semibold text-ink">{group.project.name}</span>
           <Count>{group.count}</Count>
         </button>
+        <AddHere projectId={group.project.id} sectionId={null} label={group.project.name} addDefaults={addDefaults} />
         <a href={href.project(group.project.id)} className="icon-btn opacity-0 group-hover:opacity-100 focus:opacity-100" aria-label={`Open ${group.project.name}`}>
           <ArrowUpRight size={15} />
         </a>
@@ -70,6 +95,7 @@ function ProjectBlock({
               childrenOf={childrenOf}
               hideDue={hideDue}
               defaultOpen={defaultOpen}
+              addDefaults={addDefaults}
             />
           ))}
         </div>
@@ -85,6 +111,7 @@ function SectionBlock({
   childrenOf,
   hideDue,
   defaultOpen,
+  addDefaults,
 }: {
   group: SectionGroup;
   projectId: string;
@@ -92,17 +119,21 @@ function SectionBlock({
   childrenOf: (id: string) => TodoistTask[];
   hideDue?: boolean;
   defaultOpen: boolean;
+  addDefaults?: { assigneeId?: string | null };
 }) {
   const [open, toggle] = useDisclosure(`${viewKey}:section:${projectId}:${group.section?.id ?? 'none'}`, defaultOpen);
   const collapsed = !open;
   if (!group.section) return <TaskTree tasks={group.roots} childrenOf={childrenOf} hideDue={hideDue} subtasksOpen />;
   return (
     <div className="mt-1">
-      <button type="button" onClick={toggle} aria-expanded={!collapsed} className="flex items-center gap-1.5 rounded px-1 py-1 text-left hover:bg-canvas">
-        <Chevron collapsed={collapsed} className="!h-3.5 !w-3.5" />
-        <span className="text-[12.5px] font-semibold text-ink-2">{group.section.name}</span>
-        <Count>{group.count}</Count>
-      </button>
+      <div className="group flex items-center gap-1">
+        <button type="button" onClick={toggle} aria-expanded={!collapsed} className="flex items-center gap-1.5 rounded px-1 py-1 text-left hover:bg-canvas">
+          <Chevron collapsed={collapsed} className="!h-3.5 !w-3.5" />
+          <span className="text-[12.5px] font-semibold text-ink-2">{group.section.name}</span>
+          <Count>{group.count}</Count>
+        </button>
+        <AddHere projectId={projectId} sectionId={group.section.id} label={group.section.name} addDefaults={addDefaults} />
+      </div>
       {!collapsed && <TaskTree tasks={group.roots} childrenOf={childrenOf} hideDue={hideDue} subtasksOpen />}
     </div>
   );

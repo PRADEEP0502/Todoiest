@@ -1,10 +1,11 @@
-import { FolderKanban, ListTree, MessageSquare, Search, Users, X } from 'lucide-react';
+import { ClipboardList, FolderKanban, ListTree, MessageSquare, Plus, Search, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
 import { SearchField } from '../components/common/SearchField';
 import { SearchSelect } from '../components/common/SearchSelect';
 import { Avatar, EmptyState, Notice, PageHeader, Panel, ProjectDot, ShowMore } from '../components/common/ui';
+import { BulkAddDialog } from '../components/tasks/BulkAddDialog';
 import { CompletedList } from '../components/tasks/CompletedList';
 import { GroupedTasks } from '../components/tasks/GroupedTasks';
 import { ScopeKpis, scopeLists, VIEW_TITLE } from '../components/tasks/ScopeKpis';
@@ -56,7 +57,7 @@ export function HoldersPage() {
             <PageHeader title="Holder Wise" subtitle={`${people.length} people hold active tasks`} />
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <label className="text-[13px] text-ink-2" htmlFor="holder-pick">Open a person</label>
+                <label className="text-[13px] text-ink-2" htmlFor="holder-pick">Open a Holder</label>
                 <SearchSelect
                   id="holder-pick"
                   className="w-auto min-w-60"
@@ -199,6 +200,8 @@ interface HolderPageProps {
 export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageProps) {
   const now = useNow(60_000);
   const { settings } = useWorkspace();
+  const { openNewTask } = useUi();
+  const [bulkAdding, setBulkAdding] = useState(false);
   const rules = settings.rules;
   // The search belongs to one person: opening another starts with a clear box.
   const [search, setSearch] = useState({ id: holderId, text: '' });
@@ -270,6 +273,14 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
 
         return (
           <>
+            {bulkAdding && (
+              <BulkAddDialog
+                projectId={scopeProjectId ?? index.orderedProjects[0]?.project.id ?? ''}
+                sectionId={sectionId}
+                assigneeId={holderId === UNASSIGNED ? null : holderId}
+                onClose={() => setBulkAdding(false)}
+              />
+            )}
             <Breadcrumb trail={[{ label: 'Overall', to: href.dashboard() }, { label: 'Holder Wise', to: href.holders() }, { label: name }]} />
             <PageHeader
               title={
@@ -368,8 +379,23 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                       Clear filters
                     </a>
                   )}
+                  <button
+                    type="button"
+                    className="btn-secondary h-9 sm:ml-auto"
+                    onClick={() => setBulkAdding(true)}
+                    disabled={!scopeProjectId && index.orderedProjects.length === 0}
+                  >
+                    <ClipboardList size={15} /> Add many
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary h-9"
+                    onClick={() => openNewTask({ assigneeId: holderId === UNASSIGNED ? null : holderId, projectId: scopeProjectId ?? undefined, sectionId })}
+                  >
+                    <Plus size={15} /> Add task
+                  </button>
                   <SearchField
-                    className="w-full sm:ml-auto sm:w-72"
+                    className="w-full sm:w-72"
                     value={query}
                     onChange={setQuery}
                     label={`Search tasks of ${name}`}
@@ -399,6 +425,8 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                       viewKey={`holder:${holderId}:${show}`}
                       compare={byPriorityThenTime}
                       defaultOpen
+                      // A task added from a heading here belongs to this person.
+                      addDefaults={{ assigneeId: holderId === UNASSIGNED ? null : holderId }}
                     />
                   )}
                 </div>

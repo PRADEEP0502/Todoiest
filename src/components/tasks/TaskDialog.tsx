@@ -68,8 +68,8 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
       parentId: parent?.id ?? null,
       dueDate: defaults?.dueDate ?? null,
       idd: null,
-      // A subtask starts unheld: each one is given to whoever will do it.
-      assigneeId: null,
+      // Held by whoever the page is about, when it was opened from their own list.
+      assigneeId: defaults?.assigneeId ?? null,
       priority: 4,
     };
   }, [task, defaults, index, snapshot]);

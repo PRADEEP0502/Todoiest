@@ -1,7 +1,8 @@
-import { ChevronsDownUp, ChevronsUpDown, FolderX, ListPlus, MessageSquare, Plus, Search, X } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, ClipboardList, FolderX, ListPlus, MessageSquare, Plus, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Gate } from '../components/common/Gate';
 import { SearchField } from '../components/common/SearchField';
+import { BulkAddDialog } from '../components/tasks/BulkAddDialog';
 import { GroupedTasks } from '../components/tasks/GroupedTasks';
 import { CompletedList } from '../components/tasks/CompletedList';
 import { ScopeKpis, scopeLists, VIEW_TITLE } from '../components/tasks/ScopeKpis';
@@ -45,6 +46,7 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, vi
   const people = snapshot.people;
   const openState = useDisclosureState();
   const [addingSection, setAddingSection] = useState(false);
+  const [bulkAdding, setBulkAdding] = useState(false);
   // The search belongs to one project: opening another starts with a clear box.
   const [search, setSearch] = useState({ id: projectId, text: '' });
   const query = search.id === projectId ? search.text : '';
@@ -124,6 +126,10 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, vi
             <ListPlus size={15} /> <span className="hidden sm:inline">Add section</span>
             <span className="sm:hidden">Section</span>
           </button>
+          <button type="button" className="btn-secondary" onClick={() => setBulkAdding(true)}>
+            <ClipboardList size={15} /> <span className="hidden sm:inline">Add many</span>
+            <span className="sm:hidden">Many</span>
+          </button>
           <button type="button" className="btn-secondary" onClick={() => openNewTask({ projectId: project.id })}>
             <Plus size={15} /> Add task
           </button>
@@ -140,6 +146,8 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, vi
           }}
         />
       )}
+
+      {bulkAdding && <BulkAddDialog projectId={project.id} sectionId={sectionId} onClose={() => setBulkAdding(false)} />}
 
       {childProjects.length > 0 && (
         <div className="mb-5 flex flex-wrap gap-2">

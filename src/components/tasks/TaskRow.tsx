@@ -148,7 +148,7 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
         onClick={() => openNewTask({ parentId: task.id })}
         aria-label={`Add subtask to ${plainText(dates.title)}`}
         title="Add subtask"
-        className="icon-btn mt-[1px] h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-70 hover:!opacity-100 focus:opacity-100 max-sm:opacity-60"
+        className="icon-btn mt-[1px] h-7 w-7 shrink-0 opacity-50 transition-opacity hover:opacity-100 group-hover:opacity-100 focus:opacity-100"
       >
         <Plus size={15} />
       </button>
