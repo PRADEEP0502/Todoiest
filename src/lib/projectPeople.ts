@@ -11,7 +11,7 @@ import type { Person, WorkspaceSnapshot } from '../types/todoist';
  * A newly assigned person is on the list as soon as that assignment arrives in a sync.
  */
 export function peopleForProject(snapshot: WorkspaceSnapshot, projectId: string, { include }: { include?: string | null } = {}): Person[] {
-  const ids = new Set(snapshot.peopleByProject[projectId] ?? []);
+  const ids = new Set(snapshot.peopleByProject?.[projectId] ?? []);
   for (const task of snapshot.tasks) if (task.project_id === projectId && task.responsible_uid) ids.add(task.responsible_uid);
   for (const task of snapshot.completed) if (task.project_id === projectId && task.responsible_uid) ids.add(task.responsible_uid);
   // Whoever already holds the task being edited stays on the list, even if they have since left.

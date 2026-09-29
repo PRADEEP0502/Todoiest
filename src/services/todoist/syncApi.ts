@@ -167,7 +167,8 @@ export function applySync(previous: SyncState | null, response: SyncResponse): S
   // Who is on which project. Each row is one person on one project, so they are merged under a
   // key of both; an incremental sync sends only what changed.
   const projectPeople = merge(
-    Object.entries(base.peopleByProject).flatMap(([projectId, users]) => users.map((userId) => ({ id: `${projectId}:${userId}`, projectId, userId, gone: false }))),
+    // A workspace cached before this field existed simply starts empty rather than failing.
+    Object.entries(base.peopleByProject ?? {}).flatMap(([projectId, users]) => users.map((userId) => ({ id: `${projectId}:${userId}`, projectId, userId, gone: false }))),
     response.collaborator_states?.map((state) => ({
       id: `${String(state.project_id)}:${String(state.user_id)}`,
       projectId: String(state.project_id),
