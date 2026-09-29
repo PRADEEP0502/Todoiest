@@ -34,6 +34,7 @@ const dueIn = (days: number) => ({ date: toDateKey(addDays(NOW, days)) });
 function snapshotWith(tasks: TodoistTask[], extra: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot {
   return {
     user: { id: 'u1', full_name: 'Pradeep', email: 'p@x' },
+    peopleByProject: {},
     workspaces: [],
     projects: [{ id: 'p1', name: 'MD & PRADEEP', color: 'red', parent_id: null, child_order: 1 }],
     sections: [

@@ -63,6 +63,15 @@ const PEOPLE: Person[] = [
   { id: 'u-meena', name: 'Meena R', email: 'meena@example.com' },
 ];
 
+/** People Todoist lists on a project even when they hold nothing in it yet. */
+const PROJECT_MEMBERS: Record<string, string[]> = {
+  'p-md': ['u-pradeep', 'u-md'],
+  'p-rv': ['u-pradeep', 'u-arun', 'u-kavya'],
+  'p-manpower': ['u-kavya', 'u-md'],
+  'p-projects': ['u-pradeep', 'u-meena', 'u-md'],
+  'p-vendor': ['u-pradeep', 'u-kavya'],
+};
+
 /** Files for the demo: a drawn photo, a document, and a link that no longer works. */
 type DemoFile = 'photo' | 'photo2' | 'document' | 'expired';
 
@@ -525,6 +534,18 @@ export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
     activityStatus: { ok: true },
     completedStatus: { ok: true },
     people: Object.fromEntries(PEOPLE.map((p) => [p.id, p])),
+    // Who is on each project: whoever holds a task there, plus people Todoist lists on it even
+    // though they hold nothing yet — the same two ways the live workspace fills this in.
+    peopleByProject: (() => {
+      const byProject: Record<string, Set<string>> = {};
+      for (const t of [...tasks, ...completed]) {
+        if (t.responsible_uid) (byProject[t.project_id] ??= new Set()).add(t.responsible_uid);
+      }
+      for (const [projectId, extra] of Object.entries(PROJECT_MEMBERS)) {
+        for (const id of extra) (byProject[projectId] ??= new Set()).add(id);
+      }
+      return Object.fromEntries(Object.entries(byProject).map(([id, set]) => [id, [...set]]));
+    })(),
     syncedAt: now.toISOString(),
   };
 }

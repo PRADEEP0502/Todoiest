@@ -6,6 +6,7 @@ import { isRoutineSection, isRoutineTask } from '../../lib/routine';
 import { addDays, describeDue, dueDateKey, dueTime, formatShortDate, formatTime, startOfWeek, toDateKey } from '../../lib/dates';
 import { plainText } from '../../lib/search';
 import { descendantsOf, PERSONAL_GROUP_ID, taskPath } from '../../lib/hierarchy';
+import { peopleForProject } from '../../lib/projectPeople';
 import { PRIORITY_STYLE, toUiPriority, type UiPriority } from '../../lib/priority';
 import { isUncompletable, taskTitle } from '../../lib/text';
 import { useUi, type NewTaskDefaults } from '../../store/ui';
@@ -95,8 +96,9 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const sectionName = form.sectionId ? (index.sectionById.get(form.sectionId)?.name ?? '') : '';
   const routine = (task ? isRoutineTask(task, index) : false) || isRoutineSection(sectionName);
   const assignee = task?.responsible_uid ? snapshot?.people[task.responsible_uid] : undefined;
-  // Everyone Todoist knows in this workspace; a subtask can go to someone else than its parent.
-  const people = Object.values(snapshot?.people ?? {}).sort((a, b) => a.name.localeCompare(b.name));
+  // Only the people on the project this task sits in — and whoever holds it already, if they have
+  // since left it. Changing the project changes the list.
+  const people = snapshot ? peopleForProject(snapshot, form.projectId, { include: task?.responsible_uid }) : [];
 
   // The three dates as they stand, and what saving will newly record. CD and IDD, once written,
   // are only ever shown; nothing in this form can edit them. A task with no IDD yet gets a one-time
@@ -247,7 +249,13 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
               disabled={!!form.parentId}
               searchPlaceholder="Search projects…"
               value={form.projectId}
-              onChange={(projectId) => setForm((f) => ({ ...f, projectId, sectionId: null }))}
+              onChange={(projectId) =>
+                setForm((f) => {
+                  // A holder who is not on the new project cannot hold the task there.
+                  const stillThere = snapshot && f.assigneeId ? peopleForProject(snapshot, projectId).some((p) => p.id === f.assigneeId) : false;
+                  return { ...f, projectId, sectionId: null, assigneeId: stillThere ? f.assigneeId : null };
+                })
+              }
               options={index.groups.flatMap((group) =>
                 index.orderedProjects
                   .filter((node) => (node.project.workspace_id ? String(node.project.workspace_id) : PERSONAL_GROUP_ID) === group.id)
@@ -295,7 +303,11 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
               })),
             ]}
           />
-          {mode === 'demo' && <p className="mt-1 text-[12px] text-ink-3">Todoist only records a holder in a shared project.</p>}
+          <p className="mt-1 text-[12px] text-ink-3">
+            {people.length === 0
+              ? 'Nobody is on this project in Todoist yet, so it has no holder to choose.'
+              : `${people.length} ${people.length === 1 ? 'person is' : 'people are'} on this project.`}
+          </p>
         </div>
 
         <div>

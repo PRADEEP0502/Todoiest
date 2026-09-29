@@ -214,5 +214,7 @@ export interface WorkspaceSnapshot {
   completedStatus: Availability;
   /** Everyone we know a name for: collaborators, workspace members and the account owner. */
   people: Record<string, Person>;
+  /** Who Todoist says is on each project (its collaborators), by project id. */
+  peopleByProject: Record<string, string[]>;
   syncedAt: string;
 }

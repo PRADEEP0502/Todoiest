@@ -58,6 +58,7 @@ export function createLiveSource(token: string): DataSource {
       completed: completed.filter((t) => projectIds.has(t.project_id)),
       labels: s.labels,
       comments: s.comments,
+      peopleByProject: s.peopleByProject,
       activity,
       activityStatus,
       completedStatus,

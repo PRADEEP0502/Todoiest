@@ -36,7 +36,7 @@ function toAttachment(raw: RawFileAttachment | null | undefined): TodoistAttachm
   };
 }
 
-export const SYNC_RESOURCES = ['user', 'workspaces', 'projects', 'sections', 'items', 'notes', 'labels', 'collaborators'] as const;
+export const SYNC_RESOURCES = ['user', 'workspaces', 'projects', 'sections', 'items', 'notes', 'labels', 'collaborators', 'collaborator_states'] as const;
 
 /** Todoist's own shape for a file on a comment; every field is optional in practice. */
 interface RawFileAttachment {
@@ -71,6 +71,15 @@ interface RawCollaborator {
   is_deleted?: boolean;
 }
 
+/** Todoist's record of one person being on one project. */
+interface RawCollaboratorState {
+  project_id: string | number;
+  user_id: string | number;
+  /** "active" while they are still on it; "invited" before they accept. */
+  state?: string;
+  is_deleted?: boolean;
+}
+
 export interface SyncResponse {
   sync_token: string;
   full_sync: boolean;
@@ -82,6 +91,7 @@ export interface SyncResponse {
   notes?: RawNote[];
   labels?: TodoistLabel[];
   collaborators?: RawCollaborator[];
+  collaborator_states?: RawCollaboratorState[];
 }
 
 /** The merged result of every sync so far. */
@@ -95,6 +105,8 @@ export interface SyncState {
   comments: TodoistComment[];
   labels: TodoistLabel[];
   collaborators: Person[];
+  /** Who is on each project, by project id — the list a holder can be picked from. */
+  peopleByProject: Record<string, string[]>;
 }
 
 export function readSync(client: TodoistClient, syncToken: string, signal?: AbortSignal): Promise<SyncResponse> {
@@ -131,6 +143,7 @@ export function applySync(previous: SyncState | null, response: SyncResponse): S
     comments: [],
     labels: [],
     collaborators: [],
+    peopleByProject: {},
   };
 
   const user = response.user ?? base.user;
@@ -151,9 +164,27 @@ export function applySync(previous: SyncState | null, response: SyncResponse): S
     (c) => !c.is_deleted,
   );
 
+  // Who is on which project. Each row is one person on one project, so they are merged under a
+  // key of both; an incremental sync sends only what changed.
+  const projectPeople = merge(
+    Object.entries(base.peopleByProject).flatMap(([projectId, users]) => users.map((userId) => ({ id: `${projectId}:${userId}`, projectId, userId, gone: false }))),
+    response.collaborator_states?.map((state) => ({
+      id: `${String(state.project_id)}:${String(state.user_id)}`,
+      projectId: String(state.project_id),
+      userId: String(state.user_id),
+      // Someone invited but not yet in, or removed, is not on the project.
+      gone: !!state.is_deleted || (state.state !== undefined && state.state !== 'active'),
+    })),
+    full,
+    (row) => !row.gone,
+  );
+  const peopleByProject: Record<string, string[]> = {};
+  for (const row of projectPeople) (peopleByProject[row.projectId] ??= []).push(row.userId);
+
   return {
     syncToken: response.sync_token,
     user,
+    peopleByProject,
     workspaces: merge(base.workspaces, response.workspaces, full, (w) => !w.is_deleted),
     projects: merge(base.projects, response.projects, full, (p) => !p.is_deleted && !p.is_archived),
     sections: merge(base.sections, response.sections, full, (s) => !s.is_deleted && !s.is_archived),

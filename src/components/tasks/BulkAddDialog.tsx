@@ -2,6 +2,7 @@ import { ClipboardList, Loader2, User } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { describeCount, droppedLines, MAX_BULK_TASKS, parseBulkLines } from '../../lib/bulkTasks';
 import { PERSONAL_GROUP_ID } from '../../lib/hierarchy';
+import { peopleForProject } from '../../lib/projectPeople';
 import { useWorkspace } from '../../store/workspace';
 import { Modal } from '../common/Modal';
 import { SearchSelect } from '../common/SearchSelect';
@@ -40,7 +41,8 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
   if (!index) return null;
 
   const sections = index.sectionsByProject.get(project) ?? [];
-  const people = Object.values(snapshot?.people ?? {}).sort((a, b) => a.name.localeCompare(b.name));
+  // Only the people on the chosen project; picking another project changes the list.
+  const people = snapshot ? peopleForProject(snapshot, project) : [];
   const holderOf = (id: number) => (id in holders ? holders[id] : everyone);
 
   const create = async () => {
@@ -107,6 +109,9 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
               onChange={(id) => {
                 setProject(id);
                 setSection(null);
+                // Holders belong to a project, so the ones chosen here start again.
+                setEveryone((current) => (current && snapshot && peopleForProject(snapshot, id).some((p) => p.id === current) ? current : null));
+                setHolders({});
               }}
               options={index.groups.flatMap((group) =>
                 index.orderedProjects
