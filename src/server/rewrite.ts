@@ -5,12 +5,16 @@
  * sentence, often ungrammatical. This asks a model to write what they meant as short, professional
  * English task titles, keeping the names, numbers, dates and technical words exactly as spoken.
  *
- * The key lives here, never in the browser: the page sends only the words it heard, and gets back
- * only the titles. Nothing is stored or logged.
+ * Either Google's Gemini or OpenAI can do the writing, whichever key the server holds; Gemini is
+ * used when both are set. The key stays here, never in the browser and never in a URL: the page
+ * sends only the words it heard and gets back only the titles. Nothing is stored or logged.
  */
 
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_MODEL = 'gemini-2.0-flash';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-const MODEL = 'gpt-4o-mini';
+const OPENAI_MODEL = 'gpt-4o-mini';
+
 /** Longer than anyone dictates in one go; a guard, not a limit people will meet. */
 export const MAX_SPEECH_LENGTH = 2000;
 /** As many tasks as one spoken sentence may become. */
@@ -53,15 +57,75 @@ export function cleanResult(raw: unknown): Rewritten {
   return tasks.length ? { tasks } : { tasks: [], question: question ?? 'That was not clear enough to make a task from. Please say it again.' };
 }
 
-/** The key the server was started with. Read here, so nothing on the page ever sees it. */
-function serverKey(): string | undefined {
-  // Vercel's edge and node runtimes both expose env this way; the browser never runs this file.
-  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.OPENAI_API_KEY;
+/** A model that can be asked, and how to ask it. */
+export interface Writer {
+  name: 'gemini' | 'openai';
+  request: (said: string) => Request;
+  /** The JSON the model wrote, pulled out of that service's own envelope. */
+  read: (body: unknown) => unknown;
 }
 
-export async function rewriteSpeech(request: Request, apiKey = serverKey()): Promise<Response> {
+/** Whichever service the server has a key for; Gemini first, since its free tier suits this use. */
+export function writerFor(keys: { gemini?: string; openai?: string }): Writer | null {
+  const gemini = keys.gemini;
+  if (gemini) {
+    return {
+      name: 'gemini',
+      request: (said) =>
+        new Request(`${GEMINI_URL}/${GEMINI_MODEL}:generateContent`, {
+          method: 'POST',
+          // The key travels as a header, so it is never part of a URL anywhere.
+          headers: { 'x-goog-api-key': gemini, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
+            contents: [{ role: 'user', parts: [{ text: said }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 600, responseMimeType: 'application/json' },
+          }),
+        }),
+      read: (body) => {
+        const data = body as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+        return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}');
+      },
+    };
+  }
+  const openai = keys.openai;
+  if (openai) {
+    return {
+      name: 'openai',
+      request: (said) =>
+        new Request(OPENAI_URL, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${openai}`, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            model: OPENAI_MODEL,
+            temperature: 0.2,
+            max_tokens: 500,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: INSTRUCTIONS },
+              { role: 'user', content: said },
+            ],
+          }),
+        }),
+      read: (body) => {
+        const data = body as { choices?: { message?: { content?: string } }[] };
+        return JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
+      },
+    };
+  }
+  return null;
+}
+
+/** The keys the server was started with. Read here, so nothing on the page ever sees them. */
+function serverKeys(): { gemini?: string; openai?: string } {
+  // Vercel's edge and node runtimes both expose env this way; the browser never runs this file.
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+  return { gemini: env.GEMINI_API_KEY || env.GOOGLE_API_KEY, openai: env.OPENAI_API_KEY };
+}
+
+export async function rewriteSpeech(request: Request, writer = writerFor(serverKeys())): Promise<Response> {
   if (request.method !== 'POST') return deny(405, 'Send the words as a POST.');
-  if (!apiKey) return deny(503, 'Speech to task needs an OpenAI key on the server (OPENAI_API_KEY).');
+  if (!writer) return deny(503, 'Speech to task needs a key on the server: GEMINI_API_KEY (or OPENAI_API_KEY).');
 
   let text: string;
   try {
@@ -75,31 +139,20 @@ export async function rewriteSpeech(request: Request, apiKey = serverKey()): Pro
 
   let upstream: Response;
   try {
-    upstream = await fetch(OPENAI_URL, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.2,
-        max_tokens: 500,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: INSTRUCTIONS },
-          { role: 'user', content: text },
-        ],
-      }),
-    });
+    upstream = await fetch(writer.request(text));
   } catch {
     return deny(502, 'The writing service could not be reached.');
   }
-  // The code says what to do about it — 401 a wrong key, 429 no credit — without repeating
-  // anything the service said back, which could carry account detail.
-  if (!upstream.ok) return deny(upstream.status === 401 ? 503 : 502, `The writing service refused the request (${upstream.status}).`);
+  // The code says what to do about it — 401 or 403 a wrong key, 429 no credit left — without
+  // repeating anything the service said back, which could carry account detail.
+  if (!upstream.ok) {
+    const wrongKey = upstream.status === 401 || upstream.status === 403;
+    return deny(wrongKey ? 503 : 502, `The writing service refused the request (${upstream.status}).`);
+  }
 
   let parsed: unknown;
   try {
-    const data = (await upstream.json()) as { choices?: { message?: { content?: string } }[] };
-    parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
+    parsed = writer.read(await upstream.json());
   } catch {
     return deny(502, 'The writing service sent something unreadable.');
   }
