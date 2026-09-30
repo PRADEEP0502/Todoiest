@@ -66,7 +66,10 @@ describe('turning speech into task titles', () => {
 
   it('survives a model that fails or answers with nonsense', async () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response('', { status: 500 })));
-    expect((await ask('hello')).status).toBe(502);
+    const failed = await ask('hello');
+    expect(failed.status).toBe(502);
+    // The code comes back so the cause is knowable; nothing the service said does.
+    expect((await failed.json()).error).toContain('500');
     vi.stubGlobal('fetch', () => Promise.resolve(reply('not json at all')));
     expect((await ask('hello')).status).toBe(502);
     vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));

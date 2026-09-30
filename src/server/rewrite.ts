@@ -92,7 +92,9 @@ export async function rewriteSpeech(request: Request, apiKey = serverKey()): Pro
   } catch {
     return deny(502, 'The writing service could not be reached.');
   }
-  if (!upstream.ok) return deny(upstream.status === 401 ? 503 : 502, 'The writing service refused the request.');
+  // The code says what to do about it — 401 a wrong key, 429 no credit — without repeating
+  // anything the service said back, which could carry account detail.
+  if (!upstream.ok) return deny(upstream.status === 401 ? 503 : 502, `The writing service refused the request (${upstream.status}).`);
 
   let parsed: unknown;
   try {
