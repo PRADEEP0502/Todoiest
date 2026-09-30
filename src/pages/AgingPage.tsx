@@ -28,6 +28,8 @@ function formFromTask(task: TodoistTask, index: WorkspaceIndex): TaskForm {
     dueDate: dueDateKey(task.due),
     // Never sent: a stored IDD always wins, and this page cannot enter one.
     idd: null,
+    // The holder as it stands, so changing a due date here cannot unassign the task.
+    assigneeId: task.responsible_uid ?? null,
     priority: toUiPriority(task.priority),
   };
 }

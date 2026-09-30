@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { lockedDatesIntact, titleForNewTask, titleForSavedTask } from '../lib/cd';
+import { taskChanges } from '../lib/taskChanges';
 import { isRoutineSection, isRoutineTask } from '../lib/routine';
-import { dueDateKey } from '../lib/dates';
 import { buildIndex, descendantsOf, type WorkspaceIndex } from '../lib/hierarchy';
 import { toApiPriority, type UiPriority } from '../lib/priority';
 import type { MetricRules } from '../lib/metrics';
@@ -69,7 +69,11 @@ export interface TaskForm {
    * subtask in its parent's project, so it is never sent together with a project or a section.
    */
   parentId?: string | null;
-  /** Who holds it: a collaborator's id, or null for nobody. A subtask may differ from its parent. */
+  /**
+  * Who holds it: a collaborator's id, or null for nobody. A subtask may differ from its parent.
+  * Left out (undefined), the holder is not part of the change at all — a form that only edits a
+  * due date must never hand the task back to nobody.
+  */
   assigneeId?: string | null;
   /** `YYYY-MM-DD` or null for no date. Editable at any time. */
   dueDate: string | null;
@@ -341,7 +345,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const saveTask = useCallback(
     async (task: TodoistTask, form: TaskForm) => {
-      const changes: UpdateTaskInput = {};
       // CD and IDD in the title stay exactly as they are, whatever the name or the due date becomes.
       const routine = (index ? isRoutineTask(task, index) : false) || isRoutineForm(form);
       const nextContent = titleForSavedTask({ content: task.content, addedAt: task.added_at, routine }, form.content, form.idd);
@@ -350,16 +353,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         reportWriteFailure(new Error('locked dates would change'));
         return false;
       }
-      if (nextContent !== task.content) changes.content = nextContent;
-      if (form.description.trim() !== task.description.trim()) changes.description = form.description.trim();
-      if (toApiPriority(form.priority) !== task.priority) changes.priority = toApiPriority(form.priority);
-      const currentDue = dueDateKey(task.due);
-      if (form.dueDate !== currentDue) {
-        if (form.dueDate) changes.due_date = form.dueDate;
-        else changes.due_string = 'no date';
-      }
       // Handing a task to someone else is an edit, never a move: it stays in its project.
-      if ((form.assigneeId ?? null) !== (task.responsible_uid ?? null)) changes.assignee_id = form.assigneeId ?? null;
+      const changes: UpdateTaskInput = taskChanges(task, { ...form, content: nextContent });
       const moved = form.projectId !== task.project_id || form.sectionId !== (task.section_id ?? null);
 
       try {
