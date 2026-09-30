@@ -15,6 +15,7 @@ import type { TodoistTask } from '../../types/todoist';
 import { Modal } from '../common/Modal';
 import { TaskDateCards, TaskDateLine } from './TaskDates';
 import { TaskAttachments } from './TaskAttachments';
+import { VoiceCapture } from './VoiceCapture';
 import { taskAttachments } from '../../lib/attachments';
 import { Avatar, ProjectDot } from '../common/ui';
 import { SearchSelect } from '../common/SearchSelect';
@@ -209,14 +210,17 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
         className="space-y-4"
       >
         <div>
-          <input
-            data-autofocus={task ? undefined : true}
-            className="w-full border-0 bg-transparent p-0 text-[17px] font-semibold leading-6 text-ink placeholder:font-normal placeholder:text-ink-3 focus:outline-none focus:ring-0"
-            placeholder="Task name"
-            value={form.content}
-            onChange={(e) => set('content', e.target.value)}
-            aria-label="Task name"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              data-autofocus={task ? undefined : true}
+              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[17px] font-semibold leading-6 text-ink placeholder:font-normal placeholder:text-ink-3 focus:outline-none focus:ring-0"
+              placeholder="Task name"
+              value={form.content}
+              onChange={(e) => set('content', e.target.value)}
+              aria-label="Task name"
+            />
+            {!task && <VoiceCapture single useLabel="Use this task" onTasks={(spoken) => spoken[0] && set('content', spoken[0])} />}
+          </div>
           <div className="mt-3">
             <TaskDateCards
               dates={cardDates}

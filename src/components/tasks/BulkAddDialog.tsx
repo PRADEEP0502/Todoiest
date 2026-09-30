@@ -5,8 +5,12 @@ import { PERSONAL_GROUP_ID } from '../../lib/hierarchy';
 import { peopleForProject } from '../../lib/projectPeople';
 import { useWorkspace } from '../../store/workspace';
 import { Modal } from '../common/Modal';
+import { VoiceCapture } from './VoiceCapture';
 import { SearchSelect } from '../common/SearchSelect';
 import { Avatar, ProjectDot } from '../common/ui';
+
+/** Lines in the box are separated the ordinary way. */
+const NEW_LINE = String.fromCharCode(10);
 
 interface BulkAddDialogProps {
   /** Where the tasks land; the person can still change it here. */
@@ -143,7 +147,16 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
         </div>
 
         <div>
-          <label className="label" htmlFor="bulk-text">One task per line</label>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="label mb-0" htmlFor="bulk-text">One task per line</label>
+            <VoiceCapture
+              useLabel="Add to the list"
+              onTasks={(spoken) => {
+                setText((current) => [current.trim(), ...spoken].filter(Boolean).join(NEW_LINE));
+                setResult(null);
+              }}
+            />
+          </div>
           <textarea
             id="bulk-text"
             data-autofocus
