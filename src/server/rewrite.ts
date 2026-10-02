@@ -11,7 +11,6 @@
  */
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const GEMINI_MODEL = 'gemini-2.0-flash';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL = 'gpt-4o-mini';
 
@@ -57,22 +56,57 @@ export function cleanResult(raw: unknown): Rewritten {
   return tasks.length ? { tasks } : { tasks: [], question: question ?? 'That was not clear enough to make a task from. Please say it again.' };
 }
 
-/** A model that can be asked, and how to ask it. */
+/** A service that can be asked, and how to read what it answers. */
 export interface Writer {
   name: 'gemini' | 'openai';
-  request: (said: string) => Request;
+  ask: (said: string) => Promise<Response>;
   /** The JSON the model wrote, pulled out of that service's own envelope. */
   read: (body: unknown) => unknown;
+}
+
+/** Models that are worth asking, best first; any other `flash` model will do if none are offered. */
+const GEMINI_PREFERRED = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+
+/**
+ * Which Gemini model this key may use. Google renames and retires these, and a key only sees some
+ * of them, so the list is asked for rather than assumed, and remembered for the life of the server.
+ */
+let chosenModel: string | null = null;
+
+export async function geminiModel(key: string, fetcher: typeof fetch = fetch): Promise<string> {
+  if (chosenModel) return chosenModel;
+  try {
+    const response = await fetcher(new Request(`${GEMINI_URL}?pageSize=200`, { headers: { 'x-goog-api-key': key } }));
+    if (response.ok) {
+      const data = (await response.json()) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
+      const usable = (data.models ?? [])
+        .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
+        .map((m) => (m.name ?? '').replace(/^models\//, ''))
+        .filter((name) => name && !/embedding|aqa|vision|image|tts|live/i.test(name));
+      const best = GEMINI_PREFERRED.find((want) => usable.includes(want)) ?? usable.find((name) => name.includes('flash')) ?? usable[0];
+      if (best) {
+        chosenModel = best;
+        return best;
+      }
+    }
+  } catch {
+    // Fall through to the usual name; the request itself will report anything still wrong.
+  }
+  return GEMINI_PREFERRED[0];
+}
+
+/** Forgets the chosen model, so the next request works out which one this key may use now. */
+export function forgetModel(): void {
+  chosenModel = null;
 }
 
 /** Whichever service the server has a key for; Gemini first, since its free tier suits this use. */
 export function writerFor(keys: { gemini?: string; openai?: string }): Writer | null {
   const gemini = keys.gemini;
   if (gemini) {
-    return {
-      name: 'gemini',
-      request: (said) =>
-        new Request(`${GEMINI_URL}/${GEMINI_MODEL}:generateContent`, {
+    const call = (said: string, model: string) =>
+      fetch(
+        new Request(`${GEMINI_URL}/${model}:generateContent`, {
           method: 'POST',
           // The key travels as a header, so it is never part of a URL anywhere.
           headers: { 'x-goog-api-key': gemini, 'content-type': 'application/json' },
@@ -82,6 +116,18 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
             generationConfig: { temperature: 0.2, maxOutputTokens: 600, responseMimeType: 'application/json' },
           }),
         }),
+      );
+    return {
+      name: 'gemini',
+      ask: async (said) => {
+        const response = await call(said, await geminiModel(gemini));
+        // The remembered model has gone: find out what this key may use now, and ask once more.
+        if (response.status === 404) {
+          forgetModel();
+          return call(said, await geminiModel(gemini));
+        }
+        return response;
+      },
       read: (body) => {
         const data = body as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
         return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}');
@@ -92,21 +138,23 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
   if (openai) {
     return {
       name: 'openai',
-      request: (said) =>
-        new Request(OPENAI_URL, {
-          method: 'POST',
-          headers: { authorization: `Bearer ${openai}`, 'content-type': 'application/json' },
-          body: JSON.stringify({
-            model: OPENAI_MODEL,
-            temperature: 0.2,
-            max_tokens: 500,
-            response_format: { type: 'json_object' },
-            messages: [
-              { role: 'system', content: INSTRUCTIONS },
-              { role: 'user', content: said },
-            ],
+      ask: (said) =>
+        fetch(
+          new Request(OPENAI_URL, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${openai}`, 'content-type': 'application/json' },
+            body: JSON.stringify({
+              model: OPENAI_MODEL,
+              temperature: 0.2,
+              max_tokens: 500,
+              response_format: { type: 'json_object' },
+              messages: [
+                { role: 'system', content: INSTRUCTIONS },
+                { role: 'user', content: said },
+              ],
+            }),
           }),
-        }),
+        ),
       read: (body) => {
         const data = body as { choices?: { message?: { content?: string } }[] };
         return JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
@@ -139,7 +187,7 @@ export async function rewriteSpeech(request: Request, writer = writerFor(serverK
 
   let upstream: Response;
   try {
-    upstream = await fetch(writer.request(text));
+    upstream = await writer.ask(text);
   } catch {
     return deny(502, 'The writing service could not be reached.');
   }
