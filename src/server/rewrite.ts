@@ -88,40 +88,76 @@ export interface Writer {
   read: (body: unknown) => unknown;
 }
 
-/** Models that are worth asking, best first; any other `flash` model will do if none are offered. */
-const GEMINI_PREFERRED = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+/**
+ * Models worth asking, best first. A free key is limited per model, so when one says it has had
+ * enough the next is tried; the lite ones are listed because their free allowance is the largest.
+ */
+const GEMINI_PREFERRED = [
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-flash-latest',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-1.5-flash',
+];
 
 /**
- * Which Gemini model this key may use. Google renames and retires these, and a key only sees some
- * of them, so the list is asked for rather than assumed, and remembered for the life of the server.
+ * The models this key may use, best first. Google renames and retires these, and a key only sees
+ * some of them, so the list is asked for rather than assumed, and kept for the life of the server.
  */
-let chosenModel: string | null = null;
+let candidates: string[] | null = null;
+let current = 0;
 
-export async function geminiModel(key: string, fetcher: typeof fetch = fetch): Promise<string> {
-  if (chosenModel) return chosenModel;
+async function usableModels(key: string, fetcher: typeof fetch): Promise<string[]> {
+  if (candidates?.length) return candidates;
   try {
     const response = await fetcher(new Request(`${GEMINI_URL}?pageSize=200`, { headers: { 'x-goog-api-key': key } }));
     if (response.ok) {
       const data = (await response.json()) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
-      const usable = (data.models ?? [])
+      const offered = (data.models ?? [])
         .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
         .map((m) => (m.name ?? '').replace(/^models\//, ''))
-        .filter((name) => name && !/embedding|aqa|vision|image|tts|live/i.test(name));
-      const best = GEMINI_PREFERRED.find((want) => usable.includes(want)) ?? usable.find((name) => name.includes('flash')) ?? usable[0];
-      if (best) {
-        chosenModel = best;
-        return best;
+        .filter((name) => name && !/embedding|aqa|vision|image|tts|live|thinking/i.test(name));
+      const ranked = [
+        ...GEMINI_PREFERRED.filter((want) => offered.includes(want)),
+        ...offered.filter((name) => name.includes('flash') && !GEMINI_PREFERRED.includes(name)),
+        ...offered.filter((name) => !name.includes('flash') && !GEMINI_PREFERRED.includes(name)),
+      ];
+      if (ranked.length) {
+        candidates = ranked;
+        current = 0;
+        return ranked;
       }
     }
   } catch {
-    // Fall through to the usual name; the request itself will report anything still wrong.
+    // Fall through to the usual names; the request itself reports anything still wrong.
   }
-  return GEMINI_PREFERRED[0];
+  candidates = GEMINI_PREFERRED;
+  current = 0;
+  return candidates;
 }
 
-/** Forgets the chosen model, so the next request works out which one this key may use now. */
+/** The model to ask right now. */
+export async function geminiModel(key: string, fetcher: typeof fetch = fetch): Promise<string> {
+  const models = await usableModels(key, fetcher);
+  return models[Math.min(current, models.length - 1)];
+}
+
+/**
+ * Moves to the next model this key may use, for when the one in hand is gone or has had its fill.
+ * Returns false once they have all been tried.
+ */
+export function nextModel(): boolean {
+  if (!candidates || current >= candidates.length - 1) return false;
+  current += 1;
+  return true;
+}
+
+/** Forgets everything learned about this key's models. */
 export function forgetModel(): void {
-  chosenModel = null;
+  candidates = null;
+  current = 0;
 }
 
 /** Whichever service the server has a key for; Gemini first, since its free tier suits this use. */
@@ -145,11 +181,13 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
     return {
       name: 'gemini',
       ask: async (said) => {
-        const response = await call(said, await geminiModel(gemini));
-        // The remembered model has gone: find out what this key may use now, and ask once more.
-        if (response.status === 404) {
-          forgetModel();
-          return call(said, await geminiModel(gemini));
+        let response = await call(said, await geminiModel(gemini));
+        // A model that has gone, or one that has had its fill for now: move to the next this key
+        // may use. Each has its own free allowance, so the words still get written.
+        for (let tries = 0; tries < 3 && (response.status === 404 || response.status === 429); tries++) {
+          if (response.status === 404) forgetModel();
+          else if (!nextModel()) break;
+          response = await call(said, await geminiModel(gemini));
         }
         return response;
       },

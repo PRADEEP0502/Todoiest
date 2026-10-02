@@ -205,3 +205,40 @@ describe('reading what the model wrote, however it wrapped it', () => {
     expect(parseModelJson('sorry, I cannot')).toEqual({});
   });
 });
+
+describe('when one model has had its fill', () => {
+  beforeEach(() => forgetModel());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('moves to the next model this key may use, and the words still get written', async () => {
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', async (request: Request) => {
+      if (request.method === 'GET') return modelList(['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash']);
+      asked.push(request.url);
+      // The first model is spent; the next one answers.
+      if (asked.length === 1) return new Response('quota', { status: 429 });
+      return geminiReply({ tasks: ['Prepare the quotation'] });
+    });
+
+    const response = await rewriteSpeech(
+      new Request('https://dash.example/api/rewrite', { method: 'POST', body: JSON.stringify({ text: 'quotation ready pannu' }) }),
+      writerFor({ gemini: 'gemini-test-secret' }),
+    );
+    expect(await response.json()).toEqual({ tasks: ['Prepare the quotation'] });
+    expect(asked).toHaveLength(2);
+    expect(asked[0]).toContain('gemini-2.0-flash:');
+    expect(asked[1]).toContain('gemini-2.0-flash-lite');
+  });
+
+  it('gives up once every model has said the same, and says it is busy', async () => {
+    vi.stubGlobal('fetch', async (request: Request) =>
+      request.method === 'GET' ? modelList(['gemini-2.0-flash', 'gemini-2.5-flash']) : new Response('quota', { status: 429 }),
+    );
+    const response = await rewriteSpeech(
+      new Request('https://dash.example/api/rewrite', { method: 'POST', body: JSON.stringify({ text: 'quotation ready pannu' }) }),
+      writerFor({ gemini: 'gemini-test-secret' }),
+    );
+    expect(response.status).toBe(502);
+    expect((await response.json()).error).toMatch(/busy right now \(429\)/);
+  });
+});
