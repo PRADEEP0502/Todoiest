@@ -42,6 +42,30 @@ interface Rewritten {
   question?: string;
 }
 
+/**
+ * The JSON a model wrote, however it wrapped it. Most answer with plain JSON; some fence it in
+ * backticks or add a line of their own, and a long answer can arrive cut short.
+ */
+export function parseModelJson(text: string): unknown {
+  const body = text.replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim();
+  try {
+    return JSON.parse(body);
+  } catch {
+    // Take the outermost object, in case something was said around it.
+    const start = body.indexOf('{');
+    const end = body.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(body.slice(start, end + 1));
+      } catch {
+        // Cut short: keep whichever titles are complete.
+      }
+    }
+    const titles = [...body.matchAll(/"([^"]{4,})"/g)].map((m) => m[1]).filter((t) => !/^(tasks|question)$/.test(t));
+    return titles.length ? { tasks: titles } : {};
+  }
+}
+
 /** Keeps only what the page can use: a handful of short, non-empty titles. */
 export function cleanResult(raw: unknown): Rewritten {
   const data = (raw ?? {}) as { tasks?: unknown; question?: unknown };
@@ -113,7 +137,8 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
             contents: [{ role: 'user', parts: [{ text: said }] }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 600, responseMimeType: 'application/json' },
+            // Room to spare: a cut-off answer is worse than a few unused tokens.
+            generationConfig: { temperature: 0.2, maxOutputTokens: 1200, responseMimeType: 'application/json' },
           }),
         }),
       );
@@ -130,7 +155,7 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
       },
       read: (body) => {
         const data = body as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-        return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}');
+        return parseModelJson(data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '');
       },
     };
   }
@@ -157,7 +182,7 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
         ),
       read: (body) => {
         const data = body as { choices?: { message?: { content?: string } }[] };
-        return JSON.parse(data.choices?.[0]?.message?.content ?? '{}');
+        return parseModelJson(data.choices?.[0]?.message?.content ?? '');
       },
     };
   }
@@ -215,7 +240,8 @@ export async function rewriteSpeech(request: Request, writer = writerFor(serverK
   try {
     parsed = writer.read(await upstream.json());
   } catch {
-    return deny(502, 'The writing service sent something unreadable.');
+    // Nothing usable came back; the page asks the person to say it again rather than showing a fault.
+    parsed = {};
   }
 
   return new Response(JSON.stringify(cleanResult(parsed)), { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });

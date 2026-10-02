@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { beforeEach } from 'vitest';
-import { cleanResult, forgetModel, geminiModel, MAX_SPEECH_LENGTH, MAX_TASKS, rewriteSpeech, writerFor } from './rewrite';
+import { cleanResult, parseModelJson, forgetModel, geminiModel, MAX_SPEECH_LENGTH, MAX_TASKS, rewriteSpeech, writerFor } from './rewrite';
 
 const GEMINI_KEY = 'gemini-test-secret';
 const OPENAI_KEY = 'sk-test-secret';
@@ -136,11 +136,17 @@ describe('turning speech into task titles', () => {
     expect((await ask('hello')).status).toBe(502);
   });
 
-  it('survives an answer that is not the JSON it asked for', async () => {
-    vi.stubGlobal('fetch', () =>
-      Promise.resolve(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'not json at all' }] } }] }), { status: 200, headers: { 'content-type': 'application/json' } })),
+  it('asks the person to say it again when nothing usable came back', async () => {
+    vi.stubGlobal('fetch', async (request: Request) =>
+      request.method === 'GET'
+        ? modelList(['gemini-2.0-flash'])
+        : new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'not json at all' }] } }] }), { status: 200, headers: { 'content-type': 'application/json' } }),
     );
-    expect((await ask('hello')).status).toBe(502);
+    const response = await ask('hello');
+    expect(response.status).toBe(200);
+    const { tasks, question } = await response.json();
+    expect(tasks).toEqual([]);
+    expect(question).toBeTruthy();
   });
 
   it('uses a model the key actually has, and looks again when the one it knew is gone', async () => {
@@ -176,5 +182,26 @@ describe('turning speech into task titles', () => {
     // Nothing usable: the page is told to ask again rather than shown an empty list.
     expect(cleanResult({}).question).toBeTruthy();
     expect(cleanResult({ tasks: [], question: 'Which pump?' })).toEqual({ tasks: [], question: 'Which pump?' });
+  });
+});
+
+describe('reading what the model wrote, however it wrapped it', () => {
+  it('reads plain JSON', () => {
+    expect(parseModelJson('{"tasks":["Update the JPM website"]}')).toEqual({ tasks: ['Update the JPM website'] });
+  });
+
+  it('reads JSON fenced in backticks, or with a line said around it', () => {
+    expect(parseModelJson('```json\n{"tasks":["Prepare the quotation"]}\n```')).toEqual({ tasks: ['Prepare the quotation'] });
+    expect(parseModelJson('Here you go:\n{"tasks":["Prepare the quotation"]}\nHope that helps.')).toEqual({ tasks: ['Prepare the quotation'] });
+  });
+
+  it('keeps the titles it can see when the answer was cut short', () => {
+    const cut = '{"tasks":["Prepare the quotation","Obtain MD approval","Send it to the Purcha';
+    expect((parseModelJson(cut) as { tasks: string[] }).tasks).toEqual(['Prepare the quotation', 'Obtain MD approval']);
+  });
+
+  it('gives nothing back when there is nothing in there', () => {
+    expect(parseModelJson('')).toEqual({});
+    expect(parseModelJson('sorry, I cannot')).toEqual({});
   });
 });
