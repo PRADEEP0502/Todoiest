@@ -100,6 +100,26 @@ describe('turning speech into task titles', () => {
     expect((await ask('hello', gemini, 'GET')).status).toBe(405);
   });
 
+  it('tries once more when the model is merely busy, and then says so', async () => {
+    // Overloaded, then fine: the words come back without the reader seeing a failure.
+    let first = true;
+    vi.stubGlobal('fetch', async (request: Request) => {
+      if (request.method === 'GET') return modelList(['gemini-2.0-flash']);
+      if (first) {
+        first = false;
+        return new Response('The model is overloaded', { status: 503 });
+      }
+      return geminiReply({ tasks: ['Prepare the quotation'] });
+    });
+    expect(await (await ask('quotation ready pannu')).json()).toEqual({ tasks: ['Prepare the quotation'] });
+
+    // Busy both times: said plainly, as something to try again rather than a fault.
+    vi.stubGlobal('fetch', async (request: Request) => (request.method === 'GET' ? modelList(['gemini-2.0-flash']) : new Response('', { status: 503 })));
+    const busy = await ask('quotation ready pannu');
+    expect(busy.status).toBe(502);
+    expect((await busy.json()).error).toMatch(/busy right now \(503\)/);
+  });
+
   it('says which code a refusal came with, and nothing the service said', async () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response('quota exhausted for project 12345', { status: 429 })));
     const busted = await ask('hello');

@@ -185,17 +185,30 @@ export async function rewriteSpeech(request: Request, writer = writerFor(serverK
   if (!text) return deny(400, 'Nothing was heard.');
   if (text.length > MAX_SPEECH_LENGTH) return deny(400, 'That is too long to turn into tasks.');
 
-  let upstream: Response;
-  try {
-    upstream = await writer.ask(text);
-  } catch {
-    return deny(502, 'The writing service could not be reached.');
+  // These models are busy often enough that one quiet retry is worth more than an error.
+  const BUSY = [429, 500, 502, 503, 504];
+  let upstream: Response | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      upstream = await writer.ask(text);
+    } catch {
+      upstream = null;
+    }
+    if (upstream?.ok || (upstream && !BUSY.includes(upstream.status))) break;
+    if (attempt === 0) await new Promise((wake) => setTimeout(wake, 900));
   }
-  // The code says what to do about it — 401 or 403 a wrong key, 429 no credit left — without
-  // repeating anything the service said back, which could carry account detail.
+  if (!upstream) return deny(502, 'The writing service could not be reached.');
   if (!upstream.ok) {
+    // The code says what to do about it, without repeating anything the service said back, which
+    // could carry account detail.
     const wrongKey = upstream.status === 401 || upstream.status === 403;
-    return deny(wrongKey ? 503 : 502, `The writing service refused the request (${upstream.status}).`);
+    const busy = BUSY.includes(upstream.status);
+    return deny(
+      wrongKey ? 503 : 502,
+      busy
+        ? `The writing service is busy right now (${upstream.status}). Try again in a moment.`
+        : `The writing service refused the request (${upstream.status}).`,
+    );
   }
 
   let parsed: unknown;
