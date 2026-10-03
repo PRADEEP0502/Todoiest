@@ -1,7 +1,6 @@
 import {
   AlarmClock,
   CalendarCheck,
-  CalendarClock,
   CalendarOff,
   CalendarPlus,
   CircleCheckBig,
@@ -103,13 +102,12 @@ export function ScopeKpis({
       <MetricStrip
         label={`${name}: totals`}
         size="md"
-        columns={comments === null ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'}
+        columns={comments === null ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}
         items={[
           { label: 'Active Tasks', icon: <ListChecks />, value: lists.active.length, ...card('active') },
           { label: 'Completed', icon: <CircleCheckBig />, iconTone: 'good', value: completed, note: 'this month', ...card('completed') },
           { label: 'Overdue', icon: <AlarmClock />, value: lists.overdue.length, tone: 'danger', ...card('overdue') },
           { label: 'Due Today', icon: <CalendarCheck />, iconTone: 'info', value: lists.today.length, ...card('today') },
-          { label: 'No Due Date', icon: <CalendarOff />, iconTone: 'warn', value: lists['no-due'].length, ...card('no-due') },
           ...(comments === null ? [] : [{ label: 'Comments', icon: <MessageSquare />, iconTone: 'info' as const, value: comments, note: 'written', ...card('comments') }]),
         ]}
       />
@@ -122,7 +120,7 @@ export function ScopeKpis({
           items={[
             { label: 'No CD', icon: <CalendarPlus />, iconTone: 'info', value: lists['no-cd'].length, note: 'no Creation Date', ...card('no-cd') },
             { label: 'No IDD', icon: <LockKeyhole />, iconTone: 'warn', value: lists['no-idd'].length, note: 'no Issue Date', ...card('no-idd') },
-            { label: 'No DD', icon: <CalendarClock />, iconTone: 'good', value: lists['no-dd'].length, note: 'no Due Date', ...card('no-dd') },
+            { label: 'No DD', icon: <CalendarOff />, iconTone: 'warn', value: lists['no-dd'].length, note: 'no Due Date', ...card('no-dd') },
           ]}
         />
       )}
