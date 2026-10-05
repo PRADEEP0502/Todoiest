@@ -1,7 +1,7 @@
 import { containerKey, countContainer, type WorkspaceIndex } from '../../lib/hierarchy';
 import type { TodoistTask } from '../../types/todoist';
 import { EmptyState } from '../common/ui';
-import { BoardColumn, BoardScroller } from '../tasks/BoardColumn';
+import { BoardColumn, BoardScroller, type BoardTarget } from '../tasks/BoardColumn';
 
 interface Column {
   key: string;
@@ -47,6 +47,9 @@ export function ProjectBoard({ index, projectId }: { index: WorkspaceIndex; proj
     return <EmptyState title="No open tasks" />;
   }
 
+  // Every column of this board, so a card can be sent to any of them.
+  const targets: BoardTarget[] = columns.map((column) => ({ projectId, sectionId: column.sectionId, label: column.title }));
+
   return (
     <BoardScroller>
       {columns.map((column) => (
@@ -58,6 +61,7 @@ export function ProjectBoard({ index, projectId }: { index: WorkspaceIndex; proj
           tasks={column.tasks}
           childrenOf={childrenOf}
           add={{ projectId, sectionId: column.sectionId }}
+          targets={targets}
         />
       ))}
     </BoardScroller>

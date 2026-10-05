@@ -33,7 +33,7 @@ function Page({ route, visit }: { route: Route; visit: number }) {
     case 'projects':
       return <ProjectsPage />;
     case 'project':
-      return <ProjectDetailPage projectId={route.projectId} sectionId={route.sectionId} taskId={route.taskId} show={route.show} board={route.board} visit={visit} />;
+      return <ProjectDetailPage projectId={route.projectId} sectionId={route.sectionId} taskId={route.taskId} show={route.show} visit={visit} />;
     case 'overdue':
       return <OverduePage category={route.category} />;
     case 'aging':
@@ -41,7 +41,7 @@ function Page({ route, visit }: { route: Route; visit: number }) {
     case 'holders':
       return <HoldersPage />;
     case 'holder':
-      return <HolderPage holderId={route.holderId} show={route.show} projectId={route.projectId} sectionId={route.sectionId} board={route.board} />;
+      return <HolderPage holderId={route.holderId} show={route.show} projectId={route.projectId} sectionId={route.sectionId} />;
     case 'labels':
       return <LabelsPage />;
     case 'label':

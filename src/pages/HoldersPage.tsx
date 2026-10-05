@@ -1,4 +1,4 @@
-import { ClipboardList, Columns3, FolderKanban, List, ListTree, MessageSquare, Plus, Search, Users, X } from 'lucide-react';
+import { ClipboardList, FolderKanban, ListTree, MessageSquare, Plus, Search, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
@@ -191,8 +191,6 @@ interface HolderPageProps {
   show: HolderView;
   projectId: string | null;
   sectionId: string | null;
-  /** The tasks laid out as columns, one to a section, instead of as a list. */
-  board: boolean;
 }
 
 /**
@@ -200,12 +198,14 @@ interface HolderPageProps {
  * below by state, and the project and section bars narrow it further — nothing opens the
  * company-wide views.
  */
-export function HolderPage({ holderId, show, projectId, sectionId, board }: HolderPageProps) {
+export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageProps) {
   const now = useNow(60_000);
   const { settings } = useWorkspace();
   const { openNewTask } = useUi();
   const [bulkAdding, setBulkAdding] = useState(false);
   const rules = settings.rules;
+  // One choice, made in Settings, used by every page that lists tasks.
+  const board = settings.taskLayout === 'board';
   // The search belongs to one person: opening another starts with a clear box.
   const [search, setSearch] = useState({ id: holderId, text: '' });
   const query = search.id === holderId ? search.text : '';
@@ -261,7 +261,7 @@ export function HolderPage({ holderId, show, projectId, sectionId, board }: Hold
         const topProjects = [...byProject].sort((a, b) => b[1] - a[1]).slice(0, 6);
         const topSections = [...bySection].sort((a, b) => b[1] - a[1]).slice(0, 6);
 
-        const link = (filter: HolderFilter) => href.holder(holderId, { show, projectId: scopeProjectId, sectionId, board, ...filter });
+        const link = (filter: HolderFilter) => href.holder(holderId, { show, projectId: scopeProjectId, sectionId, ...filter });
         const card = (view: HolderView) => ({ href: link({ show: view }), selected: show === view });
         const scoped = !!scopeProjectId || !!sectionId;
         const count = show === 'completed' ? completed.length : show === 'comments' ? comments.length : lists[show].length;
@@ -381,28 +381,9 @@ export function HolderPage({ holderId, show, projectId, sectionId, board }: Hold
                       Clear filters
                     </a>
                   )}
-                  {/* List or board, as Todoist offers; the choice is in the address, so a shared link keeps it. */}
-                  {show !== 'completed' && show !== 'comments' && (
-                    <div className="flex rounded-md border border-line bg-surface p-0.5 sm:ml-auto" role="group" aria-label="How to lay out these tasks">
-                      <a
-                        href={link({ board: false })}
-                        className={`inline-flex h-8 items-center gap-1.5 rounded px-2 text-[12.5px] ${board ? 'text-ink-2 hover:text-ink' : 'bg-hover font-medium text-ink'}`}
-                        aria-current={board ? undefined : 'true'}
-                      >
-                        <List size={14} /> List
-                      </a>
-                      <a
-                        href={link({ board: true })}
-                        className={`inline-flex h-8 items-center gap-1.5 rounded px-2 text-[12.5px] ${board ? 'bg-hover font-medium text-ink' : 'text-ink-2 hover:text-ink'}`}
-                        aria-current={board ? 'true' : undefined}
-                      >
-                        <Columns3 size={14} /> Board
-                      </a>
-                    </div>
-                  )}
                   <button
                     type="button"
-                    className={`btn-secondary h-9 ${show === 'completed' || show === 'comments' ? 'sm:ml-auto' : ''}`}
+                    className="btn-secondary h-9 sm:ml-auto"
                     onClick={() => setBulkAdding(true)}
                     disabled={!scopeProjectId && index.orderedProjects.length === 0}
                   >

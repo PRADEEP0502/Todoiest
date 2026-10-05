@@ -18,7 +18,7 @@ import type { TodoistComment, TodoistProject, TodoistSection, TodoistTask, Updat
 import { TodoistApiError } from '../services/todoist';
 import { href, navigate } from '../hooks/useRoute';
 import { formatShortDate, parseDateKey } from '../lib/dates';
-import { loadSettings, saveSettings, withoutSavedToken, type Settings } from './settings';
+import { loadSettings, saveSettings, withoutSavedToken, type Settings, type TaskLayout } from './settings';
 import { useUi } from './ui';
 
 export interface SyncState {
@@ -104,8 +104,11 @@ interface WorkspaceContextValue {
   reopenTask: (task: TodoistTask) => void;
   deleteTask: (taskId: string) => Promise<boolean>;
   addComment: (taskId: string, content: string) => Promise<TodoistComment | null>;
+  /** Moves a task (with its subtasks) into another project or section. */
+  moveTask: (task: TodoistTask, to: { projectId: string; sectionId: string | null }) => Promise<boolean>;
   setRules: (rules: MetricRules) => void;
   setNotifyOwnActions: (value: boolean) => void;
+  setTaskLayout: (layout: TaskLayout) => void;
   connectLive: (token: string) => Promise<{ name: string }>;
   switchToDemo: () => void;
   forgetToken: () => void;
@@ -388,6 +391,42 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [source, write, reportWriteFailure, index, isRoutineForm],
   );
 
+  /**
+   * Dropping a card in another column: the task moves, and Todoist takes its subtasks with it, so
+   * the copy on screen does the same rather than leaving them behind until the next sync.
+   */
+  const moveTask = useCallback(
+    async (task: TodoistTask, to: { projectId: string; sectionId: string | null }) => {
+      if (task.project_id === to.projectId && (task.section_id ?? null) === to.sectionId) return true;
+      try {
+        let moved = task;
+        await write('move', async () => {
+          moved = await source.moveTask(task.id, { project_id: to.projectId, section_id: to.sectionId });
+        });
+        const withIt = indexRef.current ? new Set(descendantsOf(indexRef.current, task.id).map((t) => t.id)) : new Set<string>();
+        setSnapshot((s) =>
+          s
+            ? {
+                ...s,
+                tasks: s.tasks.map((t) =>
+                  t.id === task.id
+                    ? { ...moved, project_id: to.projectId, section_id: to.sectionId, parent_id: null }
+                    : withIt.has(t.id)
+                      ? { ...t, project_id: to.projectId, section_id: to.sectionId }
+                      : t,
+                ),
+              }
+            : s,
+        );
+        return true;
+      } catch (err) {
+        reportWriteFailure(err);
+        return false;
+      }
+    },
+    [source, write, reportWriteFailure],
+  );
+
   const reopenTask = useCallback(
     (task: TodoistTask) => {
       setSnapshot((s) =>
@@ -574,8 +613,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       void cacheClear();
       setSettings((s) => withoutSavedToken(s));
     },
+    moveTask,
     setRules: (rules) => setSettings((s) => ({ ...s, rules })),
     setNotifyOwnActions: (notifyOwnActions) => setSettings((s) => ({ ...s, notifyOwnActions })),
+    setTaskLayout: (taskLayout) => setSettings((s) => ({ ...s, taskLayout })),
   };
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

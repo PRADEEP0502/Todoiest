@@ -3,6 +3,9 @@ import type { DataMode } from '../services/todoist';
 
 export type TokenSource = 'saved' | 'env' | 'none';
 
+/** How tasks are laid out everywhere: one under another, or in a column per section. */
+export type TaskLayout = 'list' | 'board';
+
 export interface Settings {
   mode: DataMode;
   /** The token in use: one pasted in Settings, else VITE_TODOIST_API_TOKEN from .env.local. */
@@ -12,6 +15,8 @@ export interface Settings {
   rules: MetricRules;
   /** Show notifications for changes made by the connected account itself. */
   notifyOwnActions: boolean;
+  /** Chosen once in Settings and used by every page that lists tasks. */
+  taskLayout: TaskLayout;
 }
 
 /** Only deliberate choices are stored — never the .env token, never an automatic "demo". */
@@ -21,6 +26,7 @@ interface StoredSettings {
   demoChosen: boolean;
   rules: Partial<MetricRules>;
   notifyOwnActions: boolean;
+  taskLayout: TaskLayout;
 }
 
 const KEY = 'md-dashboard.settings.v2';
@@ -76,6 +82,7 @@ export function resolveSettings(stored: Partial<StoredSettings>, env: string): S
       categoryNames: { ...DEFAULT_RULES.categoryNames, ...stored.rules?.categoryNames },
     },
     notifyOwnActions: stored.notifyOwnActions ?? false,
+    taskLayout: stored.taskLayout === 'board' ? 'board' : 'list',
   };
 }
 
@@ -89,6 +96,7 @@ export function saveSettings(settings: Settings): void {
     demoChosen: settings.mode === 'demo' && settings.tokenSource !== 'none',
     rules: settings.rules,
     notifyOwnActions: settings.notifyOwnActions,
+    taskLayout: settings.taskLayout,
   };
   try {
     localStorage.setItem(KEY, JSON.stringify(stored));

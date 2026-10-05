@@ -2,7 +2,7 @@ import { groupByProjectAndSection } from '../../lib/hierarchy';
 import { useWorkspace } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { EmptyState, ProjectDot } from '../common/ui';
-import { BoardColumn, BoardScroller } from './BoardColumn';
+import { BoardColumn, BoardScroller, type BoardTarget } from './BoardColumn';
 
 /**
  * Any list of tasks as a board: one column per section, in project order, each column saying which
@@ -24,6 +24,18 @@ export function TaskBoard({
   const { groups, childrenOf } = groupByProjectAndSection(index, tasks, compare);
   if (groups.length === 0) return <EmptyState title="No tasks to show" />;
 
+  // Where a card may be sent: every section of the projects on this board, including the ones
+  // holding none of these tasks, so a task can be moved into an empty section too.
+  const targets: BoardTarget[] = groups.flatMap((group) => [
+    { projectId: group.project.id, sectionId: null, label: 'No section', hint: group.project.name },
+    ...(index.sectionsByProject.get(group.project.id) ?? []).map((section) => ({
+      projectId: group.project.id,
+      sectionId: section.id,
+      label: section.name,
+      hint: group.project.name,
+    })),
+  ]);
+
   return (
     <BoardScroller>
       {groups.flatMap((group) =>
@@ -42,6 +54,7 @@ export function TaskBoard({
             tasks={section.roots}
             childrenOf={childrenOf}
             add={{ projectId: group.project.id, sectionId: section.section?.id ?? null, ...addDefaults }}
+            targets={targets}
           />
         )),
       )}

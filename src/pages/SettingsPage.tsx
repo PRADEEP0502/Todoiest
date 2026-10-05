@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Loader2, PlugZap, RefreshCw } from 'lucide-react';
+import { Columns3, Eye, EyeOff, LayoutList, Loader2, PlugZap, RefreshCw } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { IconBadge, PageHeader } from '../components/common/ui';
 import { ConnectionBadge, ModeBadge, SyncButton } from '../components/layout/SyncStatus';
@@ -6,7 +6,7 @@ import { MetricRulesCard } from '../components/settings/MetricRulesCard';
 import { useWorkspace } from '../store/workspace';
 
 export function SettingsPage() {
-  const { mode, settings, snapshot, connectLive, switchToDemo, forgetToken } = useWorkspace();
+  const { mode, settings, snapshot, connectLive, switchToDemo, forgetToken, setTaskLayout } = useWorkspace();
   const [token, setToken] = useState('');
   const [reveal, setReveal] = useState(false);
   const [status, setStatus] = useState<{ tone: 'error' | 'ok'; text: string } | null>(null);
@@ -101,6 +101,28 @@ export function SettingsPage() {
           </div>
         </Card>
 
+        <Card title="How tasks are shown" icon={<LayoutList />}>
+          <p className="mb-3 text-[13px] text-ink-2">
+            Chosen once here and used everywhere tasks are listed — projects, a person's page, and every filtered list.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <LayoutChoice
+              chosen={settings.taskLayout === 'list'}
+              icon={<LayoutList size={16} />}
+              title="List"
+              note="Project → section → task, one under another."
+              onChoose={() => setTaskLayout('list')}
+            />
+            <LayoutChoice
+              chosen={settings.taskLayout === 'board'}
+              icon={<Columns3 size={16} />}
+              title="Board"
+              note="A column for each section, with tasks as cards you can drag between them."
+              onChoose={() => setTaskLayout('board')}
+            />
+          </div>
+        </Card>
+
         <MetricRulesCard />
 
 
@@ -120,6 +142,37 @@ export function SettingsPage() {
         </Card>
       </div>
     </>
+  );
+}
+
+/** One of the two layouts, with the chosen one marked. */
+function LayoutChoice({
+  chosen,
+  icon,
+  title,
+  note,
+  onChoose,
+}: {
+  chosen: boolean;
+  icon: ReactNode;
+  title: string;
+  note: string;
+  onChoose: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onChoose}
+      aria-pressed={chosen}
+      className={`min-w-0 flex-1 basis-60 rounded-xl border p-3.5 text-left ${chosen ? 'border-accent bg-accent/[0.06]' : 'border-line hover:bg-hover'}`}
+    >
+      <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+        {icon}
+        {title}
+        {chosen && <span className="ml-auto text-[12px] font-medium text-accent">In use</span>}
+      </span>
+      <span className="mt-1 block text-[12.5px] text-ink-2">{note}</span>
+    </button>
   );
 }
 

@@ -9,8 +9,6 @@ export interface HolderFilter {
   show?: HolderView;
   projectId?: string | null;
   sectionId?: string | null;
-  /** The tasks laid out as columns, one to a section, instead of as a list. */
-  board?: boolean;
 }
 
 export type Route =
@@ -18,10 +16,10 @@ export type Route =
   | { name: 'today' }
   | { name: 'upcoming' }
   | { name: 'projects' }
-  | { name: 'project'; projectId: string; sectionId: string | null; taskId: string | null; show: HolderView | null; board: boolean }
+  | { name: 'project'; projectId: string; sectionId: string | null; taskId: string | null; show: HolderView | null }
   | { name: 'overdue'; category: string | null }
   | { name: 'holders' }
-  | { name: 'holder'; holderId: string; show: HolderView; projectId: string | null; sectionId: string | null; board: boolean }
+  | { name: 'holder'; holderId: string; show: HolderView; projectId: string | null; sectionId: string | null }
   | { name: 'aging' }
   | { name: 'labels' }
   | { name: 'label'; label: string }
@@ -55,8 +53,6 @@ export function parseHash(hash: string): Route {
             taskId: query.get('task'),
             // A KPI card was clicked: the page lists that slice of the project instead of its sections.
             show: (HOLDER_VIEWS as readonly string[]).includes(query.get('show') ?? '') ? (query.get('show') as HolderView) : null,
-            // The sections laid out as columns, as Todoist's own board does.
-            board: query.get('view') === 'board',
           }
         : { name: 'projects' };
     case 'overdue':
@@ -69,7 +65,6 @@ export function parseHash(hash: string): Route {
         show: (HOLDER_VIEWS as readonly string[]).includes(query.get('show') ?? '') ? (query.get('show') as HolderView) : 'active',
         projectId: query.get('project'),
         sectionId: query.get('section'),
-        board: query.get('view') === 'board',
       };
     case 'labels':
       return parts[1] ? { name: 'label', label: parts[1] } : { name: 'labels' };
@@ -88,12 +83,11 @@ export const href = {
   upcoming: () => '#/upcoming',
   projects: () => '#/projects',
   /** Optionally points at a section or task inside the project, or at one of its KPI lists. */
-  project: (projectId: string, focus: { sectionId?: string | null; taskId?: string | null; show?: HolderView | null; board?: boolean } = {}) => {
+  project: (projectId: string, focus: { sectionId?: string | null; taskId?: string | null; show?: HolderView | null } = {}) => {
     const query = new URLSearchParams();
     if (focus.sectionId) query.set('section', focus.sectionId);
     if (focus.taskId) query.set('task', focus.taskId);
     if (focus.show) query.set('show', focus.show);
-    if (focus.board) query.set('view', 'board');
     const qs = query.toString();
     return `#/projects/${enc(projectId)}${qs ? `?${qs}` : ''}`;
   },
@@ -104,7 +98,6 @@ export const href = {
     if (filter.show && filter.show !== 'active') query.set('show', filter.show);
     if (filter.projectId) query.set('project', filter.projectId);
     if (filter.sectionId) query.set('section', filter.sectionId);
-    if (filter.board) query.set('view', 'board');
     const qs = query.toString();
     return `#/holders/${enc(id)}${qs ? `?${qs}` : ''}`;
   },
