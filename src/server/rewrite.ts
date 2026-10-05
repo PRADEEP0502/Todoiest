@@ -182,9 +182,10 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
       name: 'gemini',
       ask: async (said) => {
         let response = await call(said, await geminiModel(gemini));
-        // A model that has gone, or one that has had its fill for now: move to the next this key
-        // may use. Each has its own free allowance, so the words still get written.
-        for (let tries = 0; tries < 3 && (response.status === 404 || response.status === 429); tries++) {
+        // A model that has gone, has had its fill, or is swamped: move to the next this key may
+        // use. Each has its own allowance and its own load, so the words still get written.
+        const moveOn = [404, 429, 500, 503, 504];
+        for (let tries = 0; tries < 4 && moveOn.includes(response.status); tries++) {
           if (response.status === 404) forgetModel();
           else if (!nextModel()) break;
           response = await call(said, await geminiModel(gemini));

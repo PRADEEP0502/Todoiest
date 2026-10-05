@@ -230,6 +230,40 @@ describe('when one model has had its fill', () => {
     expect(asked[1]).toContain('gemini-2.0-flash-lite');
   });
 
+  it('moves on when a model is swamped, not only when it is spent', async () => {
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', async (request: Request) => {
+      if (request.method === 'GET') return modelList(['gemini-2.0-flash', 'gemini-2.0-flash-lite']);
+      asked.push(request.url);
+      // Gemini answers 503 "overloaded" for the first model; the next one is free.
+      if (asked.length === 1) return new Response('overloaded', { status: 503 });
+      return geminiReply({ tasks: ['Update the JPM website'] });
+    });
+    const response = await rewriteSpeech(
+      new Request('https://dash.example/api/rewrite', { method: 'POST', body: JSON.stringify({ text: 'ஜேபிஎம் வெப்சைட்டை அப்டேட் பண்ணனும்' }) }),
+      writerFor({ gemini: 'gemini-test-secret' }),
+    );
+    expect(await response.json()).toEqual({ tasks: ['Update the JPM website'] });
+    expect(asked[1]).toContain('gemini-2.0-flash-lite');
+  });
+
+  it('carries Tamil to the model exactly as it was spoken', async () => {
+    const said = 'கொட்டேஷன் தயார் பண்ணி எம்டி கிட்ட அனுப்பணும்';
+    let sent = '';
+    vi.stubGlobal('fetch', async (request: Request) => {
+      if (request.method === 'GET') return modelList(['gemini-2.0-flash']);
+      sent = await request.clone().text();
+      return geminiReply({ tasks: ['Prepare the quotation and send it to the MD'] });
+    });
+    const response = await rewriteSpeech(
+      new Request('https://dash.example/api/rewrite', { method: 'POST', body: JSON.stringify({ text: said }) }),
+      writerFor({ gemini: 'gemini-test-secret' }),
+    );
+    expect(await response.json()).toEqual({ tasks: ['Prepare the quotation and send it to the MD'] });
+    // The Tamil arrives whole, not as escapes or question marks.
+    expect(JSON.parse(sent).contents[0].parts[0].text).toBe(said);
+  });
+
   it('gives up once every model has said the same, and says it is busy', async () => {
     vi.stubGlobal('fetch', async (request: Request) =>
       request.method === 'GET' ? modelList(['gemini-2.0-flash', 'gemini-2.5-flash']) : new Response('quota', { status: 429 }),
