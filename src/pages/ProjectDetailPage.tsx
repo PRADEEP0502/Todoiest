@@ -1,4 +1,4 @@
-import { ChevronsDownUp, ChevronsUpDown, ClipboardList, FolderX, ListPlus, MessageSquare, Plus, Search, X } from 'lucide-react';
+import { Columns3, ChevronsDownUp, ChevronsUpDown, ClipboardList, FolderX, List, ListPlus, MessageSquare, Plus, Search, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Gate } from '../components/common/Gate';
 import { SearchField } from '../components/common/SearchField';
@@ -8,6 +8,7 @@ import { CompletedList } from '../components/tasks/CompletedList';
 import { ScopeKpis, scopeLists, VIEW_TITLE } from '../components/tasks/ScopeKpis';
 import { Count, EmptyState, ProjectDot, ShowMore } from '../components/common/ui';
 import { NewSectionDialog } from '../components/projects/CreateDialogs';
+import { ProjectBoard } from '../components/projects/ProjectBoard';
 import { ProjectSections, projectBlockKeys } from '../components/projects/ProjectSections';
 import { disclosureKey, isOpen, setOpen, useDisclosureState } from '../hooks/useDisclosure';
 import { href, type HolderView } from '../hooks/useRoute';
@@ -29,6 +30,8 @@ interface Props {
   taskId: string | null;
   /** Set when a KPI card was clicked: the page lists that slice of the project. */
   show: HolderView | null;
+  /** The sections laid out as columns instead of as a list. */
+  board: boolean;
   /** Changes on every navigation, so picking the same search result again re-reveals it. */
   visit: number;
 }
@@ -37,7 +40,7 @@ export function ProjectDetailPage(props: Props) {
   return <Gate>{({ index, snapshot }) => <ProjectDetail {...props} index={index} snapshot={snapshot} />}</Gate>;
 }
 
-function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, visit }: Props & { index: WorkspaceIndex; snapshot: WorkspaceSnapshot }) {
+function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, board, visit }: Props & { index: WorkspaceIndex; snapshot: WorkspaceSnapshot }) {
   const { openNewTask } = useUi();
   const { settings } = useWorkspace();
   const now = useNow(60_000);
@@ -116,7 +119,24 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, vi
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {blockKeys.length > 0 && (
+          {/* List or board, as Todoist offers; the choice is in the URL, so a shared link keeps it. */}
+          <div className="flex rounded-md border border-line bg-surface p-0.5" role="group" aria-label="How to lay out this project">
+            <a
+              href={href.project(project.id, { show })}
+              className={`inline-flex h-7 items-center gap-1.5 rounded px-2 text-[12.5px] ${board ? 'text-ink-2 hover:text-ink' : 'bg-hover font-medium text-ink'}`}
+              aria-current={board ? undefined : 'true'}
+            >
+              <List size={14} /> List
+            </a>
+            <a
+              href={href.project(project.id, { show, board: true })}
+              className={`inline-flex h-7 items-center gap-1.5 rounded px-2 text-[12.5px] ${board ? 'bg-hover font-medium text-ink' : 'text-ink-2 hover:text-ink'}`}
+              aria-current={board ? 'true' : undefined}
+            >
+              <Columns3 size={14} /> Board
+            </a>
+          </div>
+          {!board && blockKeys.length > 0 && (
             <button type="button" className="btn-ghost" onClick={() => setOpen(blockKeys, !allOpen)}>
               {allOpen ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
               {allOpen ? 'Collapse all' : 'Expand all'}
@@ -213,6 +233,8 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, vi
             <GroupedTasks tasks={shownTasks} viewKey={`project-view:${project.id}:${show}`} compare={byPriorityThenTime} defaultOpen />
           )}
         </div>
+      ) : board ? (
+        <ProjectBoard index={index} projectId={project.id} />
       ) : (
         <div className="panel overflow-hidden">
           <ProjectSections index={index} projectId={project.id} />
