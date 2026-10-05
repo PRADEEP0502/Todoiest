@@ -1,6 +1,8 @@
 import { Languages, Loader2, Mic, MicOff, Square } from 'lucide-react';
 import { useState } from 'react';
 import { useSpeech } from '../../hooks/useSpeech';
+import { useWorkspace } from '../../store/workspace';
+import { workspaceNames } from '../../lib/workspaceNames';
 
 /** Tamil speech is recognised as Tamil; English and Tanglish both come through as English. */
 const LANGUAGES = [
@@ -29,6 +31,7 @@ interface VoiceCaptureProps {
  */
 export function VoiceCapture({ onTasks, useLabel = 'Use this', single = false }: VoiceCaptureProps) {
   const speech = useSpeech();
+  const { index, snapshot } = useWorkspace();
   const [language, setLanguage] = useState(LANGUAGES[0].value);
   const [thinking, setThinking] = useState(false);
   const [tasks, setTasks] = useState<string[]>([]);
@@ -57,7 +60,8 @@ export function VoiceCapture({ onTasks, useLabel = 'Use this', single = false }:
       const response = await fetch('/api/rewrite', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: said }),
+        // The workspace's own names, so a Tamil spelling of one comes back as the name itself.
+        body: JSON.stringify({ text: said, names: workspaceNames(index, snapshot) }),
       });
       const data = (await response.json()) as { tasks?: string[]; question?: string; error?: string };
       if (!response.ok) {

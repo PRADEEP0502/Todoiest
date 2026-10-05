@@ -34,6 +34,23 @@ Rules:
 
 Answer as JSON: {"tasks": ["..."], "question": "..."} — "question" only when you have no tasks.`;
 
+/** As many of the workspace's own names as are worth sending, and how long each may be. */
+export const MAX_NAMES = 80;
+const MAX_NAME_LENGTH = 60;
+
+/** The names this workspace uses, cleaned up and capped, as a line for the model to match against. */
+export function namesHint(raw: unknown): string {
+  if (!Array.isArray(raw)) return '';
+  const names = [...new Set(raw.filter((n): n is string => typeof n === 'string').map((n) => n.trim().slice(0, MAX_NAME_LENGTH)).filter(Boolean))].slice(0, MAX_NAMES);
+  if (!names.length) return '';
+  return `
+
+These are the names used in this workspace — projects, sections, machines and people:
+${names.join(', ')}
+
+When something spoken sounds like one of them, especially a Tamil spelling of it, write that name exactly as it appears above.`;
+}
+
 const deny = (status: number, message: string) =>
   new Response(JSON.stringify({ error: message }), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
@@ -83,7 +100,7 @@ export function cleanResult(raw: unknown): Rewritten {
 /** A service that can be asked, and how to read what it answers. */
 export interface Writer {
   name: 'gemini' | 'openai';
-  ask: (said: string) => Promise<Response>;
+  ask: (said: string, names?: string) => Promise<Response>;
   /** The JSON the model wrote, pulled out of that service's own envelope. */
   read: (body: unknown) => unknown;
 }
@@ -164,14 +181,14 @@ export function forgetModel(): void {
 export function writerFor(keys: { gemini?: string; openai?: string }): Writer | null {
   const gemini = keys.gemini;
   if (gemini) {
-    const call = (said: string, model: string) =>
+    const call = (said: string, model: string, names: string) =>
       fetch(
         new Request(`${GEMINI_URL}/${model}:generateContent`, {
           method: 'POST',
           // The key travels as a header, so it is never part of a URL anywhere.
           headers: { 'x-goog-api-key': gemini, 'content-type': 'application/json' },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
+            systemInstruction: { parts: [{ text: INSTRUCTIONS + names }] },
             contents: [{ role: 'user', parts: [{ text: said }] }],
             // Room to spare: a cut-off answer is worse than a few unused tokens.
             generationConfig: { temperature: 0.2, maxOutputTokens: 1200, responseMimeType: 'application/json' },
@@ -180,15 +197,15 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
       );
     return {
       name: 'gemini',
-      ask: async (said) => {
-        let response = await call(said, await geminiModel(gemini));
+      ask: async (said, names = '') => {
+        let response = await call(said, await geminiModel(gemini), names);
         // A model that has gone, has had its fill, or is swamped: move to the next this key may
         // use. Each has its own allowance and its own load, so the words still get written.
         const moveOn = [404, 429, 500, 503, 504];
         for (let tries = 0; tries < 4 && moveOn.includes(response.status); tries++) {
           if (response.status === 404) forgetModel();
           else if (!nextModel()) break;
-          response = await call(said, await geminiModel(gemini));
+          response = await call(said, await geminiModel(gemini), names);
         }
         return response;
       },
@@ -202,7 +219,7 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
   if (openai) {
     return {
       name: 'openai',
-      ask: (said) =>
+      ask: (said, names = '') =>
         fetch(
           new Request(OPENAI_URL, {
             method: 'POST',
@@ -213,7 +230,7 @@ export function writerFor(keys: { gemini?: string; openai?: string }): Writer | 
               max_tokens: 500,
               response_format: { type: 'json_object' },
               messages: [
-                { role: 'system', content: INSTRUCTIONS },
+                { role: 'system', content: INSTRUCTIONS + names },
                 { role: 'user', content: said },
               ],
             }),
@@ -240,9 +257,11 @@ export async function rewriteSpeech(request: Request, writer = writerFor(serverK
   if (!writer) return deny(503, 'Speech to task needs a key on the server: GEMINI_API_KEY (or OPENAI_API_KEY).');
 
   let text: string;
+  let names = '';
   try {
-    const body = (await request.json()) as { text?: unknown };
+    const body = (await request.json()) as { text?: unknown; names?: unknown };
     text = typeof body.text === 'string' ? body.text.trim() : '';
+    names = namesHint(body.names);
   } catch {
     return deny(400, 'The request was not readable.');
   }
@@ -254,7 +273,7 @@ export async function rewriteSpeech(request: Request, writer = writerFor(serverK
   let upstream: Response | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      upstream = await writer.ask(text);
+      upstream = await writer.ask(text, names);
     } catch {
       upstream = null;
     }

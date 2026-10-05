@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { beforeEach } from 'vitest';
-import { cleanResult, parseModelJson, forgetModel, geminiModel, MAX_SPEECH_LENGTH, MAX_TASKS, rewriteSpeech, writerFor } from './rewrite';
+import { cleanResult, MAX_NAMES, namesHint, parseModelJson, forgetModel, geminiModel, MAX_SPEECH_LENGTH, MAX_TASKS, rewriteSpeech, writerFor } from './rewrite';
 
 const GEMINI_KEY = 'gemini-test-secret';
 const OPENAI_KEY = 'sk-test-secret';
@@ -274,5 +274,26 @@ describe('when one model has had its fill', () => {
     );
     expect(response.status).toBe(502);
     expect((await response.json()).error).toMatch(/busy right now \(429\)/);
+  });
+});
+
+describe('the workspace names sent along with the words', () => {
+  it('puts them where the model can match a Tamil spelling against them', () => {
+    const hint = namesHint(['JPM Billpassing', '6T mechine', 'Meenakshi sundaram']);
+    expect(hint).toContain('JPM Billpassing');
+    expect(hint).toContain('6T mechine');
+    expect(hint).toMatch(/Tamil spelling/);
+  });
+
+  it('keeps the list sane: no blanks, no repeats, no runaway length', () => {
+    expect(namesHint([])).toBe('');
+    expect(namesHint('not a list')).toBe('');
+    expect(namesHint([' RV ', 'RV', '', '   '])).toContain('RV');
+    expect(namesHint([' RV ', 'RV'])).not.toMatch(/RV,\s*RV/);
+    const many = namesHint(Array.from({ length: 200 }, (_, i) => `Name ${i}`));
+    const listed = many.split(String.fromCharCode(10)).find((line) => line.startsWith('Name 0'))!;
+    expect(listed.split(', ')).toHaveLength(MAX_NAMES);
+    expect(namesHint(['x'.repeat(200)])).toContain('x'.repeat(60));
+    expect(namesHint(['x'.repeat(200)])).not.toContain('x'.repeat(61));
   });
 });
