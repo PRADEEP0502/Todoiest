@@ -191,10 +191,12 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
       onClose={onClose}
       title={
         task ? (
-          <span className="truncate">{taskPath(index, task).join(' › ')}</span>
+          <span className="block truncate">{taskPath(index, task).join(' › ')}</span>
         ) : parentTask ? (
-          <span className="truncate">
-            <span className="font-medium text-ink">New subtask</span> of {taskTitle(parentTask.content)}
+          <span className="flex min-w-0 items-baseline gap-1">
+            <span className="shrink-0 font-medium text-ink">New subtask</span>
+            <span className="shrink-0">of</span>
+            <span className="truncate">{taskTitle(parentTask.content)}</span>
           </span>
         ) : (
           <span className="font-medium text-ink">New task</span>
@@ -207,13 +209,13 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit();
         }}
-        className="space-y-4"
+        className="space-y-5"
       >
         <div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-start gap-2">
             <input
               data-autofocus={task ? undefined : true}
-              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[17px] font-semibold leading-6 text-ink placeholder:font-normal placeholder:text-ink-3 focus:outline-none focus:ring-0"
+              className="min-w-0 flex-1 rounded-xl border border-black/[0.07] bg-surface px-3.5 py-2 text-[16px] font-semibold leading-7 text-ink placeholder:font-normal placeholder:text-ink-3 focus:border-black/20 focus:outline-none focus:ring-4 focus:ring-black/[0.04]"
               placeholder="Task name"
               value={form.content}
               onChange={(e) => set('content', e.target.value)}
@@ -221,7 +223,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
             />
             {!task && <VoiceCapture single useLabel="Use this task" onTasks={(spoken) => spoken[0] && set('content', spoken[0])} />}
           </div>
-          <div className="mt-3">
+          <div className="mt-3.5">
             <TaskDateCards
               dates={cardDates}
               cdTime={task ? cardDates.cdTime : null}
@@ -232,11 +234,13 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
               onEditDue={() => dueInput.current?.focus()}
             />
             {!task && !routine && (
-              <p className="mt-2 text-[11.5px] text-ink-3">Saved in Todoist as “{titleForNewTask(form.content.trim() || 'Task name', now, form.idd)}”</p>
+              <p className="mt-2 truncate text-[11.5px] text-ink-3" title={titleForNewTask(form.content.trim() || 'Task name', now, form.idd)}>
+                Saved in Todoist as “{titleForNewTask(form.content.trim() || 'Task name', now, form.idd)}”
+              </p>
             )}
           </div>
           <textarea
-            className="mt-2 w-full resize-none border-0 bg-transparent p-0 text-[13px] leading-5 text-ink-2 placeholder:text-ink-3 focus:outline-none focus:ring-0"
+            className="mt-3 w-full resize-none rounded-xl border border-black/[0.07] bg-surface px-3 py-2 text-[13px] leading-5 text-ink-2 placeholder:text-ink-3 focus:border-black/20 focus:outline-none focus:ring-4 focus:ring-black/[0.04]"
             placeholder="Description"
             rows={Math.min(6, Math.max(2, form.description.split('\n').length))}
             value={form.description}
@@ -289,62 +293,64 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
           </div>
         </div>
 
-        <div>
-          <label className="label" htmlFor="task-assignee">Holder</label>
-          <SearchSelect
-            id="task-assignee"
-            className="w-full sm:max-w-xs"
-            searchPlaceholder="Search people…"
-            placeholder="No one"
-            value={form.assigneeId ?? ''}
-            onChange={(id) => set('assigneeId', id || null)}
-            options={[
-              { value: '', label: 'No one' },
-              ...people.map((person) => ({
-                value: person.id,
-                label: person.name,
-                icon: <Avatar id={person.id} name={person.name} size={18} />,
-              })),
-            ]}
-          />
-          <p className="mt-1 text-[12px] text-ink-3">
-            {people.length === 0
-              ? 'Nobody is on this project in Todoist yet, so it has no holder to choose.'
-              : `${people.length} ${people.length === 1 ? 'person is' : 'people are'} on this project.`}
-          </p>
-        </div>
-
-        <div>
-          <label className="label inline-flex items-center gap-1.5" htmlFor="task-due">
-            DD · Due date <Pencil size={11} strokeWidth={2.25} className="text-accent" aria-hidden />
-            <span className="font-normal text-ink-3">editable</span>
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              id="task-due"
-              ref={dueInput}
-              type="date"
-              className="field w-auto"
-              value={form.dueDate ?? ''}
-              onChange={(e) => set('dueDate', e.target.value || null)}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="task-assignee">Holder</label>
+            <SearchSelect
+              id="task-assignee"
+              className="w-full"
+              searchPlaceholder="Search people…"
+              placeholder="No one"
+              value={form.assigneeId ?? ''}
+              onChange={(id) => set('assigneeId', id || null)}
+              options={[
+                { value: '', label: 'No one' },
+                ...people.map((person) => ({
+                  value: person.id,
+                  label: person.name,
+                  icon: <Avatar id={person.id} name={person.name} size={18} />,
+                })),
+              ]}
             />
-            {quickDates.map(([label, value]) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => set('dueDate', value)}
-                className={`h-7 rounded-full border px-2.5 text-[12px] transition-colors ${form.dueDate === value ? 'border-accent bg-accent-soft font-medium text-accent' : 'border-line text-ink-2 hover:bg-hover'}`}
-              >
-                {label}
-              </button>
-            ))}
+            <p className="mt-1.5 text-[12px] leading-4 text-ink-3">
+              {people.length === 0
+                ? 'Nobody is on this project in Todoist yet, so it has no holder to choose.'
+                : `${people.length} ${people.length === 1 ? 'person is' : 'people are'} on this project.`}
+            </p>
           </div>
-          {task?.due?.is_recurring && form.dueDate !== initial.dueDate && (
-            <p className="mt-1.5 text-[12px] text-p2">This task repeats. Setting a fixed date replaces its repeat schedule in Todoist.</p>
-          )}
-          {task && dueTime(task.due) && form.dueDate === initial.dueDate && (
-            <p className="mt-1.5 text-[12px] text-ink-3">Due at {dueTime(task.due)}</p>
-          )}
+
+          <div>
+            <label className="label inline-flex items-center gap-1.5" htmlFor="task-due">
+              DD · Due date <Pencil size={11} strokeWidth={2.25} className="text-accent" aria-hidden />
+              <span className="font-normal text-ink-3">editable</span>
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                id="task-due"
+                ref={dueInput}
+                type="date"
+                className="field w-auto"
+                value={form.dueDate ?? ''}
+                onChange={(e) => set('dueDate', e.target.value || null)}
+              />
+              {quickDates.map(([label, value]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => set('dueDate', value)}
+                  className={`h-7 rounded-full border px-2.5 text-[12px] transition-colors ${form.dueDate === value ? 'border-accent bg-accent-soft font-medium text-accent' : 'border-line text-ink-2 hover:bg-hover'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {task?.due?.is_recurring && form.dueDate !== initial.dueDate && (
+              <p className="mt-1.5 text-[12px] text-p2">This task repeats. Setting a fixed date replaces its repeat schedule in Todoist.</p>
+            )}
+            {task && dueTime(task.due) && form.dueDate === initial.dueDate && (
+              <p className="mt-1.5 text-[12px] text-ink-3">Due at {dueTime(task.due)}</p>
+            )}
+          </div>
         </div>
 
         <div>

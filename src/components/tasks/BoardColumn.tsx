@@ -158,15 +158,20 @@ function MoveTaskDialog({
 
   return (
     <Modal
-      title={<>Move <span className="font-medium text-ink">{taskTitle(plainText(task.content))}</span></>}
+      title={
+        <span className="flex min-w-0 items-baseline gap-1">
+          <span className="shrink-0">Move</span>
+          <span className="truncate font-medium text-ink">{taskTitle(plainText(task.content))}</span>
+        </span>
+      }
       onClose={onClose}
       width="max-w-md"
       footer={
         <>
+          <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
           <button type="button" className="btn-primary" onClick={() => void move()} disabled={busy || to === targetKey(here)}>
-            Move task
+            {busy ? 'Moving…' : 'Move task'}
           </button>
-          <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
         </>
       }
     >

@@ -189,7 +189,7 @@ export function TaskDateCards({
             <span className="mt-1 block text-[11px] leading-[14px] text-ink-3">{note}</span>
           </>
         );
-        const base = 'block min-w-0 rounded-2xl border px-3 py-2.5 text-left';
+        const base = 'flex min-w-0 flex-col items-stretch rounded-2xl border px-3 py-2.5 text-left';
         return editable && onEditDue ? (
           <button
             key={kind}

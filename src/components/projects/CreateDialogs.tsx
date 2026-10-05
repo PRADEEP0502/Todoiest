@@ -46,7 +46,6 @@ export function NewProjectDialog({ onClose, onCreated }: { onClose: () => void; 
       onClose={onClose}
       footer={
         <>
-          <span className="flex-1" />
           <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
           <button type="button" className="btn-primary" onClick={() => submit()} disabled={!valid || busy}>
             {busy && <Loader2 size={14} className="animate-spin" />}
@@ -144,15 +143,15 @@ export function NewSectionDialog({ projectId, onClose, onCreated }: { projectId:
   return (
     <Modal
       title={
-        <span>
-          New section in <span className="font-medium text-ink">{project.name}</span>
+        <span className="flex min-w-0 items-baseline gap-1">
+          <span className="shrink-0">New section in</span>
+          <span className="truncate font-medium text-ink">{project.name}</span>
         </span>
       }
       onClose={onClose}
       width="max-w-md"
       footer={
         <>
-          <span className="flex-1" />
           <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
           <button type="button" className="btn-primary" onClick={() => submit()} disabled={!name.trim() || busy}>
             {busy && <Loader2 size={14} className="animate-spin" />}

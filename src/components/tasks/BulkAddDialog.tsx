@@ -168,9 +168,9 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
             rows={8}
             spellCheck={false}
             placeholder={'Get quotation\nCompare rates\nGet MD approval'}
-            className="field h-auto resize-y py-2 font-[inherit] leading-6"
+            className="field mt-2 h-auto resize-y py-2 font-[inherit] leading-6"
           />
-          <p className="mt-1 text-[12px] text-ink-3">
+          <p className="mt-1.5 text-[12px] leading-4 text-ink-3">
             Paste as many lines as you like; nothing is created until you press “Create tasks”. Bullets and numbering are dropped.
             {extra > 0 && <span className="text-p1"> Only the first {MAX_BULK_TASKS} lines are used — {extra} more were left out.</span>}
           </p>
