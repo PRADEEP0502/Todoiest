@@ -4,13 +4,13 @@ import { href, parseHash } from './useRoute';
 describe('holder addresses', () => {
   it('round-trips a holder page with its filters', () => {
     const url = href.holder('u 1', { show: 'overdue', projectId: 'p9', sectionId: 's3' });
-    expect(parseHash(url)).toEqual({ name: 'holder', holderId: 'u 1', show: 'overdue', projectId: 'p9', sectionId: 's3' });
+    expect(parseHash(url)).toEqual({ name: 'holder', holderId: 'u 1', show: 'overdue', projectId: 'p9', sectionId: 's3', board: false });
   });
 
   it('defaults to all active tasks and keeps the plain address short', () => {
     expect(href.holder('u1')).toBe('#/holders/u1');
     expect(href.holder('u1', { show: 'active' })).toBe('#/holders/u1');
-    expect(parseHash('#/holders/u1')).toEqual({ name: 'holder', holderId: 'u1', show: 'active', projectId: null, sectionId: null });
+    expect(parseHash('#/holders/u1')).toEqual({ name: 'holder', holderId: 'u1', show: 'active', projectId: null, sectionId: null, board: false });
   });
 
   it('ignores an unknown view instead of breaking the page', () => {
@@ -33,5 +33,17 @@ describe('project addresses', () => {
     expect(href.project('p7')).toBe('#/projects/p7');
     expect(parseHash('#/projects/p7')).toMatchObject({ board: false });
     expect(parseHash('#/projects/p7?view=nonsense')).toMatchObject({ board: false });
+  });
+});
+
+describe('holder board addresses', () => {
+  it('round-trips the board, keeping the person’s filters', () => {
+    const url = href.holder('u1', { show: 'overdue', projectId: 'p9', board: true });
+    expect(parseHash(url)).toMatchObject({ name: 'holder', holderId: 'u1', show: 'overdue', projectId: 'p9', board: true });
+  });
+
+  it('is the list unless the board was asked for', () => {
+    expect(href.holder('u1')).toBe('#/holders/u1');
+    expect(parseHash('#/holders/u1')).toMatchObject({ board: false });
   });
 });

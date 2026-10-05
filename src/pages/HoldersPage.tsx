@@ -1,4 +1,4 @@
-import { ClipboardList, FolderKanban, ListTree, MessageSquare, Plus, Search, Users, X } from 'lucide-react';
+import { ClipboardList, Columns3, FolderKanban, List, ListTree, MessageSquare, Plus, Search, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { BarList } from '../components/charts/BarList';
 import { Gate } from '../components/common/Gate';
@@ -8,10 +8,11 @@ import { Avatar, EmptyState, Notice, PageHeader, Panel, ProjectDot, ShowMore } f
 import { BulkAddDialog } from '../components/tasks/BulkAddDialog';
 import { CompletedList } from '../components/tasks/CompletedList';
 import { GroupedTasks } from '../components/tasks/GroupedTasks';
+import { TaskBoard } from '../components/tasks/TaskBoard';
 import { ScopeKpis, scopeLists, VIEW_TITLE } from '../components/tasks/ScopeKpis';
 import { useNow } from '../hooks/useNow';
 import { usePaged } from '../hooks/usePaged';
-import { href, navigate, type HolderView } from '../hooks/useRoute';
+import { href, navigate, type HolderFilter, type HolderView } from '../hooks/useRoute';
 import { formatShortDate, formatTime, startOfMonth } from '../lib/dates';
 import { taskPath, type WorkspaceIndex } from '../lib/hierarchy';
 import { filterTasks } from '../lib/search';
@@ -190,6 +191,8 @@ interface HolderPageProps {
   show: HolderView;
   projectId: string | null;
   sectionId: string | null;
+  /** The tasks laid out as columns, one to a section, instead of as a list. */
+  board: boolean;
 }
 
 /**
@@ -197,7 +200,7 @@ interface HolderPageProps {
  * below by state, and the project and section bars narrow it further — nothing opens the
  * company-wide views.
  */
-export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageProps) {
+export function HolderPage({ holderId, show, projectId, sectionId, board }: HolderPageProps) {
   const now = useNow(60_000);
   const { settings } = useWorkspace();
   const { openNewTask } = useUi();
@@ -258,8 +261,7 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
         const topProjects = [...byProject].sort((a, b) => b[1] - a[1]).slice(0, 6);
         const topSections = [...bySection].sort((a, b) => b[1] - a[1]).slice(0, 6);
 
-        const link = (filter: { show?: HolderView; projectId?: string | null; sectionId?: string | null }) =>
-          href.holder(holderId, { show, projectId: scopeProjectId, sectionId, ...filter });
+        const link = (filter: HolderFilter) => href.holder(holderId, { show, projectId: scopeProjectId, sectionId, board, ...filter });
         const card = (view: HolderView) => ({ href: link({ show: view }), selected: show === view });
         const scoped = !!scopeProjectId || !!sectionId;
         const count = show === 'completed' ? completed.length : show === 'comments' ? comments.length : lists[show].length;
@@ -379,9 +381,28 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                       Clear filters
                     </a>
                   )}
+                  {/* List or board, as Todoist offers; the choice is in the address, so a shared link keeps it. */}
+                  {show !== 'completed' && show !== 'comments' && (
+                    <div className="flex rounded-md border border-line bg-surface p-0.5 sm:ml-auto" role="group" aria-label="How to lay out these tasks">
+                      <a
+                        href={link({ board: false })}
+                        className={`inline-flex h-8 items-center gap-1.5 rounded px-2 text-[12.5px] ${board ? 'text-ink-2 hover:text-ink' : 'bg-hover font-medium text-ink'}`}
+                        aria-current={board ? undefined : 'true'}
+                      >
+                        <List size={14} /> List
+                      </a>
+                      <a
+                        href={link({ board: true })}
+                        className={`inline-flex h-8 items-center gap-1.5 rounded px-2 text-[12.5px] ${board ? 'bg-hover font-medium text-ink' : 'text-ink-2 hover:text-ink'}`}
+                        aria-current={board ? 'true' : undefined}
+                      >
+                        <Columns3 size={14} /> Board
+                      </a>
+                    </div>
+                  )}
                   <button
                     type="button"
-                    className="btn-secondary h-9 sm:ml-auto"
+                    className={`btn-secondary h-9 ${show === 'completed' || show === 'comments' ? 'sm:ml-auto' : ''}`}
                     onClick={() => setBulkAdding(true)}
                     disabled={!scopeProjectId && index.orderedProjects.length === 0}
                   >
@@ -407,7 +428,8 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                     <Notice>Todoist has no holder for these tasks (they are unassigned, or in projects that are not shared).</Notice>
                   </div>
                 )}
-                <div className="panel px-3 py-2">
+                {/* The board brings its own columns, so it is not boxed in a panel as a list is. */}
+                <div className={board && count > 0 && found > 0 ? '' : 'panel px-3 py-2'}>
                   {count === 0 ? (
                     <EmptyState title={`${VIEW_TITLE[show]}: none for ${name}${scoped ? ' here' : ''}`} />
                   ) : found === 0 ? (
@@ -418,6 +440,12 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
                     <CompletedList tasks={filterTasks(completed, query, index, snapshot.people)} index={index} listKey={`${holderId}:${scopeProjectId}:${sectionId}:${query}`} />
                   ) : show === 'comments' ? (
                     <HolderComments comments={comments.filter((c) => matchesComment(c, query, index))} index={index} now={now} />
+                  ) : board ? (
+                    <TaskBoard
+                      tasks={filterTasks(lists[show], query, index, snapshot.people)}
+                      compare={byPriorityThenTime}
+                      addDefaults={{ assigneeId: holderId === UNASSIGNED ? null : holderId }}
+                    />
                   ) : (
                     // Open, so the whole list scrolls straight through without expanding each group.
                     <GroupedTasks

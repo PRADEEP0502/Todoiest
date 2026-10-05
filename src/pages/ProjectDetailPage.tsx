@@ -4,6 +4,7 @@ import { Gate } from '../components/common/Gate';
 import { SearchField } from '../components/common/SearchField';
 import { BulkAddDialog } from '../components/tasks/BulkAddDialog';
 import { GroupedTasks } from '../components/tasks/GroupedTasks';
+import { TaskBoard } from '../components/tasks/TaskBoard';
 import { CompletedList } from '../components/tasks/CompletedList';
 import { ScopeKpis, scopeLists, VIEW_TITLE } from '../components/tasks/ScopeKpis';
 import { Count, EmptyState, ProjectDot, ShowMore } from '../components/common/ui';
@@ -204,17 +205,19 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, bo
       </div>
 
       {searching ? (
-        <div className="panel px-3 py-2">
+        <div className={board && matches.length > 0 ? '' : 'panel px-3 py-2'}>
           {matches.length === 0 ? (
             <EmptyState icon={<Search size={24} />} title={`Nothing in ${project.name} matches “${query.trim()}”`}>
               <button type="button" className="text-accent hover:underline" onClick={() => setQuery('')}>Clear the search</button>
             </EmptyState>
+          ) : board ? (
+            <TaskBoard tasks={matches} />
           ) : (
             <GroupedTasks tasks={matches} viewKey={`project-search:${project.id}`} defaultOpen />
           )}
         </div>
       ) : show ? (
-        <div className="panel px-3 py-2">
+        <div className={board && show !== 'completed' && show !== 'comments' && shownTasks.length > 0 ? '' : 'panel px-3 py-2'}>
           {show === 'completed' ? (
             completed.length === 0 ? (
               <EmptyState title={`${VIEW_TITLE[show]}: none in ${project.name}`} />
@@ -229,6 +232,8 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, bo
             )
           ) : shownTasks.length === 0 ? (
             <EmptyState title={`${VIEW_TITLE[show]}: none in ${project.name}`} />
+          ) : board ? (
+            <TaskBoard tasks={shownTasks} compare={byPriorityThenTime} />
           ) : (
             <GroupedTasks tasks={shownTasks} viewKey={`project-view:${project.id}:${show}`} compare={byPriorityThenTime} defaultOpen />
           )}

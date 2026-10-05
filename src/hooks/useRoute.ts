@@ -9,6 +9,8 @@ export interface HolderFilter {
   show?: HolderView;
   projectId?: string | null;
   sectionId?: string | null;
+  /** The tasks laid out as columns, one to a section, instead of as a list. */
+  board?: boolean;
 }
 
 export type Route =
@@ -19,7 +21,7 @@ export type Route =
   | { name: 'project'; projectId: string; sectionId: string | null; taskId: string | null; show: HolderView | null; board: boolean }
   | { name: 'overdue'; category: string | null }
   | { name: 'holders' }
-  | { name: 'holder'; holderId: string; show: HolderView; projectId: string | null; sectionId: string | null }
+  | { name: 'holder'; holderId: string; show: HolderView; projectId: string | null; sectionId: string | null; board: boolean }
   | { name: 'aging' }
   | { name: 'labels' }
   | { name: 'label'; label: string }
@@ -67,6 +69,7 @@ export function parseHash(hash: string): Route {
         show: (HOLDER_VIEWS as readonly string[]).includes(query.get('show') ?? '') ? (query.get('show') as HolderView) : 'active',
         projectId: query.get('project'),
         sectionId: query.get('section'),
+        board: query.get('view') === 'board',
       };
     case 'labels':
       return parts[1] ? { name: 'label', label: parts[1] } : { name: 'labels' };
@@ -101,6 +104,7 @@ export const href = {
     if (filter.show && filter.show !== 'active') query.set('show', filter.show);
     if (filter.projectId) query.set('project', filter.projectId);
     if (filter.sectionId) query.set('section', filter.sectionId);
+    if (filter.board) query.set('view', 'board');
     const qs = query.toString();
     return `#/holders/${enc(id)}${qs ? `?${qs}` : ''}`;
   },

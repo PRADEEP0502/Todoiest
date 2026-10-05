@@ -41,7 +41,7 @@ function Page({ route, visit }: { route: Route; visit: number }) {
     case 'holders':
       return <HoldersPage />;
     case 'holder':
-      return <HolderPage holderId={route.holderId} show={route.show} projectId={route.projectId} sectionId={route.sectionId} />;
+      return <HolderPage holderId={route.holderId} show={route.show} projectId={route.projectId} sectionId={route.sectionId} board={route.board} />;
     case 'labels':
       return <LabelsPage />;
     case 'label':
