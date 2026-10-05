@@ -106,6 +106,8 @@ interface WorkspaceContextValue {
   addComment: (taskId: string, content: string) => Promise<TodoistComment | null>;
   /** Moves a task (with its subtasks) into another project or section. */
   moveTask: (task: TodoistTask, to: { projectId: string; sectionId: string | null }) => Promise<boolean>;
+  /** Hands one task to someone else, or to nobody. The task itself stays where it is. */
+  assignTask: (task: TodoistTask, assigneeId: string | null) => Promise<boolean>;
   setRules: (rules: MetricRules) => void;
   setNotifyOwnActions: (value: boolean) => void;
   setTaskLayout: (layout: TaskLayout) => void;
@@ -427,6 +429,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [source, write, reportWriteFailure],
   );
 
+  /**
+   * Handing a task over, from a card dropped in someone's column or from the dialog. Only the
+   * holder changes: the task keeps its project, its section and its dates.
+   */
+  const assignTask = useCallback(
+    async (task: TodoistTask, assigneeId: string | null) => {
+      if ((task.responsible_uid ?? null) === assigneeId) return true;
+      try {
+        let updated = task;
+        await write('update', async () => {
+          updated = await source.updateTask(task.id, { assignee_id: assigneeId });
+        });
+        setSnapshot((s) =>
+          s ? { ...s, tasks: s.tasks.map((t) => (t.id === task.id ? { ...updated, responsible_uid: assigneeId } : t)) } : s,
+        );
+        return true;
+      } catch (err) {
+        reportWriteFailure(err);
+        return false;
+      }
+    },
+    [source, write, reportWriteFailure],
+  );
+
   const reopenTask = useCallback(
     (task: TodoistTask) => {
       setSnapshot((s) =>
@@ -614,6 +640,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setSettings((s) => withoutSavedToken(s));
     },
     moveTask,
+    assignTask,
     setRules: (rules) => setSettings((s) => ({ ...s, rules })),
     setNotifyOwnActions: (notifyOwnActions) => setSettings((s) => ({ ...s, notifyOwnActions })),
     setTaskLayout: (taskLayout) => setSettings((s) => ({ ...s, taskLayout })),

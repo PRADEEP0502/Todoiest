@@ -1,4 +1,4 @@
-import { ChevronsDownUp, ChevronsUpDown, ClipboardList, FolderX, ListPlus, MessageSquare, Plus, Search, X } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, ClipboardList, FolderX, ListPlus, ListTree, MessageSquare, Plus, Search, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Gate } from '../components/common/Gate';
 import { SearchField } from '../components/common/SearchField';
@@ -9,6 +9,7 @@ import { CompletedList } from '../components/tasks/CompletedList';
 import { ScopeKpis, scopeLists, VIEW_TITLE } from '../components/tasks/ScopeKpis';
 import { Count, EmptyState, ProjectDot, ShowMore } from '../components/common/ui';
 import { NewSectionDialog } from '../components/projects/CreateDialogs';
+import { AssigneeBoard } from '../components/projects/AssigneeBoard';
 import { ProjectBoard } from '../components/projects/ProjectBoard';
 import { ProjectSections, projectBlockKeys } from '../components/projects/ProjectSections';
 import { disclosureKey, isOpen, setOpen, useDisclosureState } from '../hooks/useDisclosure';
@@ -31,6 +32,8 @@ interface Props {
   taskId: string | null;
   /** Set when a KPI card was clicked: the page lists that slice of the project. */
   show: HolderView | null;
+  /** What the board's columns stand for: the project's sections, or the people on it. */
+  by: 'section' | 'assignee';
   /** Changes on every navigation, so picking the same search result again re-reveals it. */
   visit: number;
 }
@@ -39,7 +42,7 @@ export function ProjectDetailPage(props: Props) {
   return <Gate>{({ index, snapshot }) => <ProjectDetail {...props} index={index} snapshot={snapshot} />}</Gate>;
 }
 
-function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, visit }: Props & { index: WorkspaceIndex; snapshot: WorkspaceSnapshot }) {
+function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, by, visit }: Props & { index: WorkspaceIndex; snapshot: WorkspaceSnapshot }) {
   const { openNewTask } = useUi();
   const { settings } = useWorkspace();
   const now = useNow(60_000);
@@ -222,7 +225,30 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, vi
           )}
         </div>
       ) : board ? (
-        <ProjectBoard index={index} projectId={project.id} />
+        <>
+          {/* What the columns stand for. Only the board has columns, so only the board asks. */}
+          <div className="mb-2.5 flex rounded-md border border-line bg-surface p-0.5 w-fit" role="group" aria-label="What the columns stand for">
+            <a
+              href={href.project(project.id)}
+              className={`inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-[12.5px] ${by === 'assignee' ? 'text-ink-2 hover:text-ink' : 'bg-hover font-medium text-ink'}`}
+              aria-current={by === 'assignee' ? undefined : 'true'}
+            >
+              <ListTree size={14} /> Section wise
+            </a>
+            <a
+              href={href.project(project.id, { by: 'assignee' })}
+              className={`inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-[12.5px] ${by === 'assignee' ? 'bg-hover font-medium text-ink' : 'text-ink-2 hover:text-ink'}`}
+              aria-current={by === 'assignee' ? 'true' : undefined}
+            >
+              <Users size={14} /> Assignee wise
+            </a>
+          </div>
+          {by === 'assignee' ? (
+            <AssigneeBoard index={index} snapshot={snapshot} projectId={project.id} />
+          ) : (
+            <ProjectBoard index={index} projectId={project.id} />
+          )}
+        </>
       ) : (
         <div className="panel overflow-hidden">
           <ProjectSections index={index} projectId={project.id} />

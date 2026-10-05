@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react';
 import { useState, type DragEvent, type ReactNode } from 'react';
 import { Modal } from '../common/Modal';
-import { SearchSelect } from '../common/SearchSelect';
+import { SearchSelect, type SearchOption } from '../common/SearchSelect';
 import { useUi } from '../../store/ui';
 import { useWorkspace } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
@@ -9,16 +9,20 @@ import { plainText, taskTitle } from '../../lib/text';
 import { Count } from '../common/ui';
 import { BoardCard } from './BoardCard';
 
-/** Where a task can be dropped: one of the board's own columns. */
-export interface BoardTarget {
-  projectId: string;
-  sectionId: string | null;
-  label: string;
-  /** The project, when the board spans more than one. */
-  hint?: string;
+/**
+ * What dropping a card in another column does on this board — move it to that section, or hand it
+ * to that person. The board decides; a column only reports where the card landed.
+ */
+export interface BoardTransfer {
+  /** Every column of this board, in the order they are drawn. */
+  columns: (SearchOption & { value: string })[];
+  /** Carries out the transfer. Returns once Todoist has been told. */
+  apply: (task: TodoistTask, columnId: string) => Promise<boolean> | void;
+  /** How the dialog reads: "Move"/"Section"/"Move task", or "Hand over"/"Holder"/"Assign task". */
+  words: { verb: string; field: string; action: string; working: string; note: string };
+  /** A column worth one click of its own, e.g. "Assign to me". */
+  quick?: { label: string; value: string };
 }
-
-export const targetKey = (target: { projectId: string; sectionId: string | null }) => `${target.projectId}:${target.sectionId ?? ''}`;
 
 /** The sideways-scrolling strip the columns sit in; one column fills a phone screen at a time. */
 export function BoardScroller({ children }: { children: ReactNode }) {
@@ -30,27 +34,30 @@ export function BoardScroller({ children }: { children: ReactNode }) {
 }
 
 export interface BoardColumnProps {
+  /** This column's place on the board, as `transfer.columns` names it. */
+  columnId: string;
   title: string;
-  /** Where this column's tasks live, when the board spans more than one project. */
+  /** What this column's heading says underneath — the project, or how many are late. */
   subtitle?: ReactNode;
   count: number;
   muted?: boolean;
+  /** Shown before the title: a project dot, or the person's face. */
+  mark?: ReactNode;
   tasks: TodoistTask[];
   childrenOf: (taskId: string) => TodoistTask[];
   /** Where a task added from this column's heading goes. */
-  add: { projectId: string; sectionId: string | null; assigneeId?: string | null };
-  /** Every column of this board, so a card can be sent to any of them. */
-  targets: BoardTarget[];
+  add: { projectId: string; sectionId?: string | null; assigneeId?: string | null };
+  transfer: BoardTransfer;
 }
 
 /**
  * One column of a board: a heading that can take a new task, then its tasks as cards. A card can be
- * dragged into another column, and carries a "Move to" button as well, because dragging is not
- * possible on a touch screen.
+ * dragged into another column, and carries a button for the same thing as well, because dragging is
+ * not possible on a touch screen.
  */
-export function BoardColumn({ title, subtitle, count, muted, tasks, childrenOf, add, targets }: BoardColumnProps) {
+export function BoardColumn({ columnId, title, subtitle, count, muted, mark, tasks, childrenOf, add, transfer }: BoardColumnProps) {
   const { openNewTask } = useUi();
-  const { index, moveTask } = useWorkspace();
+  const { index } = useWorkspace();
   const [over, setOver] = useState(false);
   const addHere = () => openNewTask(add);
 
@@ -61,7 +68,7 @@ export function BoardColumn({ title, subtitle, count, muted, tasks, childrenOf, 
     setOver(false);
     const id = e.dataTransfer.getData('text/plain');
     const task = id ? index?.taskById.get(id) : undefined;
-    if (task) void moveTask(task, { projectId: add.projectId, sectionId: add.sectionId });
+    if (task) void transfer.apply(task, columnId);
   };
 
   return (
@@ -82,6 +89,7 @@ export function BoardColumn({ title, subtitle, count, muted, tasks, childrenOf, 
       }`}
     >
       <header className="flex items-center gap-2 px-1.5 py-1.5">
+        {mark && <span className="shrink-0">{mark}</span>}
         <h3 className="min-w-0 flex-1">
           <span className={`block break-words text-[13.5px] font-semibold ${muted ? 'text-ink-2' : 'text-ink'}`}>{title}</span>
           {subtitle && <span className="mt-0.5 flex items-center gap-1.5 text-[12px] text-ink-3">{subtitle}</span>}
@@ -103,7 +111,7 @@ export function BoardColumn({ title, subtitle, count, muted, tasks, childrenOf, 
       ) : (
         <div className="space-y-2">
           {tasks.map((task) => (
-            <Card key={task.id} task={task} childrenOf={childrenOf} here={add} targets={targets} />
+            <Card key={task.id} task={task} childrenOf={childrenOf} columnId={columnId} transfer={transfer} />
           ))}
         </div>
       )}
@@ -111,48 +119,52 @@ export function BoardColumn({ title, subtitle, count, muted, tasks, childrenOf, 
   );
 }
 
-/** A card, with the dialog that sends it somewhere else when dragging is not an option. */
+/** A card, with the dialog that sends it to another column when dragging is not an option. */
 function Card({
   task,
   childrenOf,
-  here,
-  targets,
+  columnId,
+  transfer,
 }: {
   task: TodoistTask;
   childrenOf: (taskId: string) => TodoistTask[];
-  here: { projectId: string; sectionId: string | null };
-  targets: BoardTarget[];
+  columnId: string;
+  transfer: BoardTransfer;
 }) {
-  const [moving, setMoving] = useState(false);
+  const [sending, setSending] = useState(false);
   return (
     <>
-      <BoardCard task={task} subtasks={childrenOf(task.id)} onMove={targets.length > 1 ? () => setMoving(true) : undefined} />
-      {moving && <MoveTaskDialog task={task} here={here} targets={targets} onClose={() => setMoving(false)} />}
+      <BoardCard
+        task={task}
+        subtasks={childrenOf(task.id)}
+        moveLabel={transfer.words.action}
+        onMove={transfer.columns.length > 1 ? () => setSending(true) : undefined}
+      />
+      {sending && <TransferDialog task={task} columnId={columnId} transfer={transfer} onClose={() => setSending(false)} />}
     </>
   );
 }
 
 /** Sending a card to another column without dragging it — the way this works on a phone. */
-function MoveTaskDialog({
+function TransferDialog({
   task,
-  here,
-  targets,
+  columnId,
+  transfer,
   onClose,
 }: {
   task: TodoistTask;
-  here: { projectId: string; sectionId: string | null };
-  targets: BoardTarget[];
+  columnId: string;
+  transfer: BoardTransfer;
   onClose: () => void;
 }) {
-  const { moveTask } = useWorkspace();
-  const [to, setTo] = useState(targetKey(here));
+  const [to, setTo] = useState(columnId);
   const [busy, setBusy] = useState(false);
+  const { verb, field, action, working, note } = transfer.words;
 
-  const move = async () => {
-    const target = targets.find((t) => targetKey(t) === to);
-    if (!target) return onClose();
+  const send = async () => {
+    if (to === columnId) return onClose();
     setBusy(true);
-    await moveTask(task, { projectId: target.projectId, sectionId: target.sectionId });
+    await transfer.apply(task, to);
     onClose();
   };
 
@@ -160,7 +172,7 @@ function MoveTaskDialog({
     <Modal
       title={
         <span className="flex min-w-0 items-baseline gap-1">
-          <span className="shrink-0">Move</span>
+          <span className="shrink-0">{verb}</span>
           <span className="truncate font-medium text-ink">{taskTitle(plainText(task.content))}</span>
         </span>
       }
@@ -169,26 +181,28 @@ function MoveTaskDialog({
       footer={
         <>
           <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={() => void move()} disabled={busy || to === targetKey(here)}>
-            {busy ? 'Moving…' : 'Move task'}
+          <button type="button" className="btn-primary" onClick={() => void send()} disabled={busy || to === columnId}>
+            {busy ? working : action}
           </button>
         </>
       }
     >
-      <label className="label" htmlFor="move-to">Section</label>
+      <div className="flex items-end justify-between gap-2">
+        <label className="label" htmlFor="board-transfer">{field}</label>
+        {transfer.quick && transfer.quick.value !== columnId && (
+          <button type="button" className="mb-1.5 text-[12px] font-medium text-accent hover:underline" onClick={() => setTo(transfer.quick!.value)}>
+            {transfer.quick.label}
+          </button>
+        )}
+      </div>
       <SearchSelect
-        id="move-to"
+        id="board-transfer"
         value={to}
         onChange={setTo}
-        searchPlaceholder="Search sections…"
-        options={targets.map((target) => ({
-          value: targetKey(target),
-          label: target.label,
-          hint: targetKey(target) === targetKey(here) ? 'now' : target.hint,
-          group: target.hint,
-        }))}
+        searchPlaceholder={`Search ${field.toLowerCase()}…`}
+        options={transfer.columns.map((column) => ({ ...column, hint: column.value === columnId ? 'now' : column.hint }))}
       />
-      <p className="mt-2 text-[12.5px] text-ink-3">Any subtasks move with it. Its dates, holder and comments stay as they are.</p>
+      <p className="mt-2 text-[12.5px] text-ink-3">{note}</p>
     </Modal>
   );
 }

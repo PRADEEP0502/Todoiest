@@ -33,12 +33,15 @@ export function BoardCard({
   task,
   subtasks,
   onMove,
+  moveLabel = 'Move to another section',
 }: {
   task: TodoistTask;
   /** This task's own subtasks, shown folded underneath. */
   subtasks: TodoistTask[];
-  /** Opens the "move to another section" dialog; absent when there is nowhere else to go. */
+  /** Opens the dialog that sends this card to another column; absent when there is nowhere to send it. */
   onMove?: () => void;
+  /** What that does on this board: "Move task", or "Assign task". */
+  moveLabel?: string;
 }) {
   const { completeTask, snapshot, index } = useWorkspace();
   const { openTask, openNewTask } = useUi();
@@ -132,14 +135,14 @@ export function BoardCard({
               <button
                 type="button"
                 onClick={onMove}
-                aria-label={`Move ${plainText(dates.title)} to another section`}
-                title="Move to another section"
+                aria-label={`${moveLabel}: ${plainText(dates.title)}`}
+                title={moveLabel}
                 className="icon-btn h-7 w-7"
               >
                 <CornerUpRight size={14} />
               </button>
             )}
-            <span className="hidden cursor-grab text-ink-3 sm:inline-flex" title="Drag to another section" aria-hidden>
+            <span className="hidden cursor-grab text-ink-3 sm:inline-flex" title="Drag to another column" aria-hidden>
               <GripVertical size={14} />
             </span>
           </span>

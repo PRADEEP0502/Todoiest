@@ -100,6 +100,8 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   // Only the people on the project this task sits in — and whoever holds it already, if they have
   // since left it. Changing the project changes the list.
   const people = snapshot ? peopleForProject(snapshot, form.projectId, { include: task?.responsible_uid }) : [];
+  // The connected Todoist account, when it is one of the people this project can hand work to.
+  const me = people.find((person) => person.id === snapshot?.user.id);
 
   // The three dates as they stand, and what saving will newly record. CD and IDD, once written,
   // are only ever shown; nothing in this form can edit them. A task with no IDD yet gets a one-time
@@ -312,6 +314,11 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
                 })),
               ]}
             />
+            {me && form.assigneeId !== me.id && (
+              <button type="button" className="mt-1.5 text-[12px] font-medium text-accent hover:underline" onClick={() => set('assigneeId', me.id)}>
+                Assign to me
+              </button>
+            )}
             <p className="mt-1.5 text-[12px] leading-4 text-ink-3">
               {people.length === 0
                 ? 'Nobody is on this project in Todoist yet, so it has no holder to choose.'

@@ -16,7 +16,7 @@ export type Route =
   | { name: 'today' }
   | { name: 'upcoming' }
   | { name: 'projects' }
-  | { name: 'project'; projectId: string; sectionId: string | null; taskId: string | null; show: HolderView | null }
+  | { name: 'project'; projectId: string; sectionId: string | null; taskId: string | null; show: HolderView | null; by: 'section' | 'assignee' }
   | { name: 'overdue'; category: string | null }
   | { name: 'holders' }
   | { name: 'holder'; holderId: string; show: HolderView; projectId: string | null; sectionId: string | null }
@@ -53,6 +53,8 @@ export function parseHash(hash: string): Route {
             taskId: query.get('task'),
             // A KPI card was clicked: the page lists that slice of the project instead of its sections.
             show: (HOLDER_VIEWS as readonly string[]).includes(query.get('show') ?? '') ? (query.get('show') as HolderView) : null,
+            // What the board's columns stand for: the project's sections, or the people on it.
+            by: query.get('by') === 'assignee' ? 'assignee' : 'section',
           }
         : { name: 'projects' };
     case 'overdue':
@@ -83,11 +85,12 @@ export const href = {
   upcoming: () => '#/upcoming',
   projects: () => '#/projects',
   /** Optionally points at a section or task inside the project, or at one of its KPI lists. */
-  project: (projectId: string, focus: { sectionId?: string | null; taskId?: string | null; show?: HolderView | null } = {}) => {
+  project: (projectId: string, focus: { sectionId?: string | null; taskId?: string | null; show?: HolderView | null; by?: 'section' | 'assignee' } = {}) => {
     const query = new URLSearchParams();
     if (focus.sectionId) query.set('section', focus.sectionId);
     if (focus.taskId) query.set('task', focus.taskId);
     if (focus.show) query.set('show', focus.show);
+    if (focus.by === 'assignee') query.set('by', 'assignee');
     const qs = query.toString();
     return `#/projects/${enc(projectId)}${qs ? `?${qs}` : ''}`;
   },

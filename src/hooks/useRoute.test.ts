@@ -17,3 +17,21 @@ describe('holder addresses', () => {
     expect(parseHash('#/holders/u1?show=nonsense')).toMatchObject({ name: 'holder', show: 'active' });
   });
 });
+
+describe('project board columns', () => {
+  it('round-trips the assignee-wise board', () => {
+    const url = href.project('p7', { by: 'assignee' });
+    expect(url).toBe('#/projects/p7?by=assignee');
+    expect(parseHash(url)).toMatchObject({ name: 'project', projectId: 'p7', by: 'assignee' });
+  });
+
+  it('keeps the assignee columns while a KPI card narrows the project', () => {
+    expect(parseHash(href.project('p7', { show: 'no-dd', by: 'assignee' }))).toMatchObject({ show: 'no-dd', by: 'assignee' });
+  });
+
+  it('stands for sections unless the people were asked for', () => {
+    expect(href.project('p7', { by: 'section' })).toBe('#/projects/p7');
+    expect(parseHash('#/projects/p7')).toMatchObject({ by: 'section' });
+    expect(parseHash('#/projects/p7?by=nonsense')).toMatchObject({ by: 'section' });
+  });
+});
