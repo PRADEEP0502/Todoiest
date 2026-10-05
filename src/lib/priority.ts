@@ -6,11 +6,11 @@ export type UiPriority = 1 | 2 | 3 | 4;
 export const toUiPriority = (api: ApiPriority): UiPriority => (5 - api) as UiPriority;
 export const toApiPriority = (ui: UiPriority): ApiPriority => (5 - ui) as ApiPriority;
 
-export const PRIORITY_STYLE: Record<UiPriority, { label: string; text: string; ring: string; fill: string }> = {
-  1: { label: 'P1', text: 'text-p1', ring: 'border-p1', fill: 'bg-p1/10' },
-  2: { label: 'P2', text: 'text-p2', ring: 'border-p2', fill: 'bg-p2/10' },
-  3: { label: 'P3', text: 'text-p3', ring: 'border-p3', fill: 'bg-p3/10' },
-  4: { label: 'P4', text: 'text-ink-3', ring: 'border-line-strong', fill: 'bg-transparent' },
+export const PRIORITY_STYLE: Record<UiPriority, { label: string; text: string; ring: string; fill: string; bar: string }> = {
+  1: { label: 'P1', text: 'text-p1', ring: 'border-p1', fill: 'bg-p1/10', bar: 'bg-p1' },
+  2: { label: 'P2', text: 'text-p2', ring: 'border-p2', fill: 'bg-p2/10', bar: 'bg-p2' },
+  3: { label: 'P3', text: 'text-p3', ring: 'border-p3', fill: 'bg-p3/10', bar: 'bg-p3' },
+  4: { label: 'P4', text: 'text-ink-3', ring: 'border-line-strong', fill: 'bg-transparent', bar: 'bg-transparent' },
 };
 
 /** Todoist's named project colors. */

@@ -1,4 +1,4 @@
-import { CornerUpRight, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useState, type DragEvent, type ReactNode } from 'react';
 import { Modal } from '../common/Modal';
 import { SearchSelect } from '../common/SearchSelect';
@@ -7,7 +7,7 @@ import { useWorkspace } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { plainText, taskTitle } from '../../lib/text';
 import { Count } from '../common/ui';
-import { TaskTree } from './TaskTree';
+import { BoardCard } from './BoardCard';
 
 /** Where a task can be dropped: one of the board's own columns. */
 export interface BoardTarget {
@@ -103,7 +103,7 @@ export function BoardColumn({ title, subtitle, count, muted, tasks, childrenOf, 
       ) : (
         <div className="space-y-2">
           {tasks.map((task) => (
-            <BoardCard key={task.id} task={task} childrenOf={childrenOf} here={add} targets={targets} />
+            <Card key={task.id} task={task} childrenOf={childrenOf} here={add} targets={targets} />
           ))}
         </div>
       )}
@@ -111,7 +111,8 @@ export function BoardColumn({ title, subtitle, count, muted, tasks, childrenOf, 
   );
 }
 
-function BoardCard({
+/** A card, with the dialog that sends it somewhere else when dragging is not an option. */
+function Card({
   task,
   childrenOf,
   here,
@@ -122,35 +123,12 @@ function BoardCard({
   here: { projectId: string; sectionId: string | null };
   targets: BoardTarget[];
 }) {
-  const [dragging, setDragging] = useState(false);
   const [moving, setMoving] = useState(false);
   return (
-    <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', task.id);
-        e.dataTransfer.effectAllowed = 'move';
-        setDragging(true);
-      }}
-      onDragEnd={() => setDragging(false)}
-      className={`group/card relative rounded-lg border border-line bg-surface px-1.5 py-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
-        dragging ? 'opacity-40' : ''
-      }`}
-    >
-      <TaskTree tasks={[task]} childrenOf={childrenOf} subtasksOpen />
-      {targets.length > 1 && (
-        <button
-          type="button"
-          className="icon-btn absolute bottom-1 right-1 opacity-60 hover:opacity-100 focus:opacity-100"
-          onClick={() => setMoving(true)}
-          aria-label={`Move “${taskTitle(plainText(task.content))}” to another section`}
-          title="Move to another section"
-        >
-          <CornerUpRight size={14} />
-        </button>
-      )}
+    <>
+      <BoardCard task={task} subtasks={childrenOf(task.id)} onMove={targets.length > 1 ? () => setMoving(true) : undefined} />
       {moving && <MoveTaskDialog task={task} here={here} targets={targets} onClose={() => setMoving(false)} />}
-    </div>
+    </>
   );
 }
 
