@@ -213,13 +213,22 @@ export function HolderPage({ holderId, show, projectId, sectionId }: HolderPageP
   const listRef = useRef<HTMLElement>(null);
   const firstRender = useRef(true);
 
-  // After picking a card or a bar, bring the filtered list into view.
+  // After picking a card or a bar, bring the filtered list into view — but only when none of it
+  // can be seen. Someone already reading the list keeps their place instead of being pulled away.
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
-    listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const list = listRef.current;
+    const scroller = list?.closest('main');
+    if (!list || !scroller) return;
+    const heading = list.getBoundingClientRect();
+    const view = scroller.getBoundingClientRect();
+    // Filtering shortens the list, and the browser then drops the page wherever it still can
+    // scroll to. Rather than land somewhere different each time, the heading is put back at the
+    // top — and when it is already in front of the reader, nothing moves at all.
+    if (heading.top < view.top || heading.top > view.bottom - 80) list.scrollIntoView({ block: 'start' });
   }, [show, projectId, sectionId]);
 
   return (

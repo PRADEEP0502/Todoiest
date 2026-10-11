@@ -51,6 +51,8 @@ export function SearchSelect({
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  // Which side of the button the list opens on. Settled as it opens and kept until it closes.
+  const [up, setUp] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const popover = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -78,7 +80,20 @@ export function SearchSelect({
   // Place the list under the button, and keep it there while the page or a dialog scrolls.
   useLayoutEffect(() => {
     if (!open) return;
-    const place = () => button.current && setRect(button.current.getBoundingClientRect());
+    // Open upwards only when there is not enough room below — decided once, so the list cannot
+    // flip from one side of the button to the other while the page behind it scrolls.
+    const start = button.current?.getBoundingClientRect();
+    if (start) {
+      const room = window.innerHeight - start.bottom;
+      setUp(room < 300 && start.top > room);
+    }
+    const place = () => {
+      const anchor = button.current?.getBoundingClientRect();
+      if (!anchor) return;
+      // The field itself has been scrolled out of sight: close, rather than leave the list floating.
+      if (anchor.bottom < 0 || anchor.top > window.innerHeight) close(false);
+      else setRect(anchor);
+    };
     place();
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
@@ -134,9 +149,6 @@ export function SearchSelect({
     }
   };
 
-  // Open upwards when there is not enough room below.
-  const below = rect ? window.innerHeight - rect.bottom : 0;
-  const up = rect ? below < 300 && rect.top > below : false;
   const width = rect ? Math.max(rect.width, 224) : 224;
   const left = rect ? Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) : 0;
 

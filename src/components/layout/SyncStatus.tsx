@@ -57,7 +57,8 @@ export function StatusPill() {
     <a
       href={href.settings()}
       title={`${c.title} · ${c.detail}`}
-      className={`inline-flex h-9 max-w-[18rem] items-center gap-2 rounded-full border px-3.5 text-[12px] shadow-pill transition-colors ${mode === 'demo' ? 'border-amber-200 bg-amber-50 hover:bg-amber-100/60' : 'border-black/[0.05] bg-surface hover:bg-[#fafafa]'}`}
+      // "synced just now" becomes "7 minutes ago" as time passes; a fixed width keeps it still.
+      className={`inline-flex h-9 max-w-[18rem] items-center gap-2 rounded-full border px-3.5 text-[12px] shadow-pill transition-colors xl:w-[17rem] ${mode === 'demo' ? 'border-amber-200 bg-amber-50 hover:bg-amber-100/60' : 'border-black/[0.05] bg-surface hover:bg-[#fafafa]'}`}
     >
       <span className={`h-2 w-2 shrink-0 rounded-full ${c.dot}`} aria-hidden />
       <span className={`shrink-0 font-semibold ${mode === 'demo' ? 'tracking-[0.04em] text-amber-900' : 'text-ink'}`}>{mode === 'demo' ? 'DEMO MODE' : 'LIVE TODOIST'}</span>
@@ -103,7 +104,8 @@ export function SyncButton({ compact = false }: { compact?: boolean }) {
       disabled={syncing}
       title={sync.error ?? 'Sync with Todoist now'}
       aria-live="polite"
-      className={`btn-secondary disabled:cursor-progress disabled:opacity-100 ${compact ? 'w-8 px-0' : 'max-w-[15rem]'} ${tone}`}
+      // A fixed width: the wording changes as it syncs, and the row must not shuffle around it.
+      className={`btn-secondary disabled:cursor-progress disabled:opacity-100 ${compact ? 'w-8 px-0' : 'w-[11.5rem] justify-start'} ${tone}`}
     >
       {icon}
       {compact ? <span className="sr-only">{label}</span> : <span className="truncate">{label}</span>}
@@ -114,7 +116,8 @@ export function SyncButton({ compact = false }: { compact?: boolean }) {
 /** Saving… → Saved ✓ (or Not saved) for changes being sent to Todoist. Hidden when idle. */
 export function WriteStatus({ compact = false }: { compact?: boolean }) {
   const { writeState } = useWorkspace();
-  if (writeState.phase === 'idle') return <span aria-live="polite" className="sr-only" />;
+  // Idle still takes its place on a wide screen, so "Saving…" does not push the row sideways.
+  if (writeState.phase === 'idle') return <span aria-live="polite" className={compact ? 'sr-only' : 'hidden w-[6.5rem] md:block'} />;
   const tone = writeState.phase === 'error' ? 'text-danger' : writeState.phase === 'done' ? 'text-accent' : 'text-ink-2';
   const icon =
     writeState.phase === 'working' ? (
@@ -125,7 +128,12 @@ export function WriteStatus({ compact = false }: { compact?: boolean }) {
       <AlertCircle size={14} />
     );
   return (
-    <span role="status" aria-live="polite" className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium ${tone}`} title={writeState.label}>
+    <span
+      role="status"
+      aria-live="polite"
+      className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium ${compact ? '' : 'w-[6.5rem] justify-end'} ${tone}`}
+      title={writeState.label}
+    >
       {icon}
       {compact ? <span className="sr-only">{writeState.label}</span> : writeState.label.replace(' ✓', '')}
     </span>
