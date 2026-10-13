@@ -51,5 +51,7 @@ describe('turning a paste into tasks', () => {
     expect(describeCount(1)).toBe('1 task ready to create');
     expect(describeCount(0)).toBe('0 tasks ready to create');
     expect(describeCount(10, 'created successfully')).toBe('10 tasks created successfully');
+    expect(describeCount(3, 'ready to create', 'subtask')).toBe('3 subtasks ready to create');
+    expect(describeCount(1, 'created successfully', 'subtask')).toBe('1 subtask created successfully');
   });
 });

@@ -9,20 +9,28 @@ interface ModalProps {
   width?: string;
 }
 
+/** Dialogs open right now, oldest first. A dialog can open another one on top of itself. */
+const stack: symbol[] = [];
+
 export function Modal({ title, onClose, children, footer, width = 'max-w-lg' }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
+    const mine = Symbol('dialog');
+    stack.push(mine);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      // Escape closes the dialog in front, never the one it was opened from.
+      if (e.key === 'Escape' && stack[stack.length - 1] === mine) onClose();
     };
     document.addEventListener('keydown', onKey);
     const first = panel.current?.querySelector<HTMLElement>('[data-autofocus]') ?? panel.current;
-    first?.focus();
+    first?.focus({ preventScroll: true });
     return () => {
       document.removeEventListener('keydown', onKey);
-      previous?.focus?.();
+      stack.splice(stack.indexOf(mine), 1);
+      // preventScroll: the page behind must not jump back to whatever had the focus before.
+      previous?.focus?.({ preventScroll: true });
     };
   }, [onClose]);
 

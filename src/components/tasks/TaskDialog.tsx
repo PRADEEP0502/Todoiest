@@ -1,4 +1,4 @@
-import { Check, ExternalLink, Flag, ListTree, MessageSquare, Pencil, Plus, Send, Tag, Trash2, User } from 'lucide-react';
+import { Check, ClipboardList, ExternalLink, Flag, ListTree, MessageSquare, Pencil, Plus, Send, Tag, Trash2, User } from 'lucide-react';
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { formatCd, parseTitle, titleForNewTask } from '../../lib/cd';
 import { longFromDateKey, longFromTitleDate, taskDates, type TaskDates } from '../../lib/taskDates';
@@ -12,6 +12,7 @@ import { isUncompletable, taskTitle } from '../../lib/text';
 import { useUi, type NewTaskDefaults } from '../../store/ui';
 import { useWorkspace, type TaskForm } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
+import { BulkAddDialog } from './BulkAddDialog';
 import { Modal } from '../common/Modal';
 import { TaskDateCards, TaskDateLine } from './TaskDates';
 import { TaskAttachments } from './TaskAttachments';
@@ -79,6 +80,7 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
   const [form, setForm] = useState<TaskForm>(initial);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [bulkSubtasks, setBulkSubtasks] = useState(false);
   const dueInput = useRef<HTMLInputElement>(null);
 
   if (!index) return null;
@@ -412,9 +414,14 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
               <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
                 <ListTree size={13} aria-hidden /> Subtasks <span className="font-normal text-ink-3">{children.length}</span>
               </h3>
-              <button type="button" className="btn-secondary h-8 text-[12.5px]" onClick={() => openNewTask({ parentId: task.id })}>
-                <Plus size={14} /> Add subtask
-              </button>
+              <span className="flex items-center gap-2">
+                <button type="button" className="btn-secondary h-8 text-[12.5px]" onClick={() => setBulkSubtasks(true)}>
+                  <ClipboardList size={14} /> Add many
+                </button>
+                <button type="button" className="btn-secondary h-8 text-[12.5px]" onClick={() => openNewTask({ parentId: task.id })}>
+                  <Plus size={14} /> Add subtask
+                </button>
+              </span>
             </div>
             {children.length > 0 && (
               <ul className="text-[13px]">
@@ -452,6 +459,15 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
         <button type="submit" hidden />
       </form>
       {task && <TaskComments taskId={task.id} />}
+      {task && bulkSubtasks && (
+        <BulkAddDialog
+          projectId={task.project_id}
+          sectionId={task.section_id ?? null}
+          parentId={task.id}
+          assigneeId={task.responsible_uid ?? null}
+          onClose={() => setBulkSubtasks(false)}
+        />
+      )}
     </Modal>
   );
 }

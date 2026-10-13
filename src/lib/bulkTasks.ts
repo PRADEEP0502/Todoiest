@@ -42,6 +42,6 @@ export function droppedLines(text: string): number {
 }
 
 /** "10 tasks ready to create" — the count in words, for the preview and the button. */
-export function describeCount(n: number, verb = 'ready to create'): string {
-  return `${n} task${n === 1 ? '' : 's'} ${verb}`;
+export function describeCount(n: number, verb = 'ready to create', noun = 'task'): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'} ${verb}`;
 }

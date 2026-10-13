@@ -1,4 +1,5 @@
 import { ClipboardList, Loader2, User } from 'lucide-react';
+import { taskTitle } from '../../lib/text';
 import { useMemo, useState } from 'react';
 import { describeCount, droppedLines, MAX_BULK_TASKS, parseBulkLines } from '../../lib/bulkTasks';
 import { PERSONAL_GROUP_ID } from '../../lib/hierarchy';
@@ -18,6 +19,11 @@ interface BulkAddDialogProps {
   sectionId?: string | null;
   /** Holder every line starts with, e.g. the person whose page this was opened from. */
   assigneeId?: string | null;
+  /**
+   * Set when the lines become subtasks of one task. Todoist keeps a subtask in its parent's
+   * project, so there is nothing to choose: the project and the section are the parent's.
+   */
+  parentId?: string | null;
   onClose: () => void;
 }
 
@@ -28,8 +34,11 @@ type Result = { created: number; failed: number } | null;
  * own holder. Nothing is created while typing or pasting — only when "Create tasks" is pressed.
  * Every task is created the ordinary way, so each gets its own locked CD exactly as a single one
  * would, and an IDD is entered later on the task itself.
+ *
+ * With a parent, the same box fills a task with subtasks instead, each of which can still be held
+ * by a different person.
  */
-export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, onClose }: BulkAddDialogProps) {
+export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, parentId = null, onClose }: BulkAddDialogProps) {
   const { index, snapshot, createTask } = useWorkspace();
   const [text, setText] = useState('');
   const [project, setProject] = useState(projectId);
@@ -44,6 +53,9 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
   const extra = useMemo(() => droppedLines(text), [text]);
   if (!index) return null;
 
+  const parent = parentId ? index.taskById.get(parentId) : undefined;
+  // What these lines will become, in words.
+  const noun = parent ? 'subtask' : 'task';
   const sections = index.sectionsByProject.get(project) ?? [];
   // Only the people on the chosen project; picking another project changes the list.
   const people = snapshot ? peopleForProject(snapshot, project) : [];
@@ -62,6 +74,8 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
         description: '',
         projectId: project,
         sectionId: section,
+        // Todoist puts a subtask in its parent's project, so the parent is all it is told.
+        parentId,
         dueDate: null,
         idd: null,
         assigneeId: holderOf(line.id),
@@ -81,13 +95,13 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
       <span className="mr-auto text-[13px] text-ink-2">
         {result ? (
           <span className={result.failed ? 'text-p1' : 'text-accent'}>
-            {describeCount(result.created, 'created successfully')}
+            {describeCount(result.created, 'created successfully', noun)}
             {result.failed > 0 && ` · ${result.failed} could not be created`}
           </span>
         ) : busy ? (
           `Creating ${done} of ${lines.length}…`
         ) : (
-          describeCount(lines.length)
+          describeCount(lines.length, 'ready to create', noun)
         )}
       </span>
       <button className="btn-ghost" onClick={onClose} disabled={busy}>
@@ -95,14 +109,36 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
       </button>
       <button className="btn-primary" onClick={create} disabled={!lines.length || busy}>
         {busy ? <Loader2 size={14} className="animate-spin" /> : <ClipboardList size={14} />}
-        {busy ? 'Creating…' : 'Create tasks'}
+        {busy ? 'Creating…' : parent ? 'Create subtasks' : 'Create tasks'}
       </button>
     </>
   );
 
   return (
-    <Modal onClose={busy ? () => {} : onClose} title={<span className="font-medium text-ink">Add many tasks</span>} footer={footer} width="max-w-2xl">
+    <Modal
+      onClose={busy ? () => {} : onClose}
+      title={
+        parent ? (
+          <span className="flex min-w-0 items-baseline gap-1">
+            <span className="shrink-0 font-medium text-ink">Add many subtasks</span>
+            <span className="shrink-0">under</span>
+            <span className="truncate">{taskTitle(parent.content)}</span>
+          </span>
+        ) : (
+          <span className="font-medium text-ink">Add many tasks</span>
+        )
+      }
+      footer={footer}
+      width="max-w-2xl"
+    >
       <div className="space-y-4">
+        {parent ? (
+          <p className="rounded-xl bg-black/[0.025] px-3 py-2 text-[12.5px] text-ink-2">
+            Each line becomes a subtask of <span className="font-medium text-ink">{taskTitle(parent.content)}</span>, in{' '}
+            <span className="font-medium text-ink">{index.projectById.get(parent.project_id)?.name ?? 'its project'}</span> — Todoist keeps a subtask
+            wherever its parent is.
+          </p>
+        ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="bulk-project">Project</label>
@@ -145,10 +181,11 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
             />
           </div>
         </div>
+        )}
 
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="label mb-0" htmlFor="bulk-text">One task per line</label>
+            <label className="label mb-0" htmlFor="bulk-text">One {parent ? 'subtask' : 'task'} per line</label>
             <VoiceCapture
               useLabel="Add to the list"
               onTasks={(spoken) => {
@@ -167,11 +204,11 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
             }}
             rows={8}
             spellCheck={false}
-            placeholder={'Get quotation\nCompare rates\nGet MD approval'}
+            placeholder={parent ? 'Measure the shaft\nOrder the bearing\nFit and test' : 'Get quotation\nCompare rates\nGet MD approval'}
             className="field mt-2 h-auto resize-y py-2 font-[inherit] leading-6"
           />
           <p className="mt-1.5 text-[12px] leading-4 text-ink-3">
-            Paste as many lines as you like; nothing is created until you press “Create tasks”. Bullets and numbering are dropped.
+            Paste as many lines as you like; nothing is created until you press “Create {noun}s”. Bullets and numbering are dropped.
             {extra > 0 && <span className="text-p1"> Only the first {MAX_BULK_TASKS} lines are used — {extra} more were left out.</span>}
           </p>
         </div>
@@ -194,9 +231,9 @@ export function BulkAddDialog({ projectId, sectionId = null, assigneeId = null, 
         </div>
 
         {lines.length > 0 && (
-          <section aria-label="Tasks ready to create">
+          <section aria-label={parent ? 'Subtasks ready to create' : 'Tasks ready to create'}>
             <h3 className="mb-2 text-[13px] font-semibold text-ink">
-              {describeCount(lines.length)} <span className="font-normal text-ink-3">· each one can go to a different person</span>
+              {describeCount(lines.length, 'ready to create', noun)} <span className="font-normal text-ink-3">· each one can go to a different person</span>
             </h3>
             <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
               {lines.map((line) => (
