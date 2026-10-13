@@ -7,10 +7,12 @@ import { isRoutineTask } from '../../lib/routine';
 import { attachmentCount } from '../../lib/attachments';
 import { taskDates } from '../../lib/taskDates';
 import { isUncompletable, plainText } from '../../lib/text';
+import { useSelection } from '../../store/selection';
 import { useUi } from '../../store/ui';
 import { useWorkspace } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { Chevron } from '../common/ui';
+import { SelectBox } from './SelectBox';
 import { TaskDateLine } from './TaskDates';
 
 interface TaskRowProps {
@@ -30,6 +32,7 @@ const TONE_CLASS = { overdue: 'text-p1', today: 'text-accent', soon: 'text-ink-2
 export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = false, onToggle, hideDue }: TaskRowProps) {
   const { completeTask, snapshot, index } = useWorkspace();
   const { openTask, openNewTask } = useUi();
+  const picked = useSelection().has(task.id);
   const now = useNow();
   const [checking, setChecking] = useState(false);
 
@@ -99,9 +102,12 @@ export function TaskRow({ task, depth = 0, path, subtaskCount = 0, collapsed = f
   return (
     <div
       data-task-id={task.id}
-      className="group relative flex scroll-mt-24 items-start gap-2 rounded-md py-2 pr-2 transition-colors hover:bg-canvas"
+      className={`group relative flex scroll-mt-24 items-start gap-2 rounded-md py-2 pr-2 transition-colors ${picked ? 'bg-accent-soft/60' : 'hover:bg-canvas'}`}
       style={{ paddingLeft: depth * 28 + 4 }}
     >
+      {/* Picks this task out for an action on many at once. */}
+      <SelectBox task={task} className="mt-[2px]" />
+
       <span className="flex h-5 w-4 shrink-0 items-center justify-center">
         {onToggle && subtaskCount > 0 && (
           <button type="button" onClick={onToggle} aria-label={collapsed ? 'Show subtasks' : 'Hide subtasks'} className="rounded hover:bg-hover">

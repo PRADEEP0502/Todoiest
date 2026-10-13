@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { lockedDatesIntact, titleForNewTask, titleForSavedTask } from '../lib/cd';
+import { lockedDatesIntact, parseTitle, titleForNewTask, titleForSavedTask } from '../lib/cd';
+import { taskDates } from '../lib/taskDates';
 import { taskChanges } from '../lib/taskChanges';
 import { isRoutineSection, isRoutineTask } from '../lib/routine';
 import { buildIndex, descendantsOf, type WorkspaceIndex } from '../lib/hierarchy';
@@ -17,7 +18,7 @@ import {
 import type { TodoistComment, TodoistProject, TodoistSection, TodoistTask, UpdateTaskInput, WorkspaceSnapshot } from '../types/todoist';
 import { TodoistApiError } from '../services/todoist';
 import { href, navigate } from '../hooks/useRoute';
-import { formatShortDate, parseDateKey } from '../lib/dates';
+import { dueDateKey, formatShortDate, parseDateKey } from '../lib/dates';
 import { loadSettings, saveSettings, withoutSavedToken, type Settings, type TaskLayout } from './settings';
 import { useUi } from './ui';
 
@@ -108,6 +109,10 @@ interface WorkspaceContextValue {
   moveTask: (task: TodoistTask, to: { projectId: string; sectionId: string | null }) => Promise<boolean>;
   /** Hands one task to someone else, or to nobody. The task itself stays where it is. */
   assignTask: (task: TodoistTask, assigneeId: string | null) => Promise<boolean>;
+  /** Changes only the due date (DD). `null` clears it. CD and IDD are never touched. */
+  setDueDate: (task: TodoistTask, dateKey: string | null) => Promise<boolean>;
+  /** Copies a task, and its subtasks, where it already is. Each copy is created today. */
+  duplicateTask: (task: TodoistTask) => Promise<boolean>;
   setRules: (rules: MetricRules) => void;
   setNotifyOwnActions: (value: boolean) => void;
   setTaskLayout: (layout: TaskLayout) => void;
@@ -453,6 +458,72 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [source, write, reportWriteFailure],
   );
 
+  /** The due date on its own, for a list of tasks being rescheduled together. */
+  const setDueDate = useCallback(
+    async (task: TodoistTask, dateKey: string | null) => {
+      if (dueDateKey(task.due) === dateKey) return true;
+      try {
+        let updated = task;
+        await write('update', async () => {
+          updated = await source.updateTask(task.id, dateKey ? { due_date: dateKey } : { due_string: 'no date' });
+        });
+        setSnapshot((s) => (s ? { ...s, tasks: s.tasks.map((t) => (t.id === task.id ? { ...updated, note_count: t.note_count } : t)) } : s));
+        return true;
+      } catch (err) {
+        reportWriteFailure(err);
+        return false;
+      }
+    },
+    [source, write, reportWriteFailure],
+  );
+
+  /**
+   * A copy of a task where it already stands, with its subtasks underneath it.
+   *
+   * The copy is a new task, so it is created the ordinary way and carries today as its CD; the name
+   * and a recorded IDD come across unchanged, as do the holder, the due date and the priority.
+   */
+  const duplicateTask = useCallback(
+    async (task: TodoistTask) => {
+      const idx = indexRef.current;
+      const copy = async (from: TodoistTask, parentId: string | null): Promise<TodoistTask | null> => {
+        const dates = taskDates(from);
+        const made = await write('create', () =>
+          source.createTask({
+            content: titleForNewTask(parseTitle(from.content).title, new Date(), dates.iddKey, idx ? isRoutineTask(from, idx) : false),
+            description: from.description || undefined,
+            project_id: parentId ? undefined : from.project_id,
+            section_id: parentId ? undefined : (from.section_id ?? undefined),
+            parent_id: parentId ?? undefined,
+            assignee_id: from.responsible_uid ?? undefined,
+            priority: from.priority,
+            due_date: dueDateKey(from.due) ?? undefined,
+          }),
+        );
+        setSnapshot((s) => (s ? { ...s, tasks: [...s.tasks, { ...made, note_count: 0 }] } : s));
+        return made;
+      };
+
+      try {
+        const made = await copy(task, null);
+        // The subtasks come with it, each under the copy rather than the original.
+        if (made && idx) {
+          const queue: [TodoistTask, string][] = (idx.subtasks.get(task.id) ?? []).map((child) => [child, made.id]);
+          while (queue.length) {
+            const [child, parentId] = queue.shift()!;
+            const childCopy = await copy(child, parentId);
+            if (childCopy) for (const grandchild of idx.subtasks.get(child.id) ?? []) queue.push([grandchild, childCopy.id]);
+          }
+        }
+        return true;
+      } catch (err) {
+        reportWriteFailure(err);
+        return false;
+      }
+    },
+    [source, write, reportWriteFailure],
+  );
+
   const reopenTask = useCallback(
     (task: TodoistTask) => {
       setSnapshot((s) =>
@@ -641,6 +712,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     moveTask,
     assignTask,
+    setDueDate,
+    duplicateTask,
     setRules: (rules) => setSettings((s) => ({ ...s, rules })),
     setNotifyOwnActions: (notifyOwnActions) => setSettings((s) => ({ ...s, notifyOwnActions })),
     setTaskLayout: (taskLayout) => setSettings((s) => ({ ...s, taskLayout })),

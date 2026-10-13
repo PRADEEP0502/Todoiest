@@ -8,10 +8,12 @@ import { PRIORITY_STYLE, toUiPriority } from '../../lib/priority';
 import { isRoutineTask } from '../../lib/routine';
 import { taskDates } from '../../lib/taskDates';
 import { isUncompletable, plainText } from '../../lib/text';
+import { useSelection } from '../../store/selection';
 import { useUi } from '../../store/ui';
 import { useWorkspace } from '../../store/workspace';
 import type { TodoistTask } from '../../types/todoist';
 import { Avatar } from '../common/ui';
+import { SelectBox } from './SelectBox';
 
 /** An age in the narrow space of a card: "51d", or nothing at all when there is no date behind it. */
 const shortAge = (days: number | null) => (days === null ? undefined : `${Number.isInteger(days) ? days : days.toFixed(1)}d`);
@@ -45,6 +47,7 @@ export function BoardCard({
 }) {
   const { completeTask, snapshot, index } = useWorkspace();
   const { openTask, openNewTask } = useUi();
+  const picked = useSelection().has(task.id);
   const now = useNow();
   const [checking, setChecking] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -81,15 +84,17 @@ export function BoardCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={() => setDragging(false)}
-      className={`group/card relative scroll-mt-24 overflow-hidden rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-all duration-150 hover:-translate-y-px hover:border-line-strong hover:shadow-card ${
-        dragging ? 'rotate-[0.6deg] opacity-50 shadow-pop' : ''
-      }`}
+      className={`group/card relative scroll-mt-24 overflow-hidden rounded-xl border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-all duration-150 hover:-translate-y-px hover:shadow-card ${
+        picked ? 'border-accent ring-1 ring-accent/30' : 'border-line hover:border-line-strong'
+      } ${dragging ? 'rotate-[0.6deg] opacity-50 shadow-pop' : ''}`}
     >
       {/* A thread of colour down the edge for anything urgent; nothing at all for P4. */}
       {priority < 4 && <span aria-hidden className={`absolute inset-y-0 left-0 w-[3px] ${style.bar}`} />}
 
       <div className="px-3 py-2.5 pl-3.5">
         <div className="flex items-start gap-2">
+          {/* Picks this task out for an action on many at once. */}
+          <SelectBox task={task} className="mt-[2px]" />
           {heading ? (
             <span className="mt-[3px] flex h-[18px] w-[18px] shrink-0 items-center justify-center" aria-hidden>
               <span className="h-1.5 w-1.5 rounded-full bg-ink-3" />

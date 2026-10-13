@@ -4,6 +4,7 @@ import { AgingPage } from './pages/AgingPage';
 import { ConnectBanner } from './components/layout/ConnectBanner';
 import { MobileNav, TopBar } from './components/layout/TopBar';
 import { Sidebar } from './components/layout/Sidebar';
+import { SelectionBar } from './components/tasks/SelectionBar';
 import { TaskDialog } from './components/tasks/TaskDialog';
 import { useRoute, type Route } from './hooks/useRoute';
 import { ActivityPage } from './pages/ActivityPage';
@@ -21,6 +22,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { TodayPage } from './pages/TodayPage';
 import { UpcomingPage } from './pages/UpcomingPage';
 import { NotificationsProvider } from './store/notifications';
+import { SelectionProvider, useSelection } from './store/selection';
 import { UiProvider } from './store/ui';
 import { WorkspaceProvider } from './store/workspace';
 
@@ -80,12 +82,15 @@ function routeKey(route: Route): string {
 
 function Shell() {
   const { route, visit } = useRoute();
+  const { clear } = useSelection();
   const main = useRef<HTMLElement>(null);
   const key = routeKey(route);
 
   useEffect(() => {
     main.current?.scrollTo({ top: 0 });
-  }, [key]);
+    // Tasks picked on the page just left are no longer in front of anyone.
+    clear();
+  }, [key, clear]);
 
   return (
     <div className="h-full bg-page md:p-3 lg:p-4">
@@ -105,6 +110,7 @@ function Shell() {
         </div>
       </div>
       <TaskDialog />
+      <SelectionBar />
       <Toasts />
     </div>
   );
@@ -115,7 +121,9 @@ export default function App() {
     <UiProvider>
       <WorkspaceProvider>
         <NotificationsProvider>
-          <Shell />
+          <SelectionProvider>
+            <Shell />
+          </SelectionProvider>
         </NotificationsProvider>
       </WorkspaceProvider>
     </UiProvider>
