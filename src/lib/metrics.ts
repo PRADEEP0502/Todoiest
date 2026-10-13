@@ -68,7 +68,8 @@ export function isMissingDate(kind: DateKind, task: TodoistTask, index: Workspac
     case 'cd':
       return !isRoutineTask(task, index) && !hasCd(task.content);
     case 'idd':
-      return !isRoutineTask(task, index) && !hasIdd(task.content);
+      // Parked work is not waiting for an issue date either, any more than for a due date.
+      return !isRoutineTask(task, index) && !isPendingTask(task, index) && !hasIdd(task.content);
     case 'dd':
       // Work parked in a "keep pending" section is waiting on purpose, not missing a date.
       return !dueDateKey(task.due) && !isPendingTask(task, index);

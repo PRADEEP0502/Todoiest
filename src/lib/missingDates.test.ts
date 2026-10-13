@@ -115,7 +115,7 @@ describe('work parked in a “keep pending” section', () => {
     expect(parked('Appointed')).toBe(true);
   });
 
-  it('leaves CD and IDD alone — only the due date is excused', () => {
+  it('is not counted as a missing issue date either, but its CD still stands', () => {
     const t = task('p2', 'Waiting on the supplier', null, { section_id: 's1' });
     const built = buildIndex({
       projects: [{ id: 'p1', name: 'P', color: 'blue', parent_id: null, child_order: 1 }],
@@ -123,7 +123,7 @@ describe('work parked in a “keep pending” section', () => {
       tasks: [t],
       workspaces: [],
     });
+    expect(isMissingDate('idd', t, built)).toBe(false);
     expect(isMissingDate('cd', t, built)).toBe(true);
-    expect(isMissingDate('idd', t, built)).toBe(true);
   });
 });
