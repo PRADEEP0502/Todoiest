@@ -89,3 +89,41 @@ describe('a card’s count and the list it opens agree', () => {
     }
   });
 });
+
+describe('work parked in a “keep pending” section', () => {
+  const parked = (sectionName: string) => {
+    const t = task('p1', 'Waiting on the supplier', null, { section_id: 's1' });
+    const built = buildIndex({
+      projects: [{ id: 'p1', name: 'P', color: 'blue', parent_id: null, child_order: 1 }],
+      sections: [{ id: 's1', project_id: 'p1', name: sectionName, section_order: 1 }],
+      tasks: [t],
+      workspaces: [],
+    });
+    return isMissingDate('dd', t, built);
+  };
+
+  it('is not counted as a missing due date, however the section is written', () => {
+    expect(parked('KEEP PENDING 🚫🚫')).toBe(false);
+    expect(parked('Keep pending')).toBe(false);
+    expect(parked('Pending — client')).toBe(false);
+    expect(parked('ON HOLD')).toBe(false);
+  });
+
+  it('still counts everywhere else, including sections that only sound similar', () => {
+    expect(parked('FUTURE PROJECTS')).toBe(true);
+    expect(parked('HOLIDAYS WORK')).toBe(true);
+    expect(parked('Appointed')).toBe(true);
+  });
+
+  it('leaves CD and IDD alone — only the due date is excused', () => {
+    const t = task('p2', 'Waiting on the supplier', null, { section_id: 's1' });
+    const built = buildIndex({
+      projects: [{ id: 'p1', name: 'P', color: 'blue', parent_id: null, child_order: 1 }],
+      sections: [{ id: 's1', project_id: 'p1', name: 'KEEP PENDING 🚫🚫', section_order: 1 }],
+      tasks: [t],
+      workspaces: [],
+    });
+    expect(isMissingDate('cd', t, built)).toBe(true);
+    expect(isMissingDate('idd', t, built)).toBe(true);
+  });
+});

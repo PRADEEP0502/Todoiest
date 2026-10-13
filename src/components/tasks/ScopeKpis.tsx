@@ -120,7 +120,7 @@ export function ScopeKpis({
           items={[
             { label: 'No CD', icon: <CalendarPlus />, iconTone: 'info', value: lists['no-cd'].length, note: 'no Creation Date', ...card('no-cd') },
             { label: 'No IDD', icon: <LockKeyhole />, iconTone: 'warn', value: lists['no-idd'].length, note: 'no Issue Date', ...card('no-idd') },
-            { label: 'No DD', icon: <CalendarOff />, iconTone: 'warn', value: lists['no-dd'].length, note: 'no Due Date', ...card('no-dd') },
+            { label: 'No DD', icon: <CalendarOff />, iconTone: 'warn', value: lists['no-dd'].length, note: 'no Due Date · kept-pending left out', ...card('no-dd') },
           ]}
         />
       )}

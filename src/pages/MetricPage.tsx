@@ -47,7 +47,7 @@ export function MetricPage({ metric }: { metric: string }) {
       : id === 'mine'
         ? 'Open tasks Todoist records you as the holder of, in every project you can see.'
         : id === 'no-due'
-          ? 'Active tasks that have no due date in Todoist.'
+          ? 'Active tasks that have no due date in Todoist. Work parked in a “keep pending” section is left out — it is waiting on purpose.'
           : isCheck ? describeDateCheck(rules[id]) : describeCategory(id as (typeof CATEGORIES)[number]['id'], rules);
 
   return (

@@ -2,6 +2,7 @@ import { hasCd, hasIdd } from './cd';
 import type { TodoistTask, WorkspaceSnapshot } from '../types/todoist';
 import { daysBetween, dueDateKey, startOfDay, startOfMonth, toDateKey } from './dates';
 import type { WorkspaceIndex } from './hierarchy';
+import { isPendingTask } from './pending';
 import { isRoutineTask } from './routine';
 import { completedSince, isDueToday, isOverdue } from './stats';
 
@@ -69,7 +70,8 @@ export function isMissingDate(kind: DateKind, task: TodoistTask, index: Workspac
     case 'idd':
       return !isRoutineTask(task, index) && !hasIdd(task.content);
     case 'dd':
-      return !dueDateKey(task.due);
+      // Work parked in a "keep pending" section is waiting on purpose, not missing a date.
+      return !dueDateKey(task.due) && !isPendingTask(task, index);
   }
 }
 
