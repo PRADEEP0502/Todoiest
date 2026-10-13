@@ -1,4 +1,4 @@
-import { AlarmClock, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, FolderKanban, History, Hourglass, Inbox, Layers, LayoutDashboard, ListChecks, MessageSquare, PanelLeftClose, PanelLeftOpen, Settings, Sun, Tag, Users } from 'lucide-react';
+import { AlarmClock, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, FolderKanban, History, Hourglass, Inbox, Layers, LayoutDashboard, ListChecks, MessageSquare, PanelLeftClose, PanelLeftOpen, Settings, Sun, Tag, UserCheck, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useDisclosure } from '../../hooks/useDisclosure';
 import { useNow } from '../../hooks/useNow';
@@ -36,9 +36,18 @@ export function useNavLinks(route: Route): { main: NavLink[]; secondary: NavLink
   const today = snapshot?.tasks.filter((t) => isDueToday(t, todayKey)).length;
   const overdue = snapshot?.tasks.filter((t) => isOverdue(t, todayKey)).length;
 
+  const mineCount = snapshot?.tasks.filter((t) => t.responsible_uid === snapshot.user.id).length;
   const main: NavLink[] = [
-    { to: href.dashboard(), label: 'Dashboard', icon: <LayoutDashboard size={ICON} />, active: route.name === 'dashboard' || route.name === 'metric' },
+    { to: href.dashboard(), label: 'Dashboard', icon: <LayoutDashboard size={ICON} />, active: route.name === 'dashboard' || (route.name === 'metric' && route.metric !== 'mine') },
     { to: href.projects(), label: 'Projects', icon: <FolderKanban size={ICON} />, active: route.name === 'projects' || route.name === 'project', count: index?.orderedProjects.length, badge: 'grey' },
+    {
+      to: href.metric('mine'),
+      label: 'Assigned to me',
+      icon: <UserCheck size={ICON} />,
+      active: route.name === 'metric' && route.metric === 'mine',
+      count: mineCount,
+      badge: 'green',
+    },
     { to: href.today(), label: 'Today', icon: <Sun size={ICON} />, active: route.name === 'today', count: today, badge: 'green' },
     { to: href.overdue(), label: 'Overdue', icon: <AlarmClock size={ICON} />, active: route.name === 'overdue', count: overdue, badge: 'orange' },
     { to: href.holders(), label: 'Holder Wise', icon: <Users size={ICON} />, active: route.name === 'holders' || route.name === 'holder' },
@@ -53,9 +62,9 @@ export function useNavLinks(route: Route): { main: NavLink[]; secondary: NavLink
     { to: href.completed(), label: 'Completed', icon: <CheckCircle2 size={ICON} />, active: route.name === 'completed' },
   ];
   const groups: NavGroup[] = [
-    { label: null, links: main.slice(0, 4) },
-    { label: 'People & labels', links: main.slice(4, 6) },
-    { label: 'Updates', links: main.slice(6) },
+    { label: null, links: main.slice(0, 5) },
+    { label: 'People & labels', links: main.slice(5, 7) },
+    { label: 'Updates', links: main.slice(7) },
     { label: 'More views', links: secondary },
   ];
   return { main, secondary, groups };
@@ -209,7 +218,7 @@ export function Sidebar({ route }: { route: Route }) {
   // Wide screens have room for the full menu; a tablet does not, so there it starts as a rail
   // until it is opened. Once opened or closed by hand, that choice is what is remembered.
   const [open, toggleSidebar] = useDisclosure('sidebar:expanded', typeof window === 'undefined' || window.innerWidth >= 1024);
-  const [dashboard, projects, today, overdue, holders, labels, activity, comments, notifications, aging] = main;
+  const [dashboard, projects, mine, today, overdue, holders, labels, activity, comments, notifications, aging] = main;
   const [upcoming, completed] = secondary;
 
   // Top-level Todoist projects as tree items; the full list lives on the Projects page.
@@ -257,6 +266,7 @@ export function Sidebar({ route }: { route: Route }) {
 
       <nav id="sidebar-nav" className={`min-h-0 flex-1 space-y-1 overflow-y-auto pb-4 ${open ? 'px-4' : 'px-3'}`} aria-label="Main">
         <NavItem link={dashboard} collapsed={!open} />
+        <NavItem link={mine} collapsed={!open} />
         <TreeGroup id="projects" label="Projects" icon={projects.icon} to={href.projects()} items={projectItems} collapsed={!open} />
         <TreeGroup id="tasks" label="Tasks" icon={<ListChecks size={ICON} />} to={href.today()} items={[today, overdue, upcoming, completed]} collapsed={!open} />
         <NavItem link={holders} collapsed={!open} />

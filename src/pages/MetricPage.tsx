@@ -23,6 +23,7 @@ import { useWorkspace } from '../store/workspace';
 const TITLES: Record<string, string> = {
   active: 'Total Active Tasks',
   'no-due': 'No Due Date',
+  mine: 'Assigned to me',
   ...Object.fromEntries(CATEGORIES.map((c) => [c.id, c.label])),
   ...Object.fromEntries(DATE_CHECKS.map((c) => [c.id, c.label])),
 };
@@ -41,7 +42,13 @@ export function MetricPage({ metric }: { metric: string }) {
   const isCheck = id === 'noCd' || id === 'noIdd';
   const isCategory = CATEGORIES.some((c) => c.id === id);
   const description =
-    id === 'active' ? 'Every open task in Todoist, subtasks included.' : id === 'no-due' ? 'Active tasks that have no due date in Todoist.' : isCheck ? describeDateCheck(rules[id]) : describeCategory(id as (typeof CATEGORIES)[number]['id'], rules);
+    id === 'active'
+      ? 'Every open task in Todoist, subtasks included.'
+      : id === 'mine'
+        ? 'Open tasks Todoist records you as the holder of, in every project you can see.'
+        : id === 'no-due'
+          ? 'Active tasks that have no due date in Todoist.'
+          : isCheck ? describeDateCheck(rules[id]) : describeCategory(id as (typeof CATEGORIES)[number]['id'], rules);
 
   return (
     <Gate>

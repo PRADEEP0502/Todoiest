@@ -35,3 +35,25 @@ describe('project board columns', () => {
     expect(parseHash('#/projects/p7?by=nonsense')).toMatchObject({ by: 'section' });
   });
 });
+
+describe('one holder inside a project', () => {
+  it('round-trips a person, this account, and the unheld tasks', () => {
+    expect(href.project('p7', { holder: 'u9' })).toBe('#/projects/p7?holder=u9');
+    expect(parseHash(href.project('p7', { holder: 'u9' }))).toMatchObject({ name: 'project', holder: 'u9' });
+    expect(parseHash(href.project('p7', { holder: 'me' }))).toMatchObject({ holder: 'me' });
+    expect(parseHash(href.project('p7', { holder: 'none' }))).toMatchObject({ holder: 'none' });
+  });
+
+  it('keeps the filter beside a KPI card and the assignee board', () => {
+    expect(parseHash(href.project('p7', { show: 'no-dd', by: 'assignee', holder: 'me' }))).toMatchObject({
+      show: 'no-dd',
+      by: 'assignee',
+      holder: 'me',
+    });
+  });
+
+  it('is everyone when nobody was picked', () => {
+    expect(href.project('p7')).toBe('#/projects/p7');
+    expect(parseHash('#/projects/p7')).toMatchObject({ holder: null });
+  });
+});

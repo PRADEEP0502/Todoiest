@@ -35,7 +35,7 @@ function Page({ route, visit }: { route: Route; visit: number }) {
     case 'projects':
       return <ProjectsPage />;
     case 'project':
-      return <ProjectDetailPage projectId={route.projectId} sectionId={route.sectionId} taskId={route.taskId} show={route.show} by={route.by} visit={visit} />;
+      return <ProjectDetailPage projectId={route.projectId} sectionId={route.sectionId} taskId={route.taskId} show={route.show} by={route.by} holder={route.holder} visit={visit} />;
     case 'overdue':
       return <OverduePage category={route.category} />;
     case 'aging':

@@ -167,7 +167,7 @@ export function describeDateCheck(rule: DateCheckRule): string {
 }
 
 /** Every drill-down list the dashboard links to. */
-export type MetricId = 'active' | 'no-due' | DateCheckId | CategoryId;
+export type MetricId = 'active' | 'no-due' | 'mine' | DateCheckId | CategoryId;
 
 export function metricTasks(metric: MetricId, snapshot: WorkspaceSnapshot, index: WorkspaceIndex, rules: MetricRules, now: Date): TodoistTask[] {
   const todayKey = toDateKey(now);
@@ -176,6 +176,9 @@ export function metricTasks(metric: MetricId, snapshot: WorkspaceSnapshot, index
       return snapshot.tasks;
     case 'no-due':
       return snapshot.tasks.filter((t) => isMissingDate('dd', t, index));
+    case 'mine':
+      // Whoever this dashboard is signed in as, across every project they can see.
+      return snapshot.tasks.filter((t) => t.responsible_uid === snapshot.user.id);
     case 'noCd':
     case 'noIdd':
       return isDateCheckConfigured(rules[metric]) ? snapshot.tasks.filter((t) => matchesDateCheck(t, rules[metric], index)) : [];

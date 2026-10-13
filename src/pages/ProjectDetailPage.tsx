@@ -7,13 +7,15 @@ import { GroupedTasks } from '../components/tasks/GroupedTasks';
 import { TaskBoard } from '../components/tasks/TaskBoard';
 import { CompletedList } from '../components/tasks/CompletedList';
 import { ScopeKpis, scopeLists, VIEW_TITLE } from '../components/tasks/ScopeKpis';
-import { Count, EmptyState, ProjectDot, ShowMore } from '../components/common/ui';
+import { Avatar, Count, EmptyState, ProjectDot, ShowMore } from '../components/common/ui';
+import { SearchSelect } from '../components/common/SearchSelect';
+import { peopleForProject } from '../lib/projectPeople';
 import { NewSectionDialog } from '../components/projects/CreateDialogs';
 import { AssigneeBoard } from '../components/projects/AssigneeBoard';
 import { ProjectBoard } from '../components/projects/ProjectBoard';
 import { ProjectSections, projectBlockKeys } from '../components/projects/ProjectSections';
 import { disclosureKey, isOpen, setOpen, useDisclosureState } from '../hooks/useDisclosure';
-import { href, type HolderView } from '../hooks/useRoute';
+import { href, navigate, type HolderView } from '../hooks/useRoute';
 import { PERSONAL_GROUP_ID, type WorkspaceIndex } from '../lib/hierarchy';
 import { useNow } from '../hooks/useNow';
 import { usePaged } from '../hooks/usePaged';
@@ -34,6 +36,8 @@ interface Props {
   show: HolderView | null;
   /** What the board's columns stand for: the project's sections, or the people on it. */
   by: 'section' | 'assignee';
+  /** Only one person's work: a Todoist id, "me" for this account, or "none" for unheld tasks. */
+  holder: string | null;
   /** Changes on every navigation, so picking the same search result again re-reveals it. */
   visit: number;
 }
@@ -42,7 +46,7 @@ export function ProjectDetailPage(props: Props) {
   return <Gate>{({ index, snapshot }) => <ProjectDetail {...props} index={index} snapshot={snapshot} />}</Gate>;
 }
 
-function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, by, visit }: Props & { index: WorkspaceIndex; snapshot: WorkspaceSnapshot }) {
+function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, by, holder, visit }: Props & { index: WorkspaceIndex; snapshot: WorkspaceSnapshot }) {
   const { openNewTask } = useUi();
   const { settings } = useWorkspace();
   const now = useNow(60_000);
@@ -75,12 +79,28 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, by
   const childProjects = index.orderedProjects.filter((n) => n.project.parent_id === project.id).map((n) => n.project);
   const blockKeys = projectBlockKeys(index, project.id);
 
-  // Everything below counts this project's own tasks and nothing else.
-  const projectTasks = [...index.taskById.values()].filter((t) => t.project_id === project.id);
+  // Everything below counts this project's own tasks and nothing else — and, when a holder has
+  // been picked, only the ones that person holds. Every card, list and board on the page follows it.
+  const holderId = holder === 'me' ? (snapshot.user.id ?? null) : holder;
+  const allProjectTasks = [...index.taskById.values()].filter((t) => t.project_id === project.id);
+  const projectTasks = holderId
+    ? allProjectTasks.filter((t) => (holderId === 'none' ? !t.responsible_uid : t.responsible_uid === holderId))
+    : allProjectTasks;
+  const holderName =
+    holderId === 'none' ? 'No holder' : holderId ? (snapshot.people[holderId]?.name ?? 'Someone') : null;
+  // Everyone the project's tasks can be filtered by: the people on it, and anyone still holding one.
+  const projectPeople = peopleForProject(snapshot, project.id);
+  for (const id of new Set(allProjectTasks.map((t) => t.responsible_uid).filter((id): id is string => !!id))) {
+    if (!projectPeople.some((p) => p.id === id) && snapshot.people[id]) projectPeople.push(snapshot.people[id]);
+  }
   const lists = scopeLists(projectTasks, index, rules, now);
-  const completed = completedSince(snapshot.completed, startOfMonth(now)).filter((t) => t.project_id === project.id);
-  const comments = snapshot.comments.filter((c) => index.taskById.get(c.task_id)?.project_id === project.id);
-  const card = (view: HolderView) => ({ href: href.project(project.id, { show: view }), selected: show === view });
+  const completed = completedSince(snapshot.completed, startOfMonth(now))
+    .filter((t) => t.project_id === project.id)
+    .filter((t) => !holderId || (holderId === 'none' ? !t.responsible_uid : t.responsible_uid === holderId));
+  const comments = snapshot.comments
+    .filter((c) => index.taskById.get(c.task_id)?.project_id === project.id)
+    .filter((c) => !holderId || holderId === 'none' || c.posted_uid === holderId);
+  const card = (view: HolderView) => ({ href: href.project(project.id, { show: view, by, holder }), selected: show === view });
   const shownTasks = show && show !== 'completed' && show !== 'comments' ? lists[show] : [];
   // Searching lists this project's matching tasks (subtasks included), already opened.
   const searching = query.trim().length > 0;
@@ -175,6 +195,32 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, by
       {/* Stays in view while scrolling a long project, so the search is always at hand. */}
       <div className="sticky top-0 z-10 -mx-2 mb-2.5 flex flex-wrap items-center gap-2 bg-canvas/95 px-2 py-2 backdrop-blur">
         <SearchField className="min-w-0 flex-1 sm:max-w-sm" value={query} onChange={setQuery} label={`Search tasks in ${project.name}`} placeholder={`Search tasks in ${project.name}…`} />
+        {/* One person's work in this project, cards and all. */}
+        <SearchSelect
+          aria-label="Show only one holder's tasks"
+          className="w-auto min-w-44"
+          placeholder="Holder: anyone"
+          searchPlaceholder="Search people…"
+          value={holder ?? ''}
+          onChange={(value) => navigate(href.project(project.id, { show, by, holder: value || null }))}
+          options={[
+            { value: '', label: 'Holder: anyone' },
+            ...(snapshot.user.id && projectPeople.some((p) => p.id === snapshot.user.id)
+              ? [{ value: 'me', label: 'Assigned to me', icon: <Avatar id={snapshot.user.id} name={snapshot.user.full_name} size={18} /> }]
+              : []),
+            ...projectPeople.map((person) => ({
+              value: person.id,
+              label: person.name,
+              icon: <Avatar id={person.id} name={person.name} size={18} />,
+            })),
+            { value: 'none', label: 'No holder' },
+          ]}
+        />
+        {holderName && (
+          <a href={href.project(project.id, { show, by })} className="filter-chip" title="Show everyone's tasks again">
+            {holder === 'me' ? 'Assigned to me' : holderName} <X size={12} />
+          </a>
+        )}
         {show && !searching && (
           <span className="flex items-center gap-2 text-[12.5px]">
             <span className="font-semibold text-ink">{VIEW_TITLE[show]}</span>
@@ -222,6 +268,16 @@ function ProjectDetail({ index, snapshot, projectId, sectionId, taskId, show, by
             <TaskBoard tasks={shownTasks} compare={byPriorityThenTime} />
           ) : (
             <GroupedTasks tasks={shownTasks} viewKey={`project-view:${project.id}:${show}`} compare={byPriorityThenTime} defaultOpen />
+          )}
+        </div>
+      ) : holderId ? (
+        <div className={board && projectTasks.length > 0 ? '' : 'panel px-3 py-2'}>
+          {projectTasks.length === 0 ? (
+            <EmptyState title={`Nothing in ${project.name} is held by ${holder === 'me' ? 'you' : holderName}`} />
+          ) : board ? (
+            <TaskBoard tasks={projectTasks} compare={byPriorityThenTime} />
+          ) : (
+            <GroupedTasks tasks={projectTasks} viewKey={`project-holder:${project.id}:${holderId}`} compare={byPriorityThenTime} defaultOpen />
           )}
         </div>
       ) : board ? (
