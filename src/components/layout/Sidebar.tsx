@@ -206,7 +206,9 @@ export function Sidebar({ route }: { route: Route }) {
   const { main, secondary } = useNavLinks(route);
   const { index } = useWorkspace();
   // Opening and closing the sidebar is remembered on this device.
-  const [open, toggleSidebar] = useDisclosure('sidebar:expanded', true);
+  // Wide screens have room for the full menu; a tablet does not, so there it starts as a rail
+  // until it is opened. Once opened or closed by hand, that choice is what is remembered.
+  const [open, toggleSidebar] = useDisclosure('sidebar:expanded', typeof window === 'undefined' || window.innerWidth >= 1024);
   const [dashboard, projects, today, overdue, holders, labels, activity, comments, notifications, aging] = main;
   const [upcoming, completed] = secondary;
 

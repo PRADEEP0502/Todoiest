@@ -145,7 +145,7 @@ export function MetricStrip({ items, columns, size = 'lg', label }: { items: Met
       {items.map((m) => {
         const danger = m.tone === 'danger' && (m.value ?? 0) > 0;
         const tone: IconTone = m.value === null ? 'neutral' : danger ? 'danger' : (m.iconTone ?? 'neutral');
-        const cardClass = `panel group relative flex h-full w-full min-w-0 flex-col text-left transition-shadow hover:shadow-pill ${lg ? 'px-4 py-4 sm:px-5' : 'rounded-[20px] px-3.5 py-3.5 sm:px-4'} ${m.selected ? 'shadow-pill ring-2 ring-ink/80' : ''}`;
+        const cardClass = `panel group relative flex h-full w-full min-w-0 flex-col text-left transition-shadow hover:shadow-pill ${lg ? 'px-4 py-3.5 sm:px-5 sm:py-4' : 'rounded-[20px] px-3.5 py-3 sm:px-4 lg:py-3.5'} ${m.selected ? 'shadow-pill ring-2 ring-ink/80' : ''}`;
         const body = (
           <>
             <span className="flex min-w-0 items-start gap-2 pr-4 sm:gap-2.5">
@@ -154,17 +154,17 @@ export function MetricStrip({ items, columns, size = 'lg', label }: { items: Met
               <span className={`min-w-0 break-normal font-semibold leading-tight text-ink [hyphens:none] ${lg ? 'text-[13.5px]' : 'text-[13px]'}`}>{m.label}</span>
             </span>
             {/* Fixed-height value row, so a card that says "Set up" is exactly as tall as one with a number. */}
-            <span className={`flex items-center ${lg ? 'mt-3 h-10' : 'mt-2.5 h-8'}`}>
+            <span className={`flex items-center ${lg ? 'mt-2.5 h-9 sm:mt-3 sm:h-10' : 'mt-2 h-7 lg:mt-2.5 lg:h-8'}`}>
               {m.value === null ? (
                 <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-black/[0.05] px-2.5 text-[12.5px] font-medium text-ink-2 transition-colors group-hover:bg-black/[0.08]">
                   <Settings2 size={13} aria-hidden /> Set up
                 </span>
               ) : (
-                <span className={`font-semibold tabular-nums tracking-[-0.04em] ${lg ? 'text-[34px] leading-10' : 'text-[27px] leading-8'} ${danger ? 'text-p1' : 'num-fade'}`}>{m.value}</span>
+                <span className={`font-semibold tabular-nums tracking-[-0.04em] ${lg ? 'text-[30px] leading-9 sm:text-[34px] sm:leading-10' : 'text-[24px] leading-7 lg:text-[27px] lg:leading-8'} ${danger ? 'text-p1' : 'num-fade'}`}>{m.value}</span>
               )}
             </span>
             {m.note && <span className="mt-1 break-words text-[12px] font-medium leading-[17px] text-ink-2">{m.note}</span>}
-            {m.onSelect ? null : <ArrowUpRight size={14} aria-hidden className="absolute right-3.5 top-3.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />}
+            {m.onSelect ? null : <ArrowUpRight size={14} aria-hidden className="absolute right-3.5 top-3.5 text-ink-3 opacity-0 transition-opacity touch:opacity-60 group-hover:opacity-100" />}
           </>
         );
         return (

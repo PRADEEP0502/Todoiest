@@ -125,8 +125,8 @@ export function BoardCard({
           </button>
 
           {/* On a pointer, the handles appear on hover, so a resting card is only its content.
-              A touch screen has no hover, so there they are always there. */}
-          <span className="-mr-1 flex shrink-0 items-center transition-opacity focus-within:opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100">
+              A touch screen has nothing to hover with, so there they are always there. */}
+          <span className="-mr-1 flex shrink-0 items-center transition-opacity focus-within:opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 touch:!opacity-100">
             <button
               type="button"
               onClick={() => openNewTask({ parentId: task.id })}
@@ -147,7 +147,7 @@ export function BoardCard({
                 <CornerUpRight size={14} />
               </button>
             )}
-            <span className="hidden cursor-grab text-ink-3 sm:inline-flex" title="Drag to another column" aria-hidden>
+            <span className="hidden cursor-grab text-ink-3 sm:inline-flex touch:!hidden" title="Drag to another column" aria-hidden>
               <GripVertical size={14} />
             </span>
           </span>

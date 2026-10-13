@@ -24,6 +24,16 @@
   }
 }
 
+/* A finger needs more room than a cursor, on a tablet as much as on a phone. */
+@media (pointer: coarse) {
+  .icon-btn {
+    @apply h-10 w-10;
+  }
+  .field {
+    @apply h-11;
+  }
+}
+
 @layer components {
   .btn {
     @apply inline-flex h-9 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[13px] font-medium transition-[background-color,box-shadow,color] disabled:cursor-not-allowed disabled:opacity-50;

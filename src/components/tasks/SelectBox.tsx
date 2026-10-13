@@ -24,9 +24,9 @@ export function SelectBox({ task, className = '' }: { task: TodoistTask; classNa
         e.stopPropagation();
         toggle(task.id);
       }}
-      className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border transition-all ${
+      className={`relative flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border transition-all before:absolute before:-inset-2.5 before:content-[''] ${
         picked ? 'border-accent bg-accent text-white' : 'border-line-strong bg-surface text-transparent hover:border-ink-3'
-      } ${picked || count > 0 ? '' : 'opacity-0 group-hover:opacity-100 group-hover/card:opacity-100 focus:opacity-100'} ${className}`}
+      } ${picked || count > 0 ? '' : 'opacity-0 touch:opacity-100 group-hover:opacity-100 group-hover/card:opacity-100 focus:opacity-100'} ${className}`}
     >
       <Check size={12} strokeWidth={3} />
     </button>

@@ -41,5 +41,9 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `touch:` applies on a screen with no pointer to hover with — a tablet or a phone — where
+    // anything that only appears on hover would otherwise never be seen.
+    ({ addVariant }) => addVariant('touch', '@media (hover: none)'),
+  ],
 };

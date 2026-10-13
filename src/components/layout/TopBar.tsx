@@ -36,8 +36,18 @@ export function TopBar({ route }: { route: Route }) {
   return (
     <>
       {/* Desktop */}
-      <header className="hidden h-[76px] shrink-0 items-center gap-4 pl-4 pr-8 pt-3 md:flex lg:pr-10">
-        <div className="min-w-0 max-w-md flex-1">
+      <header className="hidden h-[76px] shrink-0 items-center gap-3 pl-4 pr-6 pt-3 md:flex lg:gap-4 lg:pr-10">
+        {/* A tablet has no room for a search field beside everything else, so it opens as a sheet. */}
+        <button
+          type="button"
+          className="icon-btn lg:hidden"
+          onClick={() => setSearching(true)}
+          aria-label="Search tasks, projects, people"
+          title="Search"
+        >
+          <Search size={18} />
+        </button>
+        <div className="hidden min-w-0 max-w-md flex-1 lg:block">
           <SearchBox />
         </div>
         <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2">
@@ -75,8 +85,9 @@ export function TopBar({ route }: { route: Route }) {
         </div>
       </header>
 
+      {/* Up to a wide screen the search opens over the page — a phone and a tablet both use it. */}
       {searching && (
-        <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-surface p-3 md:hidden">
+        <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-surface p-3 lg:hidden">
           <div className="flex items-center gap-2">
             <SearchBox autoFocus inline onDone={() => setSearching(false)} />
             <button type="button" className="btn-ghost" onClick={() => setSearching(false)} aria-label="Close search">

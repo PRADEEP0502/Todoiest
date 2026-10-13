@@ -80,7 +80,7 @@ function ProjectBlock({
           <Count>{group.count}</Count>
         </button>
         <AddHere projectId={group.project.id} sectionId={null} label={group.project.name} addDefaults={addDefaults} />
-        <a href={href.project(group.project.id)} className="icon-btn opacity-0 group-hover:opacity-100 focus:opacity-100" aria-label={`Open ${group.project.name}`}>
+        <a href={href.project(group.project.id)} className="icon-btn opacity-0 touch:opacity-100 group-hover:opacity-100 focus:opacity-100" aria-label={`Open ${group.project.name}`}>
           <ArrowUpRight size={15} />
         </a>
       </div>
