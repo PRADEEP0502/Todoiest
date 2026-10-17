@@ -7,12 +7,17 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   width?: string;
+  /**
+   * Clicking the page behind the dialog. By default that closes it; a form that would lose work
+   * can save instead, as the task dialog does.
+   */
+  onClickAway?: () => void;
 }
 
 /** Dialogs open right now, oldest first. A dialog can open another one on top of itself. */
 const stack: symbol[] = [];
 
-export function Modal({ title, onClose, children, footer, width = 'max-w-lg' }: ModalProps) {
+export function Modal({ title, onClose, children, footer, width = 'max-w-lg', onClickAway }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,7 +40,10 @@ export function Modal({ title, onClose, children, footer, width = 'max-w-lg' }: 
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/20 backdrop-blur-[2px] sm:items-start sm:p-6 sm:pt-[10vh]" onMouseDown={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/20 backdrop-blur-[2px] sm:items-start sm:p-6 sm:pt-[10vh]"
+      onMouseDown={onClickAway ?? onClose}
+    >
       <div
         ref={panel}
         role="dialog"

@@ -190,9 +190,21 @@ function TaskEditor({ task, defaults, onClose }: { task?: TodoistTask; defaults?
     </>
   );
 
+  /**
+   * Clicking away from a half-written task would throw it away, so it is written instead: the same
+   * save the button does, with the same rules. Nothing to save simply closes.
+   */
+  const clickAway = () => {
+    if (busy) return onClose();
+    if (confirmDelete) return setConfirmDelete(false);
+    if (valid && (!task || dirty)) void submit();
+    else onClose();
+  };
+
   return (
     <Modal
       onClose={onClose}
+      onClickAway={clickAway}
       title={
         task ? (
           <span className="block truncate">{taskPath(index, task).join(' › ')}</span>
